@@ -199,13 +199,13 @@
     "compile": "webpack --mode development",
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && tsc -p ./src/test/tsconfig.json",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/diff": "^5.0.9",
-    "@types/mocha": "^10.0.1",
+    "@types/mocha": "^10.0.10",
     "@types/node": "16.x",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
@@ -218,5 +218,8 @@
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "mocha": "^11.7.1"
   }
 }
