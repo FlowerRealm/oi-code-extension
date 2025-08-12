@@ -1,0 +1,16 @@
+# Node.js
+node_modules/
+npm-debug.log*
+
+# VS Code
+.vscode/*.log
+.vscode/*.bak
+.vscode/*.code-workspace
+*.vsix
+
+# Build artifacts
+dist/
+out/
+
+# macOS
+.DS_Store

@@ -1,0 +1,222 @@
+{
+  "name": "oi-code",
+  "displayName": "OI Init",
+  "description": "Initial setup for OI IDE",
+  "version": "0.0.1",
+  "publisher": "oi-code",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "*"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "oi-code.showWelcomePage",
+        "title": "OI-Code: 重新初始化"
+      },
+      {
+        "command": "oi-code.showSettingsPage",
+        "title": "OI-Code: 打开设置IDE"
+      },
+      {
+        "command": "oicode.startPairCheck",
+        "title": "OI-Code: 对拍"
+      },
+      {
+        "command": "oicode.runCode",
+        "title": "OI-Code: 运行"
+      },
+      {
+        "command": "oicode.initializeEnvironment",
+        "title": "OI-Code: 初始化编译环境"
+      },
+      {
+        "command": "oicode.downloadDocker",
+        "title": "OI-Code: 安装Docker"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "oicode.startPairCheck",
+          "group": "navigation",
+          "icon": "$(compare-changes)"
+        },
+        {
+          "command": "oicode.runCode",
+          "group": "navigation",
+          "icon": "$(play)"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "oicode-panel",
+          "title": "OI-Code",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ]
+    },
+    "views": {
+      "oicode-panel": [
+        {
+          "id": "oicode.pairCheckView",
+          "name": "对拍",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OI-Code Configuration",
+      "properties": {
+        "oicode.docker.compilers": {
+          "type": "object",
+          "description": "Configure Docker compiler commands and arguments for different languages.",
+          "properties": {
+            "cpp": {
+              "type": "object",
+              "description": "C++ compiler settings for Docker.",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "The C++ compiler command (e.g., 'g++')."
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Arguments for the C++ compiler. Use /sandbox/${sourceFile} for source, /tmp/a.out for output."
+                }
+              },
+              "default": {
+                "command": "g++",
+                "args": [
+                  "/sandbox/${sourceFile}",
+                  "-o",
+                  "/tmp/a.out",
+                  "-O2",
+                  "-std=c++17"
+                ]
+              }
+            },
+            "c": {
+              "type": "object",
+              "description": "C compiler settings for Docker.",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "The C compiler command (e.g., 'gcc')."
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Arguments for the C compiler. Use /sandbox/${sourceFile} for source, /tmp/a.out for output."
+                }
+              },
+              "default": {
+                "command": "gcc",
+                "args": [
+                  "/sandbox/${sourceFile}",
+                  "-o",
+                  "/tmp/a.out",
+                  "-O2"
+                ]
+              }
+            },
+            "python": {
+              "type": "object",
+              "description": "Python interpreter settings for Docker.",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": "The Python interpreter command (e.g., 'python3')."
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Arguments for the Python interpreter. Use /sandbox/${sourceFile} for source."
+                }
+              },
+              "default": {
+                "command": "python3",
+                "args": [
+                  "/sandbox/${sourceFile}"
+                ]
+              }
+            }
+          }
+        },
+        "oi-code.language.c.Command": {
+          "type": "string",
+          "description": "Path to the C compiler (e.g., /usr/bin/gcc)."
+        },
+        "oi-code.language.c.Args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments for the C compiler (e.g., -Wall -O2 -std=c11)."
+        },
+        "oi-code.language.cpp.Command": {
+          "type": "string",
+          "description": "Path to the C++ compiler (e.g., /usr/bin/g++)."
+        },
+        "oi-code.language.cpp.Args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments for the C++ compiler (e.g., -Wall -O2 -std=c++17)."
+        },
+        "oi-code.language.python.Command": {
+          "type": "string",
+          "description": "Path to the Python interpreter (e.g., /usr/bin/python3)."
+        },
+        "oi-code.language.python.Args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments for the Python interpreter (e.g., -u)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack --mode development",
+    "watch": "webpack --watch --mode development",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.0.9",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/test-electron": "^2.3.4",
+    "copy-webpack-plugin": "^13.0.0",
+    "diff": "^5.2.0",
+    "eslint": "^8.47.0",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.1.6",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  }
+}

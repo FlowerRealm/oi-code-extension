@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI-Code 初始化完成</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        html[data-theme='light'] { --pico-background-color: #f9f9f9; --pico-color: #111827; --pico-h1-color: #111827; --pico-muted-color: #6b7280; --pico-contrast: #1f2937; --pico-contrast-inverse: #ffffff; --pico-primary: #43a047; --pico-primary-inverse: #ffffff; --pico-card-background-color: #ffffff; --pico-card-border-color: #e5e7eb; }
+        html[data-theme='dark'] { --pico-background-color: #1e1e1e; --pico-color: #d4d4d4; --pico-h1-color: #ffffff; --pico-muted-color: #a5a5a5; --pico-contrast: #ffffff; --pico-contrast-inverse: #000000; --pico-primary: #60a5fa; --pico-primary-inverse: #000000; --pico-card-background-color: #252526; --pico-card-border-color: #3c3c3c; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <article>
+            <h2>初始化完成！</h2>
+            <p>您的 OI-Code 环境已准备就绪。</p>
+            <div class="grid">
+                <button id="experience-now-btn">立即体验</button>
+                <button id="continue-config-btn" class="secondary">继续配置功能</button>
+            </div>
+        </article>
+    </main>
+    <script>
+        const vscode = acquireVsCodeApi();
+        document.getElementById('experience-now-btn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'close' });
+        });
+        document.getElementById('continue-config-btn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'continue-config' });
+        });
+        window.addEventListener('message', event => {
+            const message = event.data;
+            switch (message.command) {
+                case 'set-theme':
+                    document.documentElement.setAttribute('data-theme', message.theme);
+                    break;
+            }
+        });
+        vscode.postMessage({ command: 'get-theme' });
+    </script>
+</body>
+</html>

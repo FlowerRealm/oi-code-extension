@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OI-Code 设置</title>
+    <style>
+        :root {
+            --side-bar-background: #f0f0f0;
+            --input-background: #ffffff;
+            --input-foreground: #333333;
+            --foreground: #333333;
+            --background: #ffffff;
+            --border-color: #cccccc;
+            --focus-border: #007acc;
+            --list-hover-background: #e8e8e8;
+            --list-active-selection-background: #cce5ff;
+            --header-border: #e7e7e7;
+        }
+
+        html[data-theme='dark'] {
+            --side-bar-background: #252526;
+            --input-background: #3C3C3C;
+            --input-foreground: #CCCCCC;
+            --foreground: #CCCCCC;
+            --background: #1E1E1E;
+            --border-color: #3C3C3C;
+            --focus-border: #007FD4;
+            --list-hover-background: #2A2D2E;
+            --list-active-selection-background: #094771;
+            --header-border: #3c3c3c;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            color: var(--foreground);
+            background-color: var(--background);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .settings-wrapper {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 20px;
+            border-bottom: 1px solid var(--header-border);
+            flex-shrink: 0;
+        }
+
+        header input[type="search"] {
+            width: 100%;
+            padding: 8px;
+            background-color: var(--input-background);
+            color: var(--input-foreground);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+        }
+
+        header input[type="search"]:focus {
+            outline: none;
+            border-color: var(--focus-border);
+        }
+
+        nav {
+            width: 250px;
+            background-color: var(--side-bar-background);
+            padding: 10px 0;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        nav li {
+            padding: 10px 20px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        nav li:hover {
+            background-color: var(--list-hover-background);
+        }
+
+        nav li.active {
+            background-color: var(--list-active-selection-background);
+        }
+
+        main {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .setting-item {
+            margin-bottom: 20px;
+        }
+
+        .setting-item label {
+            display: block;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .setting-item p {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 0;
+        }
+
+        .setting-item input,
+        .setting-item select {
+            width: 100%;
+            max-width: 500px;
+            padding: 8px;
+            background-color: var(--input-background);
+            color: var(--input-foreground);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+        }
+
+        h2 {
+            scroll-margin-top: 20px;
+            /* Offset for scroll-into-view */
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <input type="search" id="search-box" placeholder="搜索设置">
+    </header>
+    <div class="settings-wrapper">
+        <nav id="categories-nav"></nav>
+        <main id="settings-main"></main>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        const searchBox = document.getElementById('search-box');
+        const categoriesNav = document.getElementById('categories-nav');
+        const settingsMain = document.getElementById('settings-main');
+        let fullSettingsData = {};
+        let intersectionObserver;
+
+        // --- Event Listeners ---
+        searchBox.addEventListener('input', (e) => {
+            renderSettings(fullSettingsData, e.target.value);
+        });
+
+        window.addEventListener('message', event => {
+            const message = event.data;
+            switch (message.command) {
+                case 'loadSettings':
+                    fullSettingsData = message.data;
+                    renderCategories(fullSettingsData);
+                    renderSettings(fullSettingsData);
+                    break;
+                case 'set-theme':
+                    document.documentElement.setAttribute('data-theme', message.theme);
+                    break;
+            }
+        });
+
+        // --- Functions ---
+        function renderCategories(settings) {
+            categoriesNav.innerHTML = '';
+            const ul = document.createElement('ul');
+            for (const categoryName in settings) {
+                const li = document.createElement('li');
+                li.textContent = categoryName;
+                li.dataset.category = categoryName;
+                li.addEventListener('click', () => {
+                    const categoryId = `category-anchor-${categoryName.replace(/\s+/g, '-')}`;
+                    const targetElement = document.getElementById(categoryId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+                ul.appendChild(li);
+            }
+            categoriesNav.appendChild(ul);
+        }
+
+        function renderSettings(settings, filter = '') {
+            if (intersectionObserver) intersectionObserver.disconnect();
+            settingsMain.innerHTML = '';
+            const lowerCaseFilter = filter.toLowerCase();
+
+            intersectionObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const id = entry.target.id;
+                    const categoryName = id.replace('category-anchor-', '').replace(/-/g, ' ');
+                    const navLink = categoriesNav.querySelector(`li[data-category="${categoryName}"]`);
+                    if (entry.isIntersecting && navLink) {
+                        let currentlyActive = categoriesNav.querySelector('li.active');
+                        if (currentlyActive) currentlyActive.classList.remove('active');
+                        navLink.classList.add('active');
+                    }
+                });
+            }, { root: settingsMain, threshold: 0.2 });
+
+            for (const categoryName in settings) {
+                const categoryData = settings[categoryName];
+                const filteredData = categoryData.filter(item =>
+                    item.name.toLowerCase().includes(lowerCaseFilter) ||
+                    (item.description && item.description.toLowerCase().includes(lowerCaseFilter))
+                );
+
+                if (filteredData.length === 0) continue;
+
+                const categoryTitle = document.createElement('h2');
+                categoryTitle.textContent = categoryName;
+                categoryTitle.id = `category-anchor-${categoryName.replace(/\s+/g, '-')}`;
+                settingsMain.appendChild(categoryTitle);
+                intersectionObserver.observe(categoryTitle);
+
+                filteredData.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'setting-item';
+
+                    const label = document.createElement('label');
+                    label.textContent = item.name;
+                    label.htmlFor = `setting-input-${item.vscode_setting_id}`;
+                    div.appendChild(label);
+
+                    if (item.type === 'fill') {
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.id = `setting-input-${item.vscode_setting_id}`;
+                        input.value = item.value || '';
+                        input.addEventListener('change', (e) => vscode.postMessage({ command: 'saveSetting', id: item.vscode_setting_id, value: e.target.value }));
+                        div.appendChild(input);
+                    } else if (item.type === 'select') {
+                        const select = document.createElement('select');
+                        select.id = `setting-input-${item.vscode_setting_id}`;
+                        item.options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            if (opt.value === item.value) option.selected = true;
+                            select.appendChild(option);
+                        });
+                        select.addEventListener('change', (e) => vscode.postMessage({ command: 'saveSetting', id: item.vscode_setting_id, value: e.target.value }));
+                        div.appendChild(select);
+                    }
+                    else if (item.type === 'search') {
+                        // search
+                    }
+
+                    const description = document.createElement('p');
+                    description.textContent = item.description;
+                    div.appendChild(description);
+
+                    settingsMain.appendChild(div);
+                });
+            }
+        }
+
+        // --- Initial Load ---
+        function initialLoad() {
+            vscode.postMessage({ command: 'getSettings' });
+            vscode.postMessage({ command: 'get-theme' });
+        }
+
+        initialLoad();
+    </script>
+</body>
+
+</html>

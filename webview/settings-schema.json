@@ -1,0 +1,74 @@
+{
+    "IDE 配置": [
+        {
+            "name": "主题",
+            "description": "修改 OI-Code 的主题",
+            "type": "api",
+            "value": "",
+            "vscode_api": "workbench.action.selectTheme"
+        },
+        {
+            "name": "字体",
+            "description": "修改 OI-Code 的主题",
+            "type": "search",
+            "search_thing": "font",
+            "value": "",
+            "vscode_setting_id": ""
+        },
+        {
+            "name": "保存时格式化文件",
+            "description": "在保存时自动格式化文件",
+            "type": "",
+            "value": "",
+            "vscode_setting_id": "editor.formatOnSave"
+        }
+    ],
+    "C 语言配置": [
+        {
+            "name": "C 编译器",
+            "description": "用于编译和运行 C 文件的编译器路径. 例如: /usr/bin/gcc",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.c.Command"
+        },
+        {
+            "name": "C 编译参数",
+            "description": "C 语言的编译参数. 例如: -Wall -O2 -std=c++11",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.c.Args"
+        }
+    ],
+    "C++ 语言配置": [
+        {
+            "name": "C++ 编译器",
+            "description": "用于编译和运行 C++ 文件的编译器路径. 例如: /usr/bin/g++",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.cpp.Command"
+        },
+        {
+            "name": "C++ 编译参数",
+            "description": "C++ 语言的编译参数. 例如: -Wall -O2 -std=c++11",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.cpp.Args"
+        }
+    ],
+    "Python 语言配置": [
+        {
+            "name": "Python 解释器",
+            "description": "用于执行 Python 文件的解释器路径. 例如: /usr/bin/python",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.python.Command"
+        },
+        {
+            "name": "Python 编译参数",
+            "description": "Python 语言的编译参数. 例如: -Wignore -u",
+            "type": "fill",
+            "value": "",
+            "vscode_setting_id": "oi-code.language.python.Args"
+        }
+    ]
+}
