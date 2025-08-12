@@ -26,4 +26,4 @@ jobs:
       run: npm install
 
     - name: Run tests
-      run: npm pretest
+      run: npm run pretest
