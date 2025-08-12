@@ -398,7 +398,7 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('oicode.pairCheckView.focus');
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('oicode.runCode', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('oicode.runCode', async (testInput?: string) => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             return vscode.window.showErrorMessage('Please open a file to run.');
@@ -418,12 +418,17 @@ export function activate(context: vscode.ExtensionContext) {
 
         const fullCommand = [compilerCommand, ...(compilerArgs || [])].join(' ');
 
-        const input = await vscode.window.showInputBox({
-            prompt: 'Enter input for the program',
-            placeHolder: 'Type your input here...'
-        });
-        if (input === undefined) {
-            return; // User cancelled
+        let input: string | undefined;
+        if (testInput !== undefined) {
+            input = testInput;
+        } else {
+            input = await vscode.window.showInputBox({
+                prompt: 'Enter input for the program',
+                placeHolder: 'Type your input here...'
+            });
+            if (input === undefined) {
+                return; // User cancelled
+            }
         }
 
         // Placeholder values for time and memory limits
@@ -473,7 +478,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('oicode.initializeEnvironment', async () => {
         vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: 'Initializing OI-Code Docker Environment',
+            title: 'Initializing OI-Code Environment',
             cancellable: false // Building an image cannot be cancelled easily
         }, async (progress) => {
             progress.report({ message: 'Building Docker image, this may take a while...' });
@@ -482,8 +487,8 @@ export function activate(context: vscode.ExtensionContext) {
                 progress.report({ message: 'Docker image ready!', increment: 100 });
                 vscode.window.showInformationMessage('OI-Code Docker environment is ready!');
             } catch (error: any) {
-                progress.report({ message: 'Failed to initialize Docker.', increment: 100 });
-                vscode.window.showErrorMessage(`Failed to initialize Docker environment: ${error.message}`);
+                progress.report({ message: 'Failed to initialize Environment.', increment: 100 });
+                vscode.window.showErrorMessage(`Failed to initialize environment: ${error.message}`);
             }
         });
     }));
