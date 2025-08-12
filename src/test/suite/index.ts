@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 import Mocha = require('mocha');
-import glob = require('glob');
+const glob = require('glob');
 
 export function run(): Promise<void> {
     // Create the mocha test
