@@ -12,7 +12,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { exec } from 'child_process';
+import { exec, ExecException } from 'child_process';
 
 // Helper to create a temporary file
 async function createTempFile(content: string, extension: string): Promise<vscode.Uri> {
@@ -133,7 +133,7 @@ suite('OI-Code Commands Test Suite', () => {
         // Check if Docker is already installed
         const isDockerInstalled = await new Promise<boolean>(resolve => {
             console.log('Executing docker --version');
-            exec('docker --version', (error: any, stdout: any, stderr: any) => {
+            exec('docker --version', (error: ExecException | null, stdout: string, stderr: string) => {
                 if (error) {
                     console.log('Docker is not installed (error):', error.message);
                     resolve(false);
