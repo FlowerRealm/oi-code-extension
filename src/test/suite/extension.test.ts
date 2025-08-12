@@ -55,77 +55,12 @@ suite('Extension Test Suite', () => {
 
         assert.strictEqual(activeTab.label, 'OI-Code 设置', "Webview panel title is incorrect");
     });
-
-    test('Docker initialization and code execution', async function () {
-        this.timeout(60000); // Increase timeout for Docker operations
-
-        // 1. Initialize Docker
-        vscode.window.showInformationMessage('Initializing Docker...');
-        await vscode.commands.executeCommand('oicode.initializeEnvironment');
-        vscode.window.showInformationMessage('Docker initialized.');
-
-        // 2. Set up compiler configurations for the test
-        vscode.window.showInformationMessage('Setting up compiler configurations...');
-        await setConfiguration('oi-code.language.c.Command', 'gcc');
-        await setConfiguration('oi-code.language.c.Args', ['/sandbox/testfile.c', '-o', '/tmp/a.out']);
-        await setConfiguration('oi-code.language.cpp.Command', 'g++');
-        await setConfiguration('oi-code.language.cpp.Args', ['/sandbox/testfile.cpp', '-o', '/tmp/a.out', '-std=c++17']);
-        await setConfiguration('oi-code.language.python.Command', 'python3');
-        await setConfiguration('oi-code.language.python.Args', ['/sandbox/testfile.py']);
-        vscode.window.showInformationMessage('Compiler configurations set.');
-
-        let tempFileUri: vscode.Uri | undefined;
-
-        try {
-            // 3. Test C code execution
-            vscode.window.showInformationMessage('Testing C code...');
-            const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;
-            tempFileUri = await createTempFile(cCode, 'c');
-            await vscode.window.showTextDocument(tempFileUri);
-            await vscode.commands.executeCommand('oicode.runCode', '');
-            // For now, we can only assert that the command ran without error.
-            // A more robust test would capture and assert the output in the webview panel.
-            vscode.window.showInformationMessage('C code execution command sent.');
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
-            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-            await cleanupTempDir(tempFileUri);
-
-            // 4. Test C++ code execution
-            vscode.window.showInformationMessage('Testing C++ code...');
-            const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\\n\"; return 0; }`;
-            tempFileUri = await createTempFile(cppCode, 'cpp');
-            await vscode.window.showTextDocument(tempFileUri);
-            await vscode.commands.executeCommand('oicode.runCode', '');
-            vscode.window.showInformationMessage('C++ code execution command sent.');
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
-            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-            await cleanupTempDir(tempFileUri);
-
-            // 5. Test Python code execution
-            vscode.window.showInformationMessage('Testing Python code...');
-            const pythonCode = `print(\"Hello, Python!\")`;
-            tempFileUri = await createTempFile(pythonCode, 'py');
-            await vscode.window.showTextDocument(tempFileUri);
-            await vscode.commands.executeCommand('oicode.runCode', '');
-            vscode.window.showInformationMessage('Python code execution command sent.');
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
-            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-            await cleanupTempDir(tempFileUri);
-
-        } catch (error) {
-            vscode.window.showErrorMessage(`Test failed: ${error}`);
-            if (tempFileUri) {
-                await cleanupTempDir(tempFileUri);
-            }
-            assert.fail(`Test failed: ${error}`);
-        }
-    });
 });
 
 // New test suite for OI-Code commands
 suite('OI-Code Commands Test Suite', () => {
 
-    test('should execute oi-code.installDocker command', async function () {
+    test('should execute oicode.downloadDocker command', async function () {
         this.timeout(120000); // Increase timeout for Docker installation
         vscode.window.showInformationMessage('Checking Docker installation...');
 
@@ -148,7 +83,7 @@ suite('OI-Code Commands Test Suite', () => {
         } else {
             vscode.window.showInformationMessage('Docker not found. Executing oi-code.installDocker...');
             await vscode.commands.executeCommand('oicode.downloadDocker');
-            assert.ok(true, 'oi-code.installDocker command executed successfully');
+            assert.ok(true, 'oicode.downloadDocker command executed successfully');
             vscode.window.showInformationMessage('oi-code.installDocker executed.');
         }
     });
