@@ -221,6 +221,5 @@
     "webpack-cli": "^5.1.4",
     "mocha": "^11.7.1"
   },
-  "dependencies": {
-  }
+  
 }

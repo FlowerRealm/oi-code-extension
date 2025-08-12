@@ -79,7 +79,7 @@ suite('Extension Test Suite', () => {
         try {
             // 3. Test C code execution
             vscode.window.showInformationMessage('Testing C code...');
-            const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;
+            const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\n"); return 0; }`;
             tempFileUri = await createTempFile(cCode, 'c');
             await vscode.window.showTextDocument(tempFileUri);
             await vscode.commands.executeCommand('oicode.runCode', '');
@@ -125,18 +125,20 @@ suite('Extension Test Suite', () => {
 // New test suite for OI-Code commands
 suite('OI-Code Commands Test Suite', () => {
 
-    test('should execute oi-code.installDocker command', async function () {
+    test('should execute oicode.downloadDocker command', async function () {
+        console.log('Starting test: should execute oicode.downloadDocker command');
         this.timeout(120000); // Increase timeout for Docker installation
         vscode.window.showInformationMessage('Checking Docker installation...');
 
         // Check if Docker is already installed
         const isDockerInstalled = await new Promise<boolean>(resolve => {
+            console.log('Executing docker --version');
             exec('docker --version', (error: any, stdout: any, stderr: any) => {
                 if (error) {
-                    console.log('Docker is not installed:', error.message);
+                    console.log('Docker is not installed (error):', error.message);
                     resolve(false);
                 } else {
-                    console.log('Docker is already installed:', stdout);
+                    console.log('Docker is already installed (stdout):', stdout);
                     resolve(true);
                 }
             });
@@ -145,78 +147,42 @@ suite('OI-Code Commands Test Suite', () => {
         if (isDockerInstalled) {
             vscode.window.showInformationMessage('Docker is already installed. Skipping installation.');
             assert.ok(true, 'Docker already installed, skipped installation command.');
+            console.log('Docker already installed, skipping downloadDocker command.');
         } else {
-            vscode.window.showInformationMessage('Docker not found. Executing oi-code.installDocker...');
+            vscode.window.showInformationMessage('Docker not found. Executing oicode.downloadDocker...');
+            console.log('Executing oicode.downloadDocker command');
             await vscode.commands.executeCommand('oicode.downloadDocker');
-            assert.ok(true, 'oi-code.installDocker command executed successfully');
-            vscode.window.showInformationMessage('oi-code.installDocker executed.');
+            assert.ok(true, 'oicode.downloadDocker command executed successfully');
+            vscode.window.showInformationMessage('oicode.downloadDocker executed.');
+            console.log('oicode.downloadDocker command executed.');
         }
     });
 
-    
+
 
     describe('Code Execution Tests (requires Docker environment)', () => {
         before(async function () {
             this.timeout(120000); // Increase timeout for Docker initialization
+            console.log('Starting before hook for Code Execution Tests: Initializing Docker environment');
             vscode.window.showInformationMessage('Initializing Docker environment for code execution tests...');
             await vscode.commands.executeCommand('oicode.initializeEnvironment');
             vscode.window.showInformationMessage('Docker environment initialized.');
-        });
-
-        /*
-// New test suite for OI-Code commands
-suite('OI-Code Commands Test Suite', () => {
-
-    test('should execute oi-code.installDocker command', async function () {
-        this.timeout(120000); // Increase timeout for Docker installation
-        vscode.window.showInformationMessage('Checking Docker installation...');
-
-        // Check if Docker is already installed
-        const isDockerInstalled = await new Promise<boolean>(resolve => {
-            exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                if (error) {
-                    console.log('Docker is not installed:', error.message);
-                    resolve(false);
-                } else {
-                    console.log('Docker is already installed:', stdout);
-                    resolve(true);
-                }
-            });
-        });
-
-        if (isDockerInstalled) {
-            vscode.window.showInformationMessage('Docker is already installed. Skipping installation.');
-            assert.ok(true, 'Docker already installed, skipped installation command.');
-        } else {
-            vscode.window.showInformationMessage('Docker not found. Executing oi-code.installDocker...');
-            await vscode.commands.executeCommand('oicode.downloadDocker');
-            assert.ok(true, 'oi-code.installDocker command executed successfully');
-            vscode.window.showInformationMessage('oi-code.installDocker executed.');
-        }
-    });
-
-    
-
-    describe('Code Execution Tests (requires Docker environment)', () => {
-        before(async function () {
-            this.timeout(120000); // Increase timeout for Docker initialization
-            vscode.window.showInformationMessage('Initializing Docker environment for code execution tests...');
-            await vscode.commands.executeCommand('oicode.initializeEnvironment');
-            vscode.window.showInformationMessage('Docker environment initialized.');
+            console.log('Docker environment initialized.');
         });
 
         test('should create and run C Hello World', async function () {
             this.timeout(60000);
             let tempFileUri: vscode.Uri | undefined;
             try {
-                const cCode = `#include <stdio.h>
-int main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
+                const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
                 tempFileUri = await createTempFile(cCode, 'c');
                 await vscode.window.showTextDocument(tempFileUri);
+                console.log('Executing oicode.runCode for C...');
                 vscode.window.showInformationMessage('Executing oicode.runCode for C...');
                 await vscode.commands.executeCommand('oicode.runCode', '');
                 assert.ok(true, 'oicode.runCode command for C executed successfully');
                 vscode.window.showInformationMessage('oicode.runCode for C executed.');
+                console.log('oicode.runCode for C executed.');
                 await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
@@ -225,50 +191,6 @@ int main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
                 }
             }
         });
-
-        test('should create and run C++ Hello World', async function () {
-            this.timeout(60000);
-            let tempFileUri: vscode.Uri | undefined;
-            try {
-                const cppCode = `#include <iostream>
-int main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
-                tempFileUri = await createTempFile(cppCode, 'cpp');
-                await vscode.window.showTextDocument(tempFileUri);
-                vscode.window.showInformationMessage('Executing oicode.runCode for C++...');
-                await vscode.commands.executeCommand('oicode.runCode', '');
-                assert.ok(true, 'oicode.runCode command for C++ executed successfully');
-                vscode.window.showInformationMessage('oicode.runCode for C++ executed.');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
-            } finally {
-                if (tempFileUri) {
-                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-                    await cleanupTempDir(tempFileUri);
-                }
-            }
-        });
-
-        test('should create and run Python Hello World', async function () {
-            this.timeout(60000);
-            let tempFileUri: vscode.Uri | undefined;
-            try {
-                const pythonCode = `print(\"Hello, Python from Test!\")`;
-                tempFileUri = await createTempFile(pythonCode, 'py');
-                await vscode.window.showTextDocument(tempFileUri);
-                vscode.window.showInformationMessage('Executing oicode.runCode for Python...');
-                await vscode.commands.executeCommand('oicode.runCode', '');
-                assert.ok(true, 'oicode.runCode command for Python executed successfully');
-                vscode.window.showInformationMessage('oicode.runCode for Python executed.');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
-            } finally {
-                if (tempFileUri) {
-                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-                    await cleanupTempDir(tempFileUri);
-                }
-            }
-        });
-    });
-});
-*/
 
         test('should create and run C++ Hello World', async function () {
             this.timeout(60000);
@@ -277,10 +199,12 @@ int main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
                 const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
                 tempFileUri = await createTempFile(cppCode, 'cpp');
                 await vscode.window.showTextDocument(tempFileUri);
+                console.log('Executing oicode.runCode for C++...');
                 vscode.window.showInformationMessage('Executing oicode.runCode for C++...');
                 await vscode.commands.executeCommand('oicode.runCode', '');
                 assert.ok(true, 'oicode.runCode command for C++ executed successfully');
                 vscode.window.showInformationMessage('oicode.runCode for C++ executed.');
+                console.log('oicode.runCode for C++ executed.');
                 await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
@@ -297,10 +221,12 @@ int main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
                 const pythonCode = `print(\"Hello, Python from Test!\")`;
                 tempFileUri = await createTempFile(pythonCode, 'py');
                 await vscode.window.showTextDocument(tempFileUri);
+                console.log('Executing oicode.runCode for Python...');
                 vscode.window.showInformationMessage('Executing oicode.runCode for Python...');
                 await vscode.commands.executeCommand('oicode.runCode', '');
                 assert.ok(true, 'oicode.runCode command for Python executed successfully');
                 vscode.window.showInformationMessage('oicode.runCode for Python executed.');
+                console.log('oicode.runCode for Python executed.');
                 await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
