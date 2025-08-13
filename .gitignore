@@ -15,3 +15,9 @@ out/
 
 # macOS
 .DS_Store
+
+# VS Code test runtime (downloaded test VS Code binaries etc.)
+.vscode-test/
+
+# Test logs
+test-output.log
