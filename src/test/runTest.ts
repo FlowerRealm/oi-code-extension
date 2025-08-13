@@ -7,16 +7,6 @@ import * as path from 'path';
 import { runTests } from '@vscode/test-electron';
 
 async function main() {
-    process.on('uncaughtException', (error) => {
-        console.error('Uncaught Exception:', error);
-        process.exit(1);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-        console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-        process.exit(1);
-    });
-
     try {
         // The folder containing the Extension Manifest package.json
         // Passed to `--extensionDevelopmentPath`
@@ -31,6 +21,7 @@ async function main() {
             extensionDevelopmentPath,
             extensionTestsPath,
             launchArgs: [
+                '--no-sandbox'
             ]
         });
     } catch (err) {

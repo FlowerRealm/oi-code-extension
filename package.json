@@ -21,6 +21,10 @@
         "title": "OI-Code: 重新初始化"
       },
       {
+        "command": "oicode.createProblem",
+        "title": "OI-Code: 新建题目"
+      },
+      {
         "command": "oi-code.showSettingsPage",
         "title": "OI-Code: 打开设置IDE"
       },
@@ -41,21 +45,15 @@
         "title": "OI-Code: 安装Docker"
       }
     ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "oicode.startPairCheck",
-          "group": "navigation",
-          "icon": "$(compare-changes)"
-        },
-        {
-          "command": "oicode.runCode",
-          "group": "navigation",
-          "icon": "$(play)"
-        }
-      ]
-    },
+    "menus": {},
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "oicode-activity",
+          "title": "OI-Code",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ],
       "panel": [
         {
           "id": "oicode-panel",
@@ -65,6 +63,13 @@
       ]
     },
     "views": {
+      "oicode-activity": [
+        {
+          "id": "oicode.problemView",
+          "name": "题目",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ],
       "oicode-panel": [
         {
           "id": "oicode.pairCheckView",
@@ -76,6 +81,29 @@
     "configuration": {
       "title": "OI-Code Configuration",
       "properties": {
+        "oicode.compile.opt": {
+          "type": "string",
+          "enum": [
+            "O0",
+            "O1",
+            "O2",
+            "O3"
+          ],
+          "default": "O2",
+          "description": "默认优化等级，会在 C/C++ 编译命令中注入/覆盖 -O?。"
+        },
+        "oicode.compile.std": {
+          "type": "string",
+          "enum": [
+            "c++17",
+            "c++14",
+            "c++11",
+            "c11",
+            "c99"
+          ],
+          "default": "c++17",
+          "description": "默认语言标准，会在 C/C++ 编译命令中注入/覆盖 -std=...。"
+        },
         "oicode.docker.compilers": {
           "type": "object",
           "description": "Configure Docker compiler commands and arguments for different languages.",
@@ -200,7 +228,7 @@
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
     "lint": "eslint src --ext ts",
-    "test": "npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
+    "test": "rm -rf out && npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
     "test:log": "npm test > test-output.log 2>&1"
   },
   "devDependencies": {
@@ -220,5 +248,6 @@
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4",
     "mocha": "^11.7.1"
-  }
+  },
+  "dependencies": {}
 }
