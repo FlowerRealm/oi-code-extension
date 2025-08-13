@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import { exec } from 'child_process';
+import { onRunCodeCompletion } from '../../extension';
 
 // Helper to create a temporary file
 async function createTempFile(content: string, extension: string): Promise<vscode.Uri> {
@@ -28,7 +29,21 @@ async function cleanupTempDir(uri: vscode.Uri) {
     await fs.rm(dir, { recursive: true, force: true });
 }
 
-suite('Extension Test Suite', () => {
+suite('Extension Test Suite', function() {
+    this.timeout(300000); // Set a long timeout for the entire suite
+
+    before(async function () {
+        this.timeout(300000); // Set a long timeout for the before hook
+        console.log('Ensuring Docker image is ready before running tests...');
+        try {
+            await vscode.commands.executeCommand('oicode.initializeEnvironment');
+            console.log('Docker image is ready.');
+        } catch (error) {
+            console.error('Failed to ensure Docker image:', error);
+            throw error; // Fail the test suite if Docker isn't ready
+        }
+    });
+
     vscode.window.showInformationMessage('Start all tests.');
 
     // Helper to set VS Code configuration for tests
@@ -91,12 +106,6 @@ suite('OI-Code Commands Test Suite', () => {
     
 
     describe('Code Execution Tests (requires Docker environment)', () => {
-        before(async function () {
-            this.timeout(120000); // Increase timeout for Docker initialization
-            vscode.window.showInformationMessage('Initializing Docker environment for code execution tests...');
-            await vscode.commands.executeCommand('oicode.initializeEnvironment');
-            vscode.window.showInformationMessage('Docker environment initialized.');
-        });
 
         test('should create and run C Hello World', async function () {
             this.timeout(60000);
@@ -105,11 +114,19 @@ suite('OI-Code Commands Test Suite', () => {
                 const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
                 tempFileUri = await createTempFile(cCode, 'c');
                 await vscode.window.showTextDocument(tempFileUri);
-                vscode.window.showInformationMessage('Executing oicode.runCode for C...');
-                await vscode.commands.executeCommand('oicode.runCode', '');
+                console.log('Executing oicode.runCode for C...');
+                
+                const resultPromise = new Promise(resolve => {
+                    onRunCodeCompletion.event(result => {
+                        console.log('oicode.runCode for C finished, result:', result);
+                        resolve(result);
+                    });
+                });
+
+                vscode.commands.executeCommand('oicode.runCode', '');
+
+                const result = await resultPromise;
                 assert.ok(true, 'oicode.runCode command for C executed successfully');
-                vscode.window.showInformationMessage('oicode.runCode for C executed.');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -125,11 +142,19 @@ suite('OI-Code Commands Test Suite', () => {
                 const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
                 tempFileUri = await createTempFile(cppCode, 'cpp');
                 await vscode.window.showTextDocument(tempFileUri);
-                vscode.window.showInformationMessage('Executing oicode.runCode for C++...');
-                await vscode.commands.executeCommand('oicode.runCode', '');
+                console.log('Executing oicode.runCode for C++...');
+                
+                const resultPromise = new Promise(resolve => {
+                    onRunCodeCompletion.event(result => {
+                        console.log('oicode.runCode for C++ finished, result:', result);
+                        resolve(result);
+                    });
+                });
+
+                vscode.commands.executeCommand('oicode.runCode', '');
+
+                const result = await resultPromise;
                 assert.ok(true, 'oicode.runCode command for C++ executed successfully');
-                vscode.window.showInformationMessage('oicode.runCode for C++ executed.');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -145,11 +170,19 @@ suite('OI-Code Commands Test Suite', () => {
                 const pythonCode = `print(\"Hello, Python from Test!\")`;
                 tempFileUri = await createTempFile(pythonCode, 'py');
                 await vscode.window.showTextDocument(tempFileUri);
-                vscode.window.showInformationMessage('Executing oicode.runCode for Python...');
-                await vscode.commands.executeCommand('oicode.runCode', '');
+                console.log('Executing oicode.runCode for Python...');
+                
+                const resultPromise = new Promise(resolve => {
+                    onRunCodeCompletion.event(result => {
+                        console.log('oicode.runCode for Python finished, result:', result);
+                        resolve(result);
+                    });
+                });
+
+                vscode.commands.executeCommand('oicode.runCode', '');
+
+                const result = await resultPromise;
                 assert.ok(true, 'oicode.runCode command for Python executed successfully');
-                vscode.window.showInformationMessage('oicode.runCode for Python executed.');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Give time for execution
             } finally {
                 if (tempFileUri) {
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');

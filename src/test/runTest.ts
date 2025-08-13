@@ -31,8 +31,6 @@ async function main() {
             extensionDevelopmentPath,
             extensionTestsPath,
             launchArgs: [
-                '--no-sandbox',
-                '--disable-extensions'
             ]
         });
     } catch (err) {

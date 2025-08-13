@@ -10,8 +10,8 @@ import * as util from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import { DockerManager } from './dockerManager';
-import * as Diff from 'diff';
 import { Installer } from './docker/install';
+export const onRunCodeCompletion = new vscode.EventEmitter<any>();
 
 const exec = util.promisify(cp.exec);
 
@@ -468,7 +468,7 @@ export function activate(context: vscode.ExtensionContext) {
                     content += `<h2>Error:</h2><pre>${htmlEscape(result.error)}</pre>`;
                 }
                 panel.webview.html = content;
-
+                console.log('oicode.runCode command finished.');
             } catch (e: any) {
                 vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
             }

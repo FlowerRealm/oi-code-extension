@@ -12,6 +12,7 @@ import * as vscode from 'vscode';
 
 
 
+import { onRunCodeCompletion } from './extension';
 import { Installer, InstallCommand } from './docker/install';
 
 const IMAGE_NAME = 'oi-runner:stable';
@@ -168,15 +169,18 @@ export class DockerManager {
             dockerProcess.on('close', async (code) => {
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
 
+                let result;
                 if (stderr.includes('command not found')) {
-                    resolve({ verdict: 'COMPILE_ERROR', output: stdout, error: stderr });
+                    result = { verdict: 'COMPILE_ERROR', output: stdout, error: stderr };
                 } else if (code === 124) {
-                    resolve({ verdict: 'TLE', output: stdout, error: stderr });
+                    result = { verdict: 'TLE', output: stdout, error: stderr };
                 } else if (code !== 0) {
-                    resolve({ verdict: 'RE', output: stdout, error: stderr });
+                    result = { verdict: 'RE', output: stdout, error: stderr };
                 } else {
-                    resolve({ verdict: 'AC', output: stdout, error: stderr });
+                    result = { verdict: 'AC', output: stdout, error: stderr };
                 }
+                onRunCodeCompletion.fire(result);
+                resolve(result);
             });
 
             dockerProcess.on('error', async (err) => {
