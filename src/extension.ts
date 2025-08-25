@@ -12,6 +12,7 @@ import * as os from 'os';
 import { DockerManager } from './dockerManager';
 import * as Diff from 'diff';
 import { Installer } from './docker/install';
+import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
 
 const exec = util.promisify(cp.exec);
 
@@ -121,6 +122,26 @@ async function runSingleInDocker(
     const compilers = config.get<any>('oicode.docker.compilers') || {};
     const defaultOpt = config.get<string>('oicode.compile.opt');
     const defaultStd = config.get<string>('oicode.compile.std');
+    
+    // Helper function to apply compiler options
+    function applyCompilerOptions(args: string[], options?: { opt?: string; std?: string }): string[] {
+        let result = [...args];
+        
+        const effOpt = options?.opt || defaultOpt;
+        if (effOpt) {
+            result = result.map(a => /^-O[0-3]$/.test(a) ? `-${effOpt}` : a);
+            if (!result.some(a => /^-O[0-3]$/.test(a))) result.push(`-${effOpt}`);
+        }
+        
+        const effStd = options?.std || defaultStd;
+        if (effStd) {
+            result = result.map(a => a.startsWith('-std=') ? `-std=${effStd}` : a);
+            if (!result.some(a => a.startsWith('-std='))) result.push(`-std=${effStd}`);
+        }
+        
+        return result;
+    }
+    
     let command: string;
     if (languageId === 'python') {
         const py = compilers.python || { command: 'python3', args: ['/sandbox/${sourceFile}'] };
@@ -129,42 +150,31 @@ async function runSingleInDocker(
     } else if (languageId === 'cpp') {
         const cpp = compilers.cpp || { command: 'g++', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2', '-std=c++17'] };
         let args = (cpp.args as string[]).map(a => a.replace(/\$\{sourceFile\}/g, sourceFileName));
-        const effOpt = options?.opt || defaultOpt;
-        if (effOpt) {
-            args = args.map(a => /^-O[0-3]$/.test(a) ? `-${effOpt}` : a);
-            if (!args.some(a => /^-O[0-3]$/.test(a))) args.push(`-${effOpt}`);
-        }
-        const effStd = options?.std || defaultStd;
-        if (effStd) {
-            args = args.map(a => a.startsWith('-std=') ? `-std=${effStd}` : a);
-            if (!args.some(a => a.startsWith('-std='))) args.push(`-std=${effStd}`);
-        }
+        args = applyCompilerOptions(args, options);
         command = [cpp.command as string, ...args, '&&', '/tmp/a.out'].join(' ');
     } else {
         const c = compilers.c || { command: 'gcc', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2'] };
         let args = (c.args as string[]).map(a => a.replace(/\$\{sourceFile\}/g, sourceFileName));
-        const effOptC = options?.opt || defaultOpt;
-        if (effOptC) {
-            args = args.map(a => /^-O[0-3]$/.test(a) ? `-${effOptC}` : a);
-            if (!args.some(a => /^-O[0-3]$/.test(a))) args.push(`-${effOptC}`);
-        }
-        const effStdC = options?.std || defaultStd;
-        if (effStdC) {
-            args = args.map(a => a.startsWith('-std=') ? `-std=${effStdC}` : a);
-            if (!args.some(a => a.startsWith('-std='))) args.push(`-std=${effStdC}`);
-        }
+        args = applyCompilerOptions(args, options);
         command = [c.command as string, ...args, '&&', '/tmp/a.out'].join(' ');
     }
 
     const result = await DockerManager.run({
-        projectRootPath,
         sourceDir,
         command,
-        input: input || '',
-        timeLimit: options?.timeLimit ?? 5,
-        memoryLimit: options?.memoryLimit ?? 256
+        input,
+        memoryLimit: '512',
+        projectRootPath,
+        languageId,
+        timeLimit: 10
     });
-    return { stdout: result.output, stderr: result.error, timedOut: result.timedOut, memoryExceeded: result.memoryExceeded, spaceExceeded: result.spaceExceeded };
+    return { 
+        stdout: result.stdout, 
+        stderr: result.stderr, 
+        timedOut: result.timedOut, 
+        memoryExceeded: result.memoryExceeded, 
+        spaceExceeded: result.spaceExceeded 
+    };
 }
 
 function createDiffHtml(output1: string, output2: string): { html1: string; html2: string } {
@@ -214,9 +224,8 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     }
 
                     this.setOutputs('<i>正在运行...</i>', '<i>正在运行...</i>');
-                    const baseDir = path.join(os.homedir(), '.oi-code-tests');
-                    await fs.promises.mkdir(baseDir, { recursive: true });
-                    const tempDir = await fs.promises.mkdtemp(path.join(baseDir, 'pair-'));
+                    await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
+                    const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
                     const file1Path = path.join(tempDir, `code1.${langId}`);
                     const file2Path = path.join(tempDir, `code2.${langId}`);
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
@@ -550,9 +559,8 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
             return { error: 'LANG_MISMATCH' };
         }
         // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
-        const sharedBaseDir = path.join(os.homedir(), '.oi-code-tests', 'tmp');
-        await fs.promises.mkdir(sharedBaseDir, { recursive: true });
-        const tempDir = await fs.promises.mkdtemp(path.join(sharedBaseDir, 'oi-code-'));
+        await fs.promises.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
+        const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-code-'));
         try {
             const ext = langId === 'python' ? 'py' : langId;
             const file1Path = path.join(tempDir, `code1.${ext}`);

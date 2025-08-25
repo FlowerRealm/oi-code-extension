@@ -13,6 +13,7 @@ import * as vscode from 'vscode';
 
 
 import { Installer, InstallCommand } from './docker/install';
+import { OI_CODE_TEST_TMP_PATH } from './constants';
 
 /**
  * Manages the Docker environment, including building the image, running containers,
@@ -67,24 +68,30 @@ export class DockerManager {
      * @returns A promise that resolves with the execution result.
      */
     public static async run(options: {
-        projectRootPath: string; // New: Project root path for ensureImage
-        sourceDir: string;      // Directory containing source code, mounted read-only at /sandbox
-        command: string;        // The full shell command to execute inside the container
+        sourceDir: string;
+        command: string;
         input: string;
-        timeLimit: number;      // in seconds, for soft timeout
-        memoryLimit: number;    // in megabytes
-    }): Promise<{ output: string; error: string; timedOut: boolean; memoryExceeded: boolean; spaceExceeded: boolean }> {
-        // Ensure the image is ready before running.
+        memoryLimit: string;
+        projectRootPath: string;
+        languageId: string;
+        timeLimit: number;
+    }): Promise<{
+        stdout: string;
+        stderr: string;
+        timedOut: boolean;
+        memoryExceeded: boolean;
+        spaceExceeded: boolean;
+    }> {
+        // Ensure Docker is available
         await this.ensureImage(options.projectRootPath);
 
-        const { sourceDir, command, input, memoryLimit } = options;
+        const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 
-        const image = this.selectImageForCommand(command);
+        // Create a temporary directory on the host for writable output (e.g., compiled binary)
+        await fs.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
+        const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
+        const image = this.selectImageForCommand(languageId);
 
-        // Create a writable dir under user's home to avoid Docker Desktop file-sharing issues
-        const sharedBaseDir = path.join(os.homedir(), '.oi-code-tests', 'tmp');
-        await fs.mkdir(sharedBaseDir, { recursive: true });
-        const tempDir = await fs.mkdtemp(path.join(sharedBaseDir, 'oi-run-'));
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         const args = [
@@ -128,21 +135,21 @@ export class DockerManager {
                 console.warn(`[DockerManager] Timeout exceeded, killing container ${containerName}`);
                 spawn('docker', ['kill', containerName]).on('close', () => { /* noop */ });
                 timedOut = true;
-            }, (options.timeLimit + 1) * 1000);
+            }, (timeLimit + 1) * 1000);
 
             dockerProcess.on('close', async (code) => {
                 clearTimeout(killTimer);
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
                 const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
                 const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
-                resolve({ output: stdout, error: stderr, timedOut, memoryExceeded, spaceExceeded });
+                resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
                 outputChannel.appendLine(`[DockerManager] exit code=${code}`);
             });
 
             dockerProcess.on('error', async (err) => {
                 clearTimeout(killTimer);
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
-                resolve({ output: '', error: `Failed to start Docker: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
+                resolve({ stdout: '', stderr: `Failed to start Docker: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
                 outputChannel.appendLine(`[DockerManager] error: ${err.message}`);
             });
 
@@ -154,10 +161,17 @@ export class DockerManager {
         });
     }
 
-    private static selectImageForCommand(command: string): string {
-        const cmd = command.toLowerCase();
-        if (cmd.includes('python')) return 'python:3.11';
-        if (cmd.includes('g++') || cmd.includes('gcc')) return 'gcc:13';
-        return 'ubuntu:24.04';
+    private static selectImageForCommand(languageId: string): string {
+        switch (languageId.toLowerCase()) {
+            case 'python':
+                return 'python:3.11';
+            case 'cpp':
+            case 'c++':
+                return 'gcc:13';
+            case 'c':
+                return 'gcc:13';
+            default:
+                return 'ubuntu:24.04';
+        }
     }
 }

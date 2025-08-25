@@ -13,10 +13,11 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import { exec } from 'child_process';
+import { OI_CODE_TEST_TMP_PATH } from '../../constants';
 
 // Base dir for test-created problems
 const TEST_BASE_DIR = path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
-const TEST_TMP_BASE = path.join(os.homedir(), '.oi-code-tests', 'tmp');
+const TEST_TMP_BASE = OI_CODE_TEST_TMP_PATH;
 
 // Helper: create a problem via command, inject code, and open it
 async function createProblemAndOpen(name: string, language: 'c' | 'cpp' | 'python', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {

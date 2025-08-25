@@ -10,13 +10,13 @@ assets by path *.html 22.4 KiB
   asset init.html 10.4 KiB [compared for emit] [from: webview/init.html] [copied]
   asset settings.html 9.91 KiB [compared for emit] [from: webview/settings.html] [copied]
   asset completion.html 2.13 KiB [compared for emit] [from: webview/completion.html] [copied]
-asset extension.js 282 KiB [compared for emit] (name: main) 1 related asset
+asset extension.js 279 KiB [emitted] (name: main) 1 related asset
 asset settings-schema.json 2.36 KiB [compared for emit] [from: webview/settings-schema.json] [copied]
-cacheable modules 271 KiB
+cacheable modules 269 KiB
   modules by path ./node_modules/diff/lib/ 210 KiB 19 modules
-  modules by path ./src/ 61.4 KiB
-    ./src/extension.ts 37.9 KiB [built] [code generated]
-    ./src/dockerManager.ts 11.5 KiB [built] [code generated]
+  modules by path ./src/ 58.9 KiB
+    ./src/extension.ts 37.8 KiB [built] [code generated]
+    ./src/dockerManager.ts 9.01 KiB [built] [code generated]
     ./src/docker/install.ts 12.1 KiB [built] [code generated]
 external "vscode" 42 bytes [built] [code generated]
 external "path" 42 bytes [built] [code generated]
@@ -25,81 +25,37 @@ external "util" 42 bytes [built] [code generated]
 external "fs" 42 bytes [built] [code generated]
 external "os" 42 bytes [built] [code generated]
 external "fs/promises" 42 bytes [built] [code generated]
-webpack 5.101.0 compiled successfully in 1482 ms
+webpack 5.101.0 compiled successfully in 2882 ms
 - Resolving version...
 ✔ Validated version: 1.103.2
 ✔ Found existing install in /home/flowerrealm/oi-code/extensions/oi-code/.vscode-test/vscode-linux-x64-1.103.2
-[90m[main 2025-08-25T06:14:16.031Z][0m update#setState disabled
-[90m[main 2025-08-25T06:14:16.032Z][0m update#ctor - updates are disabled by the environment
+[90m[main 2025-08-25T06:19:43.124Z][0m update#setState disabled
+[90m[main 2025-08-25T06:19:43.125Z][0m update#ctor - updates are disabled by the environment
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-vsliveshare.vsliveshare' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.gather' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.vscode-pylance' wants API proposal 'mcpConfigurationProvider' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
-Started local extension host with pid 53664.
 ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Started local extension host with pid 58132.
 Loading development extension at /home/flowerrealm/oi-code/extensions/oi-code
 Settings Sync: Account status changed from uninitialized to unavailable
 [0m[0m
 [0m  Extension Test Suite[0m
-  [32m  ✔[0m[90m showSettingsPage command should create a webview panel[0m[31m (1503ms)[0m
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-[53332:0825/141425.142417:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
-[53332:0825/141425.153997:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-  [32m  ✔[0m[90m Docker initialization and code execution[0m[31m (8235ms)[0m
+  [32m  ✔[0m[90m showSettingsPage command should create a webview panel[0m[31m (1504ms)[0m
+  [32m  ✔[0m[90m Docker initialization and code execution[0m[31m (11985ms)[0m
 [0m  OI-Code Commands Test Suite[0m
 Docker is already installed: Docker version 28.3.3, build 980b856
 
   [32m  ✔[0m[90m should execute oi-code.installDocker command[0m
 [0m    Code Execution Tests (requires Docker environment)[0m
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m should create and run C Hello World[0m[31m (1054ms)[0m
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m should create and run C++ Hello World[0m[31m (1167ms)[0m
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m should create and run Python Hello World[0m[31m (856ms)[0m
+    [32m  ✔[0m[90m should create and run C Hello World[0m[31m (2140ms)[0m
+    [32m  ✔[0m[90m should create and run C++ Hello World[0m[31m (1578ms)[0m
+    [32m  ✔[0m[90m should create and run Python Hello World[0m[31m (1803ms)[0m
 [0m    Pair Check Tests (Catalan numbers)[0m
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m pair check c catalan recursive vs dp[0m[31m (7240ms)[0m
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m pair check cpp catalan recursive vs dp[0m[31m (14171ms)[0m
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-Docker image 'oi-runner:stable' already exists.
-    [32m  ✔[0m[90m pair check python catalan recursive vs dp[0m[31m (5308ms)[0m
-[92m [0m[32m 9 passing[0m[90m (40s)[0m
-[90m[main 2025-08-25T06:14:58.532Z][0m Extension host with pid 53664 exited with code: 0, signal: unknown.
+    [32m  ✔[0m[90m pair check c catalan recursive vs dp[0m[31m (14352ms)[0m
+[DockerManager] Timeout exceeded, killing container oi-task-1756102819974-940
+[DockerManager] Timeout exceeded, killing container oi-task-1756102819978-909
+    [32m  ✔[0m[90m pair check cpp catalan recursive vs dp[0m[31m (20297ms)[0m
+    [32m  ✔[0m[90m pair check python catalan recursive vs dp[0m[31m (8048ms)[0m
+[92m [0m[32m 9 passing[0m[90m (1m)[0m
+[90m[main 2025-08-25T06:20:48.790Z][0m Extension host with pid 58132 exited with code: 0, signal: unknown.
 Exit code:   0
