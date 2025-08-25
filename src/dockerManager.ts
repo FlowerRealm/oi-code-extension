@@ -67,17 +67,17 @@ export class DockerManager {
         return new Promise<void>((resolve, reject) => {
             console.log(`Docker image '${IMAGE_NAME}' not found. Proceeding with build.`);
             vscode.window.showInformationMessage(`Building Docker image '${IMAGE_NAME}'. This may take a few minutes...`);
-            
+
             try {
                 const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Build');
                 outputChannel.show();
                 outputChannel.appendLine(`Starting build for ${IMAGE_NAME}...\n`);
-                
+
                 const buildProcess = spawn('docker', ['build', '-t', IMAGE_NAME, '-f', path.join(projectRootPath, 'Dockerfile'), '.'], { cwd: projectRootPath });
-                
+
                 buildProcess.stdout.on('data', data => outputChannel.append(data.toString()));
                 buildProcess.stderr.on('data', data => outputChannel.append(data.toString()));
-                
+
                 buildProcess.on('close', (buildCode) => {
                     if (buildCode === 0) {
                         outputChannel.appendLine(`\nSuccessfully built image '${IMAGE_NAME}'.`);
@@ -88,7 +88,7 @@ export class DockerManager {
                         reject(new Error(errorMsg));
                     }
                 });
-                
+
                 buildProcess.on('error', (err) => {
                     const errorMsg = `Failed to start Docker build: ${err.message}`;
                     outputChannel.appendLine(`\nERROR: ${errorMsg}`);
