@@ -4,20 +4,19 @@
   "description": "Initial setup for OI IDE",
   "version": "0.0.1",
   "publisher": "oi-code",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FlowerRealm/oi-code-extension.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
   ],
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:oi-code.showSettingsPage",
-    "onCommand:oicode.createProblem",
-    "onCommand:oicode.initializeEnvironment",
-    "onCommand:oicode.runCode",
-    "onCommand:oicode.runPairCheck"
+    "*"
   ],
   "contributes": {
     "commands": [
@@ -233,7 +232,7 @@
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
     "lint": "eslint src --ext ts",
-    "test": "rimraf out && npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/test/runTest.js",
+    "test": "npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
     "test:log": "npm test > test-output.log 2>&1"
   },
   "devDependencies": {

@@ -10,14 +10,14 @@ assets by path *.html 22.4 KiB
   asset init.html 10.4 KiB [compared for emit] [from: webview/init.html] [copied]
   asset settings.html 9.91 KiB [compared for emit] [from: webview/settings.html] [copied]
   asset completion.html 2.13 KiB [compared for emit] [from: webview/completion.html] [copied]
-asset extension.js 283 KiB [compared for emit] (name: main) 1 related asset
+asset extension.js 284 KiB [compared for emit] (name: main) 1 related asset
 asset settings-schema.json 2.36 KiB [compared for emit] [from: webview/settings-schema.json] [copied]
-cacheable modules 272 KiB
+cacheable modules 273 KiB
   modules by path ./node_modules/diff/lib/ 210 KiB 19 modules
-  modules by path ./src/ 62.2 KiB
-    ./src/extension.ts 39.3 KiB [built] [code generated]
+  modules by path ./src/ 63 KiB
+    ./src/extension.ts 40.1 KiB [built] [code generated]
     ./src/dockerManager.ts 9.05 KiB [built] [code generated]
-    ./src/docker/install.ts 12.1 KiB [built] [code generated]
+    ./src/docker/install.ts 12 KiB [built] [code generated]
     ./src/constants.ts 1.84 KiB [built] [code generated]
 external "vscode" 42 bytes [built] [code generated]
 external "path" 42 bytes [built] [code generated]
@@ -26,21 +26,26 @@ external "util" 42 bytes [built] [code generated]
 external "fs" 42 bytes [built] [code generated]
 external "fs/promises" 42 bytes [built] [code generated]
 external "os" 42 bytes [built] [code generated]
-webpack 5.101.0 compiled successfully in 2486 ms
+webpack 5.101.0 compiled successfully in 1977 ms
 - Resolving version...
 ✔ Validated version: 1.103.2
 ✔ Found existing install in /home/flowerrealm/oi-code/extensions/oi-code/.vscode-test/vscode-linux-x64-1.103.2
-[90m[main 2025-08-25T06:45:09.887Z][0m update#setState disabled
-[90m[main 2025-08-25T06:45:09.888Z][0m update#ctor - updates are disabled by the environment
+[90m[main 2025-08-25T07:09:50.601Z][0m update#setState disabled
+[90m[main 2025-08-25T07:09:50.602Z][0m update#ctor - updates are disabled by the environment
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-vsliveshare.vsliveshare' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.gather' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.vscode-pylance' wants API proposal 'mcpConfigurationProvider' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
+Started local extension host with pid 104755.
 Unable to read file '/home/flowerrealm/oi-code/extensions/oi-code/out/test/package.json' (Error: Unable to resolve nonexistent file '/home/flowerrealm/oi-code/extensions/oi-code/out/test/package.json')
-Started local extension host with pid 89970.
 ChatSessionStore: Migrating 0 chat sessions from storage service to file system
 Settings Sync: Account status changed from uninitialized to unavailable
 [0m[0m
 [0m  Extension Test Suite[0m
+Attempting to manually activate extension...
+Extension not found by ID, trying alternative...
+No OI-Code extension found in available extensions
+[104422:0825/150954.796480:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
+[104422:0825/150954.803693:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
 Skipping extension activation check - extension not loading in test environment
   [32m  ✔[0m[90m Extension activation check[0m
 Skipping showSettingsPage test - extension not loading in test environment
@@ -50,7 +55,7 @@ Skipping Docker initialization test - extension not loading in test environment
 [0m  OI-Code Commands Test Suite[0m
 Docker is already installed: Docker version 28.3.3, build 980b856
 
-  [32m  ✔[0m[90m should execute oi-code.installDocker command[0m[33m (45ms)[0m
+  [32m  ✔[0m[90m should execute oi-code.installDocker command[0m[31m (117ms)[0m
 [0m    Code Execution Tests (requires Docker environment)[0m
 Skipping Code Execution Tests - extension not loading in test environment
 Skipping C Hello World test - extension not loading in test environment
@@ -65,7 +70,8 @@ Skipping pair check c test - extension not loading in test environment
 Skipping pair check cpp test - extension not loading in test environment
     [32m  ✔[0m[90m pair check cpp catalan recursive vs dp[0m
 Skipping pair check python test - extension not loading in test environment
-    [32m  ✔[0m[90m pair check python catalan recursive vs dp[0m
-[92m [0m[32m 10 passing[0m[90m (77ms)[0m
-[90m[main 2025-08-25T06:45:11.715Z][0m Extension host with pid 89970 exited with code: 0, signal: unknown.
+    [32m  ✔[0m[90m pair                                                                         check python catalan recursive vs dp[0m
+[92m [0m[32m 10 passing[0m[90m (2s)[0m
+[90m[main 2025-08-25T07:09:54.916Z][0m Extension host with pid 104755 exited with code: 0, signal: unknown.
 Exit code:   0
+              

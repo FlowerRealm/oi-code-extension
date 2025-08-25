@@ -10,7 +10,7 @@ npm-debug.log*
 *.vsix
 
 # Build artifacts
-dist/
+
 out/
 
 # macOS

@@ -356,13 +356,16 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
                 async function pickProblemsBaseDir(): Promise<string> {
                     const saved = context.globalState.get<string>('oicode.lastProblemsBaseDir');
-                    if (saved && fs.existsSync(saved)) {
-                        const choice = await vscode.window.showQuickPick([
-                            { label: `使用上次：${saved}`, value: 'saved' },
-                            { label: '重新选择...', value: 'pick' }
-                        ], { placeHolder: '选择题目根目录' });
-                        if (!choice) { throw new Error('未选择题目根目录'); }
-                        if (choice.value === 'saved') { return saved; }
+                    if (saved) {
+                        try {
+                            await fs.promises.access(saved);
+                            const choice = await vscode.window.showQuickPick([
+                                { label: `使用上次：${saved}`, value: 'saved' },
+                                { label: '重新选择...', value: 'pick' }
+                            ], { placeHolder: '选择题目根目录' });
+                            if (!choice) { throw new Error('未选择题目根目录'); }
+                            if (choice.value === 'saved') { return saved; }
+                        } catch { }
                     }
                     const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: '选择题目根目录' });
                     if (!pick || !pick[0]) { throw new Error('未选择题目根目录'); }
@@ -440,7 +443,14 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                 const safe = name.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
 
                 let baseDir = payload?.baseDir || context.globalState.get<string>('oicode.lastProblemsBaseDir');
-                if (!(baseDir && fs.existsSync(baseDir))) {
+                if (baseDir) {
+                    try {
+                        await fs.promises.access(baseDir);
+                    } catch {
+                        baseDir = undefined;
+                    }
+                }
+                if (!baseDir) {
                     const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: '选择题目根目录' });
                     if (!pick || !pick[0]) { return; }
                     baseDir = pick[0].fsPath;
@@ -457,38 +467,49 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                     if (!langPick) { return; }
                     langId = langPick.value as 'c' | 'cpp' | 'python';
                 }
-                const ext = langId === 'python' ? 'py' : langId;
+                if (langId) {
+                    const ext = langId === 'python' ? 'py' : langId;
+                    const problemDir = path.join(baseDir, safe);
+                    const configDir = path.join(problemDir, 'config');
+                    await fs.promises.mkdir(problemDir, { recursive: true });
+                    await fs.promises.mkdir(configDir, { recursive: true });
+                    // Template source
+                    const sourcePath = path.join(problemDir, `main.${ext}`);
+                    try {
+                        await fs.promises.access(sourcePath);
+                    } catch {
+                        const tpl = langId === 'c'
+                            ? '#include <stdio.h>\nint main(){ /* TODO */ return 0; }\n'
+                            : langId === 'cpp'
+                                ? '#include <bits/stdc++.h>\nusing namespace std; int main(){ /* TODO */ return 0; }\n'
+                                : 'print("TODO")\n';
+                        await fs.promises.writeFile(sourcePath, tpl, 'utf8');
+                    }
+                    // Default config
+                    const problemJsonPath = path.join(configDir, 'problem.json');
+                    try {
+                        await fs.promises.access(problemJsonPath);
+                    } catch {
+                        await fs.promises.writeFile(problemJsonPath, JSON.stringify({ name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' }, null, 2), 'utf8');
+                    }
+                    const statementPath = path.join(configDir, 'statement.md');
+                    try {
+                        await fs.promises.access(statementPath);
+                    } catch {
+                        await fs.promises.writeFile(statementPath, `# ${safe}\n\n在此编写题面...\n`, 'utf8');
+                    }
+                    const samplesPath = path.join(configDir, 'samples.txt');
+                    try {
+                        await fs.promises.access(samplesPath);
+                    } catch {
+                        await fs.promises.writeFile(samplesPath, '', 'utf8');
+                    }
 
-                const problemDir = path.join(baseDir, safe);
-                const configDir = path.join(problemDir, 'config');
-                await fs.promises.mkdir(problemDir, { recursive: true });
-                await fs.promises.mkdir(configDir, { recursive: true });
-
-                // Template source
-                const sourcePath = path.join(problemDir, `main.${ext}`);
-                if (!fs.existsSync(sourcePath)) {
-                    const tpl = langId === 'c'
-                        ? '#include <stdio.h>\nint main(){ /* TODO */ return 0; }\n'
-                        : langId === 'cpp'
-                            ? '#include <bits/stdc++.h>\nusing namespace std; int main(){ /* TODO */ return 0; }\n'
-                            : 'print("TODO")\n';
-                    await fs.promises.writeFile(sourcePath, tpl, 'utf8');
+                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
+                    await vscode.window.showTextDocument(doc, { preview: false });
+                    vscode.window.showInformationMessage(`已创建题目：${safe}`);
+                    return { problemDir, sourcePath };
                 }
-
-                // Default config
-                const problemJsonPath = path.join(configDir, 'problem.json');
-                if (!fs.existsSync(problemJsonPath)) {
-                    await fs.promises.writeFile(problemJsonPath, JSON.stringify({ name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' }, null, 2), 'utf8');
-                }
-                const statementPath = path.join(configDir, 'statement.md');
-                if (!fs.existsSync(statementPath)) await fs.promises.writeFile(statementPath, `# ${safe}\n\n在此编写题面...\n`, 'utf8');
-                const samplesPath = path.join(configDir, 'samples.txt');
-                if (!fs.existsSync(samplesPath)) await fs.promises.writeFile(samplesPath, '', 'utf8');
-
-                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
-                await vscode.window.showTextDocument(doc, { preview: false });
-                vscode.window.showInformationMessage(`已创建题目：${safe}`);
-                return { problemDir, sourcePath };
             } catch (e: any) {
                 vscode.window.showErrorMessage(`新建题目失败：${e.message || e}`);
                 return { error: e?.message || String(e) };

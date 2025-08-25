@@ -37,66 +37,85 @@ async function cleanupDir(dir: string) {
 }
 
 suite('Extension Test Suite', () => {
-    // Manually activate the extension at the start
+    // 等待扩展激活
     before(async function () {
-        this.timeout(10000);
-        console.log('Attempting to manually activate extension...');
-
-        try {
-            // Try to find and activate the extension
-            const extension = vscode.extensions.getExtension('oi-code');
-            if (extension) {
-                console.log('Extension found, attempting to activate...');
-                await extension.activate();
-                console.log('Extension activated successfully');
-            } else {
-                console.log('Extension not found by ID, trying alternative...');
-                // Try alternative activation methods
-                const allExtensions = vscode.extensions.all;
-                const oiExtension = allExtensions.find(ext => ext.id.includes('oi-code') || ext.packageJSON?.name === 'oi-code');
-                if (oiExtension) {
-                    console.log('Found extension by search, activating...');
-                    await oiExtension.activate();
-                    console.log('Extension activated successfully');
-                } else {
-                    console.log('No OI-Code extension found in available extensions');
-                }
+        this.timeout(35000);
+        const extId = 'oi-code.oi-code';
+        let extension = vscode.extensions.getExtension(extId);
+        let waited = 0;
+        const interval = 500;
+        // 输出所有扩展id和name
+        console.log('All extensions in test env:', vscode.extensions.all.map(e => ({ id: e.id, name: e.packageJSON?.name })));
+        // 输出当前工作目录和 dist/extension.js 是否存在
+        const fs = require('fs');
+        console.log('CWD:', process.cwd());
+        console.log('dist/extension.js exists:', fs.existsSync('./dist/extension.js'));
+        while ((!extension || !extension.isActive) && waited < 30000) {
+            if (extension && !extension.isActive) {
+                try { await extension.activate(); } catch { }
             }
-        } catch (error) {
-            console.error('Error activating extension:', error);
+            await new Promise(res => setTimeout(res, interval));
+            waited += interval;
+            extension = vscode.extensions.getExtension(extId);
         }
-
-        // Wait a bit for activation to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!extension || !extension.isActive) {
+            throw new Error('OI-Code extension did not activate in time');
+        }
     });
 
-    // Debug: Check if extension is activated
     test('Extension activation check', async function () {
-        this.timeout(10000);
-
-        // Skip this test for now since extension activation is not working in test environment
-        console.log('Skipping extension activation check - extension not loading in test environment');
-        assert.ok(true, 'Skipping extension activation check');
+        this.timeout(15000);
+        const extId = 'oi-code.oi-code';
+        let extension = vscode.extensions.getExtension(extId);
+        let waited = 0;
+        const interval = 300;
+        while (extension && !extension.isActive && waited < 6000) {
+            try { await extension.activate(); } catch { }
+            await new Promise(res => setTimeout(res, interval));
+            waited += interval;
+            extension = vscode.extensions.getExtension(extId);
+        }
+        const commands = await vscode.commands.getCommands();
+        const hasAny = commands.includes('oi-code.showSettingsPage') || commands.includes('oicode.initializeEnvironment');
+        assert.ok((extension && extension.isActive) || hasAny, 'OI-Code extension should be active or commands should be available');
     });
-
-    // Helper to set VS Code configuration for tests
-    async function setConfiguration(section: string, value: any) {
-        const config = vscode.workspace.getConfiguration();
-        await config.update(section, value, vscode.ConfigurationTarget.Global);
-    }
 
     test('showSettingsPage command should create a webview panel', async function () {
-        this.timeout(5000); // Increase timeout for UI operations
-        // Skip this test for now since extension activation is not working in test environment
-        console.log('Skipping showSettingsPage test - extension not loading in test environment');
-        assert.ok(true, 'Skipping showSettingsPage test');
+        this.timeout(10000);
+        await vscode.commands.executeCommand('oi-code.showSettingsPage');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+        assert.ok(activeTab, "No active tab found after executing command");
+        const isWebview = activeTab.input instanceof vscode.TabInputWebview;
+        assert.ok(isWebview, "The active tab is not a webview panel");
+        assert.strictEqual(activeTab.label, 'OI-Code 设置', "Webview panel title is incorrect");
     });
 
     test('Docker initialization and code execution', async function () {
-        this.timeout(60000); // Increase timeout for Docker operations
-        // Skip this test for now since extension activation is not working in test environment
-        console.log('Skipping Docker initialization test - extension not loading in test environment');
-        assert.ok(true, 'Skipping Docker initialization test');
+        this.timeout(90000);
+        await vscode.commands.executeCommand('oicode.initializeEnvironment');
+        // Test C code execution
+        const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;
+        const createdC = await createProblemAndOpen('UT-C-Hello', 'c', cCode);
+        const resC: any = await vscode.commands.executeCommand('oicode.runCode', '');
+        assert.ok(resC, 'oicode.runCode should return a result');
+        assert.ok(typeof resC.output === 'string');
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        await cleanupDir(path.dirname(createdC.sourcePath));
+        // Test C++ code execution
+        const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\\n\"; return 0; }`;
+        const createdCpp = await createProblemAndOpen('UT-CPP-Hello', 'cpp', cppCode);
+        const resCpp: any = await vscode.commands.executeCommand('oicode.runCode', '');
+        assert.ok(resCpp && typeof resCpp.output === 'string');
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        await cleanupDir(path.dirname(createdCpp.sourcePath));
+        // Test Python code execution
+        const pythonCode = `print(\"Hello, Python!\")`;
+        const createdPy = await createProblemAndOpen('UT-PY-Hello', 'python', pythonCode);
+        const resPy: any = await vscode.commands.executeCommand('oicode.runCode', '');
+        assert.ok(resPy && typeof resPy.output === 'string');
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        await cleanupDir(path.dirname(createdPy.sourcePath));
     });
 });
 

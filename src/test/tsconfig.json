@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../out/test",
-    "rootDir": "../",
+    "outDir": "../../out",
     "module": "commonjs",
     "target": "es6",
     "lib": [

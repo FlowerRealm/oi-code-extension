@@ -194,7 +194,7 @@ export class Installer {
                 output.appendLine('Docker is ready.');
             } catch (e: any) {
                 output.appendLine(`Silent installation failed: ${e?.message || e}`);
-                // Do not throw to avoid breaking the main flow; let the caller decide next steps
+                // 向上层传递错误，让调用者决定如何处理
                 throw e;
             }
         });
