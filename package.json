@@ -12,7 +12,12 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onCommand:oi-code.showSettingsPage",
+    "onCommand:oicode.createProblem",
+    "onCommand:oicode.initializeEnvironment",
+    "onCommand:oicode.runCode",
+    "onCommand:oicode.runPairCheck"
   ],
   "contributes": {
     "commands": [

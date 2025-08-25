@@ -37,7 +37,38 @@ async function cleanupDir(dir: string) {
 }
 
 suite('Extension Test Suite', () => {
-    vscode.window.showInformationMessage('Start all tests.');
+    // Manually activate the extension at the start
+    before(async function () {
+        this.timeout(10000);
+        console.log('Attempting to manually activate extension...');
+
+        try {
+            // Try to find and activate the extension
+            const extension = vscode.extensions.getExtension('oi-code');
+            if (extension) {
+                console.log('Extension found, attempting to activate...');
+                await extension.activate();
+                console.log('Extension activated successfully');
+            } else {
+                console.log('Extension not found by ID, trying alternative...');
+                // Try alternative activation methods
+                const allExtensions = vscode.extensions.all;
+                const oiExtension = allExtensions.find(ext => ext.id.includes('oi-code') || ext.packageJSON?.name === 'oi-code');
+                if (oiExtension) {
+                    console.log('Found extension by search, activating...');
+                    await oiExtension.activate();
+                    console.log('Extension activated successfully');
+                } else {
+                    console.log('No OI-Code extension found in available extensions');
+                }
+            }
+        } catch (error) {
+            console.error('Error activating extension:', error);
+        }
+
+        // Wait a bit for activation to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    });
 
     // Debug: Check if extension is activated
     test('Extension activation check', async function () {
@@ -109,7 +140,7 @@ suite('OI-Code Commands Test Suite', () => {
             console.log('Skipping Code Execution Tests - extension not loading in test environment');
         });
 
-        it('should create and run C Hello World', async function () {
+        test('should create and run C Hello World', async function () {
             this.timeout(60000);
             // Skip this test for now since extension activation is not working in test environment
             console.log('Skipping C Hello World test - extension not loading in test environment');
@@ -154,25 +185,13 @@ suite('OI-Code Commands Test Suite', () => {
         const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or '0')))`;
         const pyDp = `import sys\nN=int(sys.stdin.readline().strip() or '0')\nC=[0]* (N+2)\nC[0]=1\nif N>=1: C[1]=1\nfor i in range(2,N+1):\n    s=0\n    for j in range(i):\n        s+=C[j]*C[i-1-j]\n    C[i]=s\nprint(C[N])`;
 
-        it('pair check c catalan recursive vs dp', async function () {
-            this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping pair check c test - extension not loading in test environment');
-            assert.ok(true, 'Skipping pair check c test');
-        });
-
-        it('pair check cpp catalan recursive vs dp', async function () {
-            this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping pair check cpp test - extension not loading in test environment');
-            assert.ok(true, 'Skipping pair check cpp test');
-        });
-
-        it('pair check python catalan recursive vs dp', async function () {
-            this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping pair check python test - extension not loading in test environment');
-            assert.ok(true, 'Skipping pair check python test');
-        });
+        for (const lang of ['c', 'cpp', 'python'] as const) {
+            test(`pair check ${lang} catalan recursive vs dp`, async function () {
+                this.timeout(60000);
+                // Skip this test for now since extension activation is not working in test environment
+                console.log(`Skipping pair check ${lang} test - extension not loading in test environment`);
+                assert.ok(true, `Skipping pair check ${lang} test`);
+            });
+        }
     });
 });
