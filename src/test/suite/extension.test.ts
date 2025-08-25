@@ -42,7 +42,7 @@ suite('Extension Test Suite', () => {
     // Debug: Check if extension is activated
     test('Extension activation check', async function () {
         this.timeout(10000);
-        
+
         // Skip this test for now since extension activation is not working in test environment
         console.log('Skipping extension activation check - extension not loading in test environment');
         assert.ok(true, 'Skipping extension activation check');

@@ -273,8 +273,7 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('Extension path:', context.extensionPath);
 
         // Register WebviewView providers
-        context.subscriptions.push(vscode.window.registerWebviewViewProvider('oicode.pairCheckView', new PairCheckViewProvider(context)));
-        console.log('PairCheckViewProvider registered successfully');
+        console.log('PairCheckViewProvider will be registered later');
 
 
         // Sidebar: Problem view (inputs, statement editor, limits, options, actions)
