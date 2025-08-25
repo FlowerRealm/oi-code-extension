@@ -16,6 +16,7 @@ import { exec } from 'child_process';
 
 // Base dir for test-created problems
 const TEST_BASE_DIR = path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
+const TEST_TMP_BASE = path.join(os.homedir(), '.oi-code-tests', 'tmp');
 
 // Helper: create a problem via command, inject code, and open it
 async function createProblemAndOpen(name: string, language: 'c' | 'cpp' | 'python', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
@@ -206,11 +207,11 @@ suite('OI-Code Commands Test Suite', () => {
             return { leftDir: path.dirname(left.sourcePath), rightDir: path.dirname(right.sourcePath) };
         }
 
-        const cRec = `#include <stdio.h>\nlong long C(int n){ if(n<=1) return 1; long long s=0; for(int i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;}\nint main(){ int n; if(scanf("%d",&n)!=1) return 0; printf("%lld\n", C(n)); }`;
-        const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){ int n; if(scanf("%d",&n)!=1) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } printf("%lld\n", C[n]); }`;
+        const cRec = `#include <stdio.h>\nlong long C(int n){ if(n<=1) return 1; long long s=0; for(int i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;}\nint main(){ int n; if(scanf(\"%d\",&n)!=1) return 0; printf(\"%lld\\n\", C(n)); }`;
+        const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){ int n; if(scanf(\"%d\",&n)!=1) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } printf(\"%lld\\n\", C[n]); }`;
 
-        const cppRec = `#include <bits/stdc++.h>\nusing namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<"\n"; }`;
-        const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<"\n"; }`;
+        const cppRec = `#include <bits/stdc++.h>\nusing namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
+        const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
 
         const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or 0)))`;
         const pyDp = `import sys\nN=int(sys.stdin.readline().strip() or 0)\nC=[0]* (N+2)\nC[0]=1\nif N>=1: C[1]=1\nfor i in range(2,N+1):\n    s=0\n    for j in range(i):\n        s+=C[j]*C[i-1-j]\n    C[i]=s\nprint(C[N])`;

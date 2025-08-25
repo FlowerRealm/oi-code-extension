@@ -549,7 +549,10 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
             vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
             return { error: 'LANG_MISMATCH' };
         }
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
+        // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
+        const sharedBaseDir = path.join(os.homedir(), '.oi-code-tests', 'tmp');
+        if (!fs.existsSync(sharedBaseDir)) { fs.mkdirSync(sharedBaseDir, { recursive: true }); }
+        const tempDir = fs.mkdtempSync(path.join(sharedBaseDir, 'oi-code-'));
         try {
             const ext = langId === 'python' ? 'py' : langId;
             const file1Path = path.join(tempDir, `code1.${ext}`);
@@ -690,7 +693,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
         });
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('oicode.downloadDocker', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('oi-code.downloadDocker', async () => {
         const installCommand = Installer.getInstallCommand();
         if (installCommand) {
             vscode.window.showInformationMessage(
