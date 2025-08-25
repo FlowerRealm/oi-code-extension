@@ -14,8 +14,6 @@ import * as vscode from 'vscode';
 
 import { Installer, InstallCommand } from './docker/install';
 
-const IMAGE_NAME = 'oi-runner:stable';
-
 /**
  * Manages the Docker environment, including building the image, running containers,
  * and monitoring submissions for the OI extension.
@@ -23,80 +21,33 @@ const IMAGE_NAME = 'oi-runner:stable';
 export class DockerManager {
 
     /**
-     * Ensures the 'oi-runner:stable' Docker image exists, building it if necessary.
-     * It will show progress in a VS Code terminal.
-     * @returns A promise that resolves when the image is confirmed to be ready.
+     * Ensures Docker is available and ready for use.
+     * @returns A promise that resolves when Docker is ready.
      */
     public static async ensureImage(projectRootPath: string): Promise<void> {
-        // Check if image already exists
-        if (await this.checkImageExists()) {
-            console.log(`Docker image '${IMAGE_NAME}' already exists.`);
-            return;
-        }
-
-        // Try silent installation/startup if Docker is not available
+        // Check if Docker is available
         try {
             await Installer.ensureDockerAvailableSilently();
         } catch (error) {
             console.log('Silent Docker installation failed, proceeding with manual flow');
         }
 
-        // Check again after installation attempt
-        if (await this.checkImageExists()) {
-            console.log(`Docker image '${IMAGE_NAME}' found after installation.`);
-            return;
+        // Verify Docker is working
+        const isDockerWorking = await this.checkDockerWorking();
+        if (!isDockerWorking) {
+            throw new Error('Docker is not available or not working properly');
         }
-
-        // Build image if not found
-        await this.buildImage(projectRootPath);
     }
 
-    private static async checkImageExists(): Promise<boolean> {
+    private static async checkDockerWorking(): Promise<boolean> {
         return new Promise<boolean>((resolve) => {
-            const check = spawn('docker', ['image', 'inspect', IMAGE_NAME], { stdio: 'ignore' });
+            const check = spawn('docker', ['info'], { stdio: 'ignore' });
             check.on('close', (code) => {
                 resolve(code === 0);
             });
             check.on('error', () => {
                 resolve(false);
             });
-        });
-    }
-
-    private static async buildImage(projectRootPath: string): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            console.log(`Docker image '${IMAGE_NAME}' not found. Proceeding with build.`);
-            vscode.window.showInformationMessage(`Building Docker image '${IMAGE_NAME}'. This may take a few minutes...`);
-
-            try {
-                const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Build');
-                outputChannel.show();
-                outputChannel.appendLine(`Starting build for ${IMAGE_NAME}...\n`);
-
-                const buildProcess = spawn('docker', ['build', '-t', IMAGE_NAME, '-f', path.join(projectRootPath, 'Dockerfile'), '.'], { cwd: projectRootPath });
-
-                buildProcess.stdout.on('data', data => outputChannel.append(data.toString()));
-                buildProcess.stderr.on('data', data => outputChannel.append(data.toString()));
-
-                buildProcess.on('close', (buildCode) => {
-                    if (buildCode === 0) {
-                        outputChannel.appendLine(`\nSuccessfully built image '${IMAGE_NAME}'.`);
-                        resolve();
-                    } else {
-                        const errorMsg = `Failed to build Docker image. Exit code: ${buildCode}. Check output channel for details.`;
-                        outputChannel.appendLine(`\nERROR: ${errorMsg}`);
-                        reject(new Error(errorMsg));
-                    }
-                });
-
-                buildProcess.on('error', (err) => {
-                    const errorMsg = `Failed to start Docker build: ${err.message}`;
-                    outputChannel.appendLine(`\nERROR: ${errorMsg}`);
-                    reject(new Error(errorMsg));
-                });
-            } catch (e) {
-                reject(e as any);
-            }
         });
     }
 

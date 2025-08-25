@@ -215,12 +215,12 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 
                     this.setOutputs('<i>正在运行...</i>', '<i>正在运行...</i>');
                     const baseDir = path.join(os.homedir(), '.oi-code-tests');
-                    if (!fs.existsSync(baseDir)) { fs.mkdirSync(baseDir, { recursive: true }); }
-                    const tempDir = fs.mkdtempSync(path.join(baseDir, 'pair-'));
+                    await fs.promises.mkdir(baseDir, { recursive: true });
+                    const tempDir = await fs.promises.mkdtemp(path.join(baseDir, 'pair-'));
                     const file1Path = path.join(tempDir, `code1.${langId}`);
                     const file2Path = path.join(tempDir, `code2.${langId}`);
-                    fs.writeFileSync(file1Path, editor1.document.getText());
-                    fs.writeFileSync(file2Path, editor2.document.getText());
+                    await fs.promises.writeFile(file1Path, editor1.document.getText());
+                    await fs.promises.writeFile(file2Path, editor2.document.getText());
 
                     const ext = langId === 'python' ? 'py' : langId;
                     const [result1, result2] = await Promise.all([
@@ -240,7 +240,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                         this.setOutputs(html1, html2);
                     }
 
-                    fs.rm(tempDir, { recursive: true, force: true }, () => { });
+                    await fs.promises.rm(tempDir, { recursive: true, force: true });
 
                 } catch (e: any) {
                     vscode.window.showErrorMessage(`对拍时发生错误: ${e.message}`);
@@ -551,14 +551,14 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
         }
         // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
         const sharedBaseDir = path.join(os.homedir(), '.oi-code-tests', 'tmp');
-        if (!fs.existsSync(sharedBaseDir)) { fs.mkdirSync(sharedBaseDir, { recursive: true }); }
-        const tempDir = fs.mkdtempSync(path.join(sharedBaseDir, 'oi-code-'));
+        await fs.promises.mkdir(sharedBaseDir, { recursive: true });
+        const tempDir = await fs.promises.mkdtemp(path.join(sharedBaseDir, 'oi-code-'));
         try {
             const ext = langId === 'python' ? 'py' : langId;
             const file1Path = path.join(tempDir, `code1.${ext}`);
             const file2Path = path.join(tempDir, `code2.${ext}`);
-            fs.writeFileSync(file1Path, editor1.document.getText());
-            fs.writeFileSync(file2Path, editor2.document.getText());
+            await fs.promises.writeFile(file1Path, editor1.document.getText());
+            await fs.promises.writeFile(file2Path, editor2.document.getText());
 
             const input = testInput ?? '';
             const [result1, result2] = await Promise.all([
