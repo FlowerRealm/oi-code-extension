@@ -122,26 +122,26 @@ async function runSingleInDocker(
     const compilers = config.get<any>('oicode.docker.compilers') || {};
     const defaultOpt = config.get<string>('oicode.compile.opt');
     const defaultStd = config.get<string>('oicode.compile.std');
-    
+
     // Helper function to apply compiler options
     function applyCompilerOptions(args: string[], options?: { opt?: string; std?: string }): string[] {
         let result = [...args];
-        
+
         const effOpt = options?.opt || defaultOpt;
         if (effOpt) {
             result = result.map(a => /^-O[0-3]$/.test(a) ? `-${effOpt}` : a);
             if (!result.some(a => /^-O[0-3]$/.test(a))) result.push(`-${effOpt}`);
         }
-        
+
         const effStd = options?.std || defaultStd;
         if (effStd) {
             result = result.map(a => a.startsWith('-std=') ? `-std=${effStd}` : a);
             if (!result.some(a => a.startsWith('-std='))) result.push(`-std=${effStd}`);
         }
-        
+
         return result;
     }
-    
+
     let command: string;
     if (languageId === 'python') {
         const py = compilers.python || { command: 'python3', args: ['/sandbox/${sourceFile}'] };
@@ -168,12 +168,12 @@ async function runSingleInDocker(
         languageId,
         timeLimit: 10
     });
-    return { 
-        stdout: result.stdout, 
-        stderr: result.stderr, 
-        timedOut: result.timedOut, 
-        memoryExceeded: result.memoryExceeded, 
-        spaceExceeded: result.spaceExceeded 
+    return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        timedOut: result.timedOut,
+        memoryExceeded: result.memoryExceeded,
+        spaceExceeded: result.spaceExceeded
     };
 }
 
@@ -268,7 +268,13 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-
+    try {
+        console.log('OI-Code extension is now active!');
+        console.log('Extension path:', context.extensionPath);
+        
+        // Register WebviewView providers
+        context.subscriptions.push(vscode.window.registerWebviewViewProvider('oicode.pairCheckView', new PairCheckViewProvider(context)));
+        console.log('PairCheckViewProvider registered successfully');
 
 
     // Sidebar: Problem view (inputs, statement editor, limits, options, actions)
@@ -708,6 +714,12 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
     if (context.globalState.get<boolean>('oi-code.initializationComplete')) {
         context.globalState.update('oi-code.initializationComplete', false);
         vscode.commands.executeCommand('oi-code.showCompletionPage');
+    }
+    
+    console.log('OI-Code extension activation completed successfully');
+    } catch (error) {
+        console.error('Error activating OI-Code extension:', error);
+        vscode.window.showErrorMessage(`Failed to activate OI-Code extension: ${error}`);
     }
 }
 

@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "../../out/test",
-    "rootDir": ".",
+    "rootDir": "../",
     "module": "commonjs",
     "target": "es6",
     "lib": ["es6", "dom"],
@@ -14,7 +14,8 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "../constants.ts"
   ],
   "exclude": [
     "node_modules"

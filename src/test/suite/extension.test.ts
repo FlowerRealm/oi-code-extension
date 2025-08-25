@@ -39,6 +39,31 @@ async function cleanupDir(dir: string) {
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
 
+    // Debug: Check if extension is activated
+    test('Extension activation check', async function () {
+        this.timeout(5000);
+        
+        // Wait a bit for extension to activate
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // List all available commands
+        const commands = await vscode.commands.getCommands();
+        console.log('Available commands:', commands.filter(cmd => cmd.includes('oi')));
+        
+        // Check if our commands are registered
+        const hasShowSettings = commands.includes('oi-code.showSettingsPage');
+        const hasCreateProblem = commands.includes('oicode.createProblem');
+        const hasInitializeEnv = commands.includes('oicode.initializeEnvironment');
+        
+        console.log('Command availability:', {
+            'oi-code.showSettingsPage': hasShowSettings,
+            'oicode.createProblem': hasCreateProblem,
+            'oicode.initializeEnvironment': hasInitializeEnv
+        });
+        
+        assert.ok(hasShowSettings || hasCreateProblem || hasInitializeEnv, 'At least one OI-Code command should be available');
+    });
+
     // Helper to set VS Code configuration for tests
     async function setConfiguration(section: string, value: any) {
         const config = vscode.workspace.getConfiguration();
