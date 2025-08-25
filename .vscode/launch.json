@@ -26,7 +26,7 @@
             "outFiles": [
                 "${workspaceFolder}/out/test/**/*.js"
             ],
-            "preLaunchTask": "npm: pretest"
+            "preLaunchTask": "npm: compile"
         }
     ]
 }

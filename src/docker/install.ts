@@ -119,12 +119,11 @@ export class Installer {
                 await new Promise(r => setTimeout(r, 3000));
             }
         }
-        throw new Error('等待 Docker 就绪超时');
+        throw new Error('Waiting for Docker to be ready timeout');
     }
 
     /**
-     * Attempt to install and start Docker silently (best-effort) on Win/macOS/Linux.
-     * Shows a single progress notification; avoids显式引导界面。
+     * Shows a single progress notification; avoids explicit UI guidance.
      */
     public static async ensureDockerAvailableSilently(): Promise<void> {
         // If already available, just return
@@ -135,11 +134,11 @@ export class Installer {
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: '正在准备运行环境...',
+            title: 'Preparing to run environment...',
             cancellable: false
         }, async (progress) => {
             const output = vscode.window.createOutputChannel('OI-Code Docker Install');
-            output.appendLine('开始静默安装 Docker...');
+            output.appendLine('Starting silent Docker installation...');
             const platform = os.platform();
 
             function run(cmd: string, args: string[], cwd?: string): Promise<number> {
@@ -155,10 +154,10 @@ export class Installer {
                 if (platform === 'win32') {
                     // Prefer winget, then choco
                     if (this.isCommandAvailable('winget')) {
-                        progress.report({ message: '通过 winget 安装 Docker Desktop（静默）...' });
+                        progress.report({ message: 'Installing Docker Desktop via winget (silently)...' });
                         await run('winget', ['install', '-e', '--id', 'Docker.DockerDesktop', '--silent', '--accept-package-agreements', '--accept-source-agreements']);
                     } else if (this.isCommandAvailable('choco')) {
-                        progress.report({ message: '通过 choco 安装 Docker Desktop（静默）...' });
+                        progress.report({ message: 'Installing Docker Desktop via choco (silently)...' });
                         await run('choco', ['install', 'docker-desktop', '-y', '--no-progress']);
                     }
                     // Try to launch Docker Desktop
@@ -167,7 +166,7 @@ export class Installer {
                     } catch { }
                 } else if (platform === 'darwin') {
                     if (this.isCommandAvailable('brew')) {
-                        progress.report({ message: '通过 Homebrew 安装 Docker Desktop（静默）...' });
+                        progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
                         await run('brew', ['install', '--cask', 'docker']);
                     }
                     try {
@@ -176,7 +175,7 @@ export class Installer {
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
                     const distro = this.getLinuxDistro();
-                    progress.report({ message: `通过 ${distro} 包管理器安装 Docker（静默）...` });
+                    progress.report({ message: `Installing Docker via ${distro} package manager (silently)...` });
                     try {
                         if (distro === 'ubuntu' || distro === 'debian') {
                             await run('bash', ['-lc', 'sudo apt-get update && sudo apt-get install -y docker.io']);
@@ -190,12 +189,12 @@ export class Installer {
                     try { await run('bash', ['-lc', 'sudo systemctl start docker']); } catch { }
                 }
 
-                progress.report({ message: '等待 Docker 就绪...' });
+                progress.report({ message: 'Waiting for Docker to be ready...' });
                 await this.waitForDockerReady();
-                output.appendLine('Docker 已就绪。');
+                output.appendLine('Docker is ready.');
             } catch (e: any) {
-                output.appendLine(`静默安装失败：${e?.message || e}`);
-                // Do not throw to avoid打断主流程；由调用方决定后续引导
+                output.appendLine(`Silent installation failed: ${e?.message || e}`);
+                // Do not throw to avoid breaking the main flow; let the caller decide next steps
                 throw e;
             }
         });

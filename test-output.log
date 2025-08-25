@@ -12,11 +12,11 @@ assets by path *.html 22.4 KiB
   asset completion.html 2.13 KiB [compared for emit] [from: webview/completion.html] [copied]
 asset extension.js 284 KiB [compared for emit] (name: main) 1 related asset
 asset settings-schema.json 2.36 KiB [compared for emit] [from: webview/settings-schema.json] [copied]
-cacheable modules 274 KiB
+cacheable modules 273 KiB
   modules by path ./node_modules/diff/lib/ 210 KiB 19 modules
-  modules by path ./src/ 64.2 KiB
-    ./src/extension.ts 39.1 KiB [built] [code generated]
-    ./src/dockerManager.ts 13 KiB [built] [code generated]
+  modules by path ./src/ 63.3 KiB
+    ./src/extension.ts 38 KiB [built] [code generated]
+    ./src/dockerManager.ts 13.3 KiB [built] [code generated]
     ./src/docker/install.ts 12.1 KiB [built] [code generated]
 external "vscode" 42 bytes [built] [code generated]
 external "path" 42 bytes [built] [code generated]
@@ -25,228 +25,79 @@ external "util" 42 bytes [built] [code generated]
 external "fs" 42 bytes [built] [code generated]
 external "os" 42 bytes [built] [code generated]
 external "fs/promises" 42 bytes [built] [code generated]
-webpack 5.101.0 compiled successfully in 1827 ms
+webpack 5.101.0 compiled successfully in 1523 ms
 - Resolving version...
 ✔ Validated version: 1.103.2
 ✔ Found existing install in /home/flowerrealm/oi-code/extensions/oi-code/.vscode-test/vscode-linux-x64-1.103.2
-[90m[main 2025-08-25T05:47:15.690Z][0m update#setState disabled
-[90m[main 2025-08-25T05:47:15.691Z][0m update#ctor - updates are disabled by the environment
+[90m[main 2025-08-25T06:06:13.176Z][0m update#setState disabled
+[90m[main 2025-08-25T06:06:13.177Z][0m update#ctor - updates are disabled by the environment
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-vsliveshare.vsliveshare' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.gather' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.vscode-pylance' wants API proposal 'mcpConfigurationProvider' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
 ChatSessionStore: Migrating 0 chat sessions from storage service to file system
-Started local extension host with pid 36158.
+Started local extension host with pid 48760.
 Loading development extension at /home/flowerrealm/oi-code/extensions/oi-code
 Settings Sync: Account status changed from uninitialized to unavailable
 [0m[0m
 [0m  Extension Test Suite[0m
-[35835:0825/134718.129211:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 1 times!
-[35835:0825/134718.134913:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 2 times!
-[35835:0825/134718.145106:ERROR:ui/gl/gl_surface_presentation_helper.cc:260] GetVSyncParametersIfAvailable() failed for 3 times!
-  [32m  ✔[0m[90m showSettingsPage command should create a webview panel[0m[31m (1502ms)[0m
+  [32m  ✔[0m[90m showSettingsPage command should create a webview panel[0m[31m (1501ms)[0m
 Docker image 'oi-runner:stable' already exists.
-[oicode.runCode] lang=c cmd=( gcc /sandbox/main.c -o /tmp/a.out -O2 ) && /tmp/a.out
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100839806-943 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-C-Hello:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-KIJb87:/tmp:rw gcc:13 bash -c ( gcc /sandbox/main.c -o /tmp/a.out -O2 ) && /tmp/a.out
-[docker stdout] Hello, C!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-[oicode.runCode] lang=cpp cmd=( g++ /sandbox/main.cpp -o /tmp/a.out -O2 -std=c++17 ) && /tmp/a.out
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100841061-229 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-CPP-Hello:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-hhxAlA:/tmp:rw gcc:13 bash -c ( g++ /sandbox/main.cpp -o /tmp/a.out -O2 -std=c++17 ) && /tmp/a.out
-[docker stdout] Hello, C++!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-[oicode.runCode] lang=python cmd=python3 /sandbox/main.py
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100843092-145 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-PY-Hello:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-z8UL6d:/tmp:rw python:3.11 bash -c python3 /sandbox/main.py
-[docker stdout] Hello, Python!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-  [32m  ✔[0m[90m Docker initialization and code execution[0m[31m (4559ms)[0m
+  [32m  ✔[0m[90m Docker initialization and code execution[0m[31m (2825ms)[0m
 [0m  OI-Code Commands Test Suite[0m
 Docker is already installed: Docker version 28.3.3, build 980b856
 
   [32m  ✔[0m[90m should execute oi-code.installDocker command[0m
 [0m    Code Execution Tests (requires Docker environment)[0m
 Docker image 'oi-runner:stable' already exists.
-[oicode.runCode] lang=c cmd=( gcc /sandbox/main.c -o /tmp/a.out -O2 ) && /tmp/a.out
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100844955-801 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-Run-C:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-BYNXYR:/tmp:rw gcc:13 bash -c ( gcc /sandbox/main.c -o /tmp/a.out -O2 ) && /tmp/a.out
-[docker stdout] Hello, C from Test!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-    [32m  ✔[0m[90m should create and run C Hello World[0m[31m (1310ms)[0m
-[oicode.runCode] lang=cpp cmd=( g++ /sandbox/main.cpp -o /tmp/a.out -O2 -std=c++17 ) && /tmp/a.out
+    [32m  ✔[0m[90m should create and run C Hello World[0m[31m (806ms)[0m
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100845789-488 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-Run-CPP:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-O8FcNv:/tmp:rw gcc:13 bash -c ( g++ /sandbox/main.cpp -o /tmp/a.out -O2 -std=c++17 ) && /tmp/a.out
-[docker stdout] Hello, C++ from Test!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-    [32m  ✔[0m[90m should create and run C++ Hello World[0m[31m (1116ms)[0m
-[oicode.runCode] lang=python cmd=python3 /sandbox/main.py
+    [32m  ✔[0m[90m should create and run C++ Hello World[0m[31m (858ms)[0m
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100846943-29 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/problems-ut/UT-Run-PY:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-yxUpda:/tmp:rw python:3.11 bash -c python3 /sandbox/main.py
-[docker stdout] Hello, Python from Test!
-[DockerManager] exit code=0
-[oicode.runCode] finished
-    [32m  ✔[0m[90m should create and run Python Hello World[0m[31m (741ms)[0m
+    [32m  ✔[0m[90m should create and run Python Hello World[0m[31m (736ms)[0m
 [0m    Pair Check Tests (Catalan numbers)[0m
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100847740-862 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-a5dlH3:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-J4SWE9:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100847746-684 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-a5dlH3:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-9XojrZ:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100849095-865 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-6PnWhN:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-OghJKw:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100849114-83 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-6PnWhN:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-vfK3oR:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stdout] 1
-[docker stdout] 1
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100850962-491 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-LpuVro:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-CfqkRZ:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100850969-733 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-LpuVro:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-xVgsYp:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stdout] 2
-[docker stdout] 2
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100852121-562 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-rjzTO8:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-3BkuIN:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100852126-433 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-rjzTO8:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-F9hJoy:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stdout] 5
-[docker stdout] 5
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100853440-142 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-y8hWdS:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-2LEb1C:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100853494-564 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-y8hWdS:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-oyLiLO:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stdout] 14
-[docker stdout] 14
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100854782-254 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-XxOprI:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-9eLfeV:/tmp:rw gcc:13 bash -c gcc /sandbox/code1.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100854794-247 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-XxOprI:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-VC0Jqa:/tmp:rw gcc:13 bash -c gcc /sandbox/code2.c -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stderr] cc1: warning: command-line option '-std=c++17' is valid for C++/ObjC++ but not for C
-[docker stdout] 42
-[docker stdout] 42
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-    [32m  ✔[0m[90m pair check c catalan recursive vs dp[0m[31m (8543ms)[0m
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100856377-239 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NGcy35:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-1Oqswo:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100856380-914 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NGcy35:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-y2dpPI:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100859422-66 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-fldkgO:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-p23HJ2:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[DockerManager] docker run --rm -i --name oi-task-1756100859425-281 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-fldkgO:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-ux0Q7L:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stdout] 1
-[docker stdout] 1
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100861336-276 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-BiDkhU:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-Q2i1CL:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[DockerManager] docker run --rm -i --name oi-task-1756100861339-286 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-BiDkhU:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-uL4DRO:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stdout] 2
-[docker stdout] 2
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100863099-818 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-SRmTMG:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-oBebe4:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100863102-755 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-SRmTMG:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-YsH15b:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stdout] 5
-[docker stdout] 5
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100864817-10 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-yHBfbH:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-ErOMxS:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[DockerManager] docker run --rm -i --name oi-task-1756100864820-31 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-yHBfbH:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-4RMvhv:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stdout] 14
-[DockerManager] exit code=0
-[docker stdout] 14
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100866697-341 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-TeOu6z:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-egBweD:/tmp:rw gcc:13 bash -c g++ /sandbox/code2.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[DockerManager] docker run --rm -i --name oi-task-1756100866700-368 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-TeOu6z:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-tOqDTT:/tmp:rw gcc:13 bash -c g++ /sandbox/code1.cpp -o /tmp/a.out -O2 -std=c++17 && /tmp/a.out
-[docker stdout] 42
-[docker stdout] 42
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-    [32m  ✔[0m[90m pair check cpp catalan recursive vs dp[0m[31m (12498ms)[0m
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100868888-521 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-OdEp3A:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-i9SRQz:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100868894-560 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-OdEp3A:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-CLC2Hg:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-[docker stdout] TODO
-[docker stdout] TODO
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100869786-579 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NhtYga:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-6JaDoJ:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-[DockerManager] docker run --rm -i --name oi-task-1756100869790-65 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NhtYga:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-1ulMnO:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-[docker stdout] 1
-[docker stdout] 1
-[DockerManager] exit code=0
-[DockerManager] exit code=0
+Docker image 'oi-runner:stable' already exists.
+    [32m  ✔[0m[90m pair check c catalan recursive vs dp[0m[31m (6342ms)[0m
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100870591-540 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-2g6m0O:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-63veLe:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-[DockerManager] docker run --rm -i --name oi-task-1756100870594-335 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-2g6m0O:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-1kelkf:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-[docker stdout] 2
-[docker stdout] 2
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100871388-857 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-Mx73PD:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-tAVOqa:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100871391-993 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-Mx73PD:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-j7fLdh:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-[docker stdout] 5
-[docker stdout] 5
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100872340-651 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NU9R19:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-yWXmsg:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-[DockerManager] docker run --rm -i --name oi-task-1756100872343-595 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-NU9R19:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-4W7eu3:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-[docker stdout] 14
-[docker stdout] 14
-[DockerManager] exit code=0
-[DockerManager] exit code=0
 Docker image 'oi-runner:stable' already exists.
 Docker image 'oi-runner:stable' already exists.
-[DockerManager] docker run --rm -i --name oi-task-1756100873202-156 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-U3QI6F:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-yNJBMr:/tmp:rw python:3.11 bash -c python3 /sandbox/code2.py
-[DockerManager] docker run --rm -i --name oi-task-1756100873205-809 --network=none --read-only --memory=256m --memory-swap=256m --cpus=1.0 --pids-limit=64 -v /home/flowerrealm/.oi-code-tests/tmp/oi-code-U3QI6F:/sandbox:ro -v /home/flowerrealm/.oi-code-tests/tmp/oi-run-STWrns:/tmp:rw python:3.11 bash -c python3 /sandbox/code1.py
-[docker stdout] 42
-[docker stdout] 42
-[DockerManager] exit code=0
-[DockerManager] exit code=0
-    [32m  ✔[0m[90m pair check python catalan recursive vs dp[0m[31m (5508ms)[0m
-[92m [0m[32m 9 passing[0m[90m (36s)[0m
-[90m[main 2025-08-25T05:47:54.181Z][0m Extension host with pid 36158 exited with code: 0, signal: unknown.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+    [32m  ✔[0m[90m pair check cpp catalan recursive vs dp[0m[31m (13985ms)[0m
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+Docker image 'oi-runner:stable' already exists.
+    [32m  ✔[0m[90m pair check python catalan recursive vs dp[0m[31m (7174ms)[0m
+[92m [0m[32m 9 passing[0m[90m (34s)[0m
+[90m[main 2025-08-25T06:06:50.357Z][0m Extension host with pid 48760 exited with code: 0, signal: unknown.
 Exit code:   0

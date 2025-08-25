@@ -21,3 +21,4 @@ out/
 
 # Test logs
 test-output.log
+.vscode/settings.json

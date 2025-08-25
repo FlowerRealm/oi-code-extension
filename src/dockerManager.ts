@@ -152,8 +152,10 @@ export class DockerManager {
             'bash', '-c', command
         ];
 
+        const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
+        outputChannel.show(true);
         return new Promise((resolve) => {
-            console.log(`[DockerManager] docker ${args.join(' ')}`);
+            outputChannel.appendLine(`[DockerManager] docker ${args.join(' ')}`);
             const dockerProcess = spawn('docker', args);
 
             let stdout = '';
@@ -163,12 +165,12 @@ export class DockerManager {
             dockerProcess.stdout.on('data', (data) => {
                 const text = data.toString();
                 stdout += text;
-                console.log(`[docker stdout] ${text.trimEnd()}`);
+                outputChannel.appendLine(`[docker stdout] ${text.trimEnd()}`);
             });
             dockerProcess.stderr.on('data', (data) => {
                 const text = data.toString();
                 stderr += text;
-                console.error(`[docker stderr] ${text.trimEnd()}`);
+                outputChannel.appendLine(`[docker stderr] ${text.trimEnd()}`);
             });
 
             // Hard timeout: kill container if timeLimit exceeded
@@ -184,13 +186,14 @@ export class DockerManager {
                 const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
                 const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
                 resolve({ output: stdout, error: stderr, timedOut, memoryExceeded, spaceExceeded });
-                console.log(`[DockerManager] exit code=${code}`);
+                outputChannel.appendLine(`[DockerManager] exit code=${code}`);
             });
 
             dockerProcess.on('error', async (err) => {
                 clearTimeout(killTimer);
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
                 resolve({ output: '', error: `Failed to start Docker: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
+                outputChannel.appendLine(`[DockerManager] error: ${err.message}`);
             });
 
             // Provide input to the process

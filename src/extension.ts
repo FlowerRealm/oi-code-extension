@@ -447,8 +447,8 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
             const problemDir = path.join(baseDir, safe);
             const configDir = path.join(problemDir, 'config');
-            fs.mkdirSync(problemDir, { recursive: true });
-            fs.mkdirSync(configDir, { recursive: true });
+            await fs.promises.mkdir(problemDir, { recursive: true });
+            await fs.promises.mkdir(configDir, { recursive: true });
 
             // Template source
             const sourcePath = path.join(problemDir, `main.${ext}`);
@@ -458,18 +458,18 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                     : langId === 'cpp'
                         ? '#include <bits/stdc++.h>\nusing namespace std; int main(){ /* TODO */ return 0; }\n'
                         : 'print("TODO")\n';
-                fs.writeFileSync(sourcePath, tpl, 'utf8');
+                await fs.promises.writeFile(sourcePath, tpl, 'utf8');
             }
 
             // Default config
             const problemJsonPath = path.join(configDir, 'problem.json');
             if (!fs.existsSync(problemJsonPath)) {
-                fs.writeFileSync(problemJsonPath, JSON.stringify({ name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' }, null, 2), 'utf8');
+                await fs.promises.writeFile(problemJsonPath, JSON.stringify({ name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' }, null, 2), 'utf8');
             }
             const statementPath = path.join(configDir, 'statement.md');
-            if (!fs.existsSync(statementPath)) fs.writeFileSync(statementPath, `# ${safe}\n\n在此编写题面...\n`, 'utf8');
+            if (!fs.existsSync(statementPath)) await fs.promises.writeFile(statementPath, `# ${safe}\n\n在此编写题面...\n`, 'utf8');
             const samplesPath = path.join(configDir, 'samples.txt');
-            if (!fs.existsSync(samplesPath)) fs.writeFileSync(samplesPath, '', 'utf8');
+            if (!fs.existsSync(samplesPath)) await fs.promises.writeFile(samplesPath, '', 'utf8');
 
             const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
             await vscode.window.showTextDocument(doc, { preview: false });
@@ -586,33 +586,9 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
         if (!editor) {
             return vscode.window.showErrorMessage('Please open a file to run.');
         }
-
         const document = editor.document;
         const languageId = document.languageId as 'c' | 'cpp' | 'python';
         const sourceFile = path.basename(document.fileName);
-
-        // Use Docker-side compilers. Read from 'oicode.docker.compilers' instead of local toolchains.
-        const dockerCompilers = vscode.workspace.getConfiguration().get<any>('oicode.docker.compilers');
-        const langDocker = dockerCompilers?.[languageId];
-        const compilerCommand = langDocker?.command as string | undefined;
-        const compilerArgs = (langDocker?.args as string[] | undefined) || [];
-
-        if (!compilerCommand) {
-            return vscode.window.showErrorMessage(`未找到 Docker 内 ${languageId} 的编译/解释配置，请检查 'oicode.docker.compilers' 设置。`);
-        }
-
-        // Substitute variables like ${sourceFile}
-        const substitutions: Record<string, string> = {
-            sourceFile
-        };
-        const replacedArgs = compilerArgs.map(arg => arg.replace(/\$\{(\w+)\}/g, (_m, k) => substitutions[k] ?? ''));
-        let fullCommand = [compilerCommand, ...replacedArgs].join(' ');
-        if (languageId === 'c' || languageId === 'cpp') {
-            // Compile then run the produced binary to ensure an end-to-end execution
-            fullCommand = `( ${fullCommand} ) && /tmp/a.out`;
-        }
-        console.log(`[oicode.runCode] lang=${languageId} cmd=${fullCommand}`);
-
         let input: string | undefined;
         if (testInput !== undefined) {
             input = testInput;
@@ -625,11 +601,9 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                 return; // User cancelled
             }
         }
-
         // Placeholder values for time and memory limits
         const timeLimit = 5; // seconds
         const memoryLimit = 256; // MB
-
         return vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `正在运行 ${sourceFile}...`,
@@ -637,37 +611,38 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
         }, async (progress) => {
             progress.report({ increment: 0, message: 'Preparing container...' });
             try {
-                const result = await DockerManager.run({
-                    projectRootPath: context.extensionPath,
-                    sourceDir: path.dirname(document.uri.fsPath),
-                    command: fullCommand,
-                    input: input || '',
-                    timeLimit: timeLimit,
-                    memoryLimit: memoryLimit
-                });
-
+                const result = await runSingleInDocker(
+                    (vscode.extensions.getExtension('oi-code')?.extensionPath || ''),
+                    path.dirname(document.uri.fsPath),
+                    languageId,
+                    sourceFile,
+                    input || '',
+                    { timeLimit, memoryLimit }
+                );
                 progress.report({ increment: 100 });
-
                 const panel = vscode.window.createWebviewPanel(
                     'oiCodeOutput',
                     `Output for ${sourceFile}`,
                     vscode.ViewColumn.Two,
                     {}
                 );
-
                 const meta: string[] = [];
                 if (result.timedOut) meta.push('TimedOut');
                 if (result.memoryExceeded) meta.push('MemoryExceeded');
                 if (result.spaceExceeded) meta.push('SpaceExceeded');
-
                 let content = '';
                 if (meta.length) content += `<p><b>Flags:</b> ${meta.join(', ')}</p>`;
-                if (result.output) content += `<h2>Output:</h2><pre>${htmlEscape(result.output)}</pre>`;
-                if (result.error) content += `<h2>Error:</h2><pre>${htmlEscape(result.error)}</pre>`;
+                if (result.stdout) content += `<h2>Output:</h2><pre>${htmlEscape(result.stdout)}</pre>`;
+                if (result.stderr) content += `<h2>Error:</h2><pre>${htmlEscape(result.stderr)}</pre>`;
                 panel.webview.html = content || '<i>No output</i>';
-                console.log(`[oicode.runCode] finished`);
-                return result;
-
+                // Return in the format expected by tests: { output, error, ... }
+                return {
+                    output: result.stdout,
+                    error: result.stderr,
+                    timedOut: result.timedOut,
+                    memoryExceeded: result.memoryExceeded,
+                    spaceExceeded: result.spaceExceeded
+                };
             } catch (e: any) {
                 vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
                 throw e;
@@ -693,7 +668,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
         });
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('oi-code.downloadDocker', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('oicode.downloadDocker', async () => {
         const installCommand = Installer.getInstallCommand();
         if (installCommand) {
             vscode.window.showInformationMessage(

@@ -213,8 +213,8 @@ suite('OI-Code Commands Test Suite', () => {
         const cppRec = `#include <bits/stdc++.h>\nusing namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
         const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
 
-        const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or 0)))`;
-        const pyDp = `import sys\nN=int(sys.stdin.readline().strip() or 0)\nC=[0]* (N+2)\nC[0]=1\nif N>=1: C[1]=1\nfor i in range(2,N+1):\n    s=0\n    for j in range(i):\n        s+=C[j]*C[i-1-j]\n    C[i]=s\nprint(C[N])`;
+        const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or '0')))`;
+        const pyDp = `import sys\nN=int(sys.stdin.readline().strip() or '0')\nC=[0]* (N+2)\nC[0]=1\nif N>=1: C[1]=1\nfor i in range(2,N+1):\n    s=0\n    for j in range(i):\n        s+=C[j]*C[i-1-j]\n    C[i]=s\nprint(C[N])`;
 
         for (const lang of ['c', 'cpp', 'python'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
