@@ -28,76 +28,75 @@ export class DockerManager {
      * @returns A promise that resolves when the image is confirmed to be ready.
      */
     public static async ensureImage(projectRootPath: string): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
+        // Check if image already exists
+        if (await this.checkImageExists()) {
+            console.log(`Docker image '${IMAGE_NAME}' already exists.`);
+            return;
+        }
+
+        // Try silent installation/startup if Docker is not available
+        try {
+            await Installer.ensureDockerAvailableSilently();
+        } catch (error) {
+            console.log('Silent Docker installation failed, proceeding with manual flow');
+        }
+
+        // Check again after installation attempt
+        if (await this.checkImageExists()) {
+            console.log(`Docker image '${IMAGE_NAME}' found after installation.`);
+            return;
+        }
+
+        // Build image if not found
+        await this.buildImage(projectRootPath);
+    }
+
+    private static async checkImageExists(): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
             const check = spawn('docker', ['image', 'inspect', IMAGE_NAME], { stdio: 'ignore' });
-
-            check.on('close', async (code) => {
-                if (code === 0) {
-                    console.log(`Docker image '${IMAGE_NAME}' already exists.`);
-                    return resolve();
-                }
-
-                // Skip building custom image in transparent mode; we'll use official images per language
-                console.log(`Docker image '${IMAGE_NAME}' not found. Using official language images dynamically.`);
-                resolve();
+            check.on('close', (code) => {
+                resolve(code === 0);
             });
-
-            check.on('error', async (err) => {
-                // Try silent installation / startup
-                try {
-                    await Installer.ensureDockerAvailableSilently();
-                    // Retry check
-                    const recheck = spawn('docker', ['image', 'inspect', IMAGE_NAME], { stdio: 'ignore' });
-                    recheck.on('close', async (code2) => {
-                        if (code2 === 0) { resolve(); } else {
-                            // Fall back to build path
-                            console.log(`Docker running after install. Proceeding with build.`);
-                            // Trigger close handler path by simulating not found image
-                            const notFound = spawn('bash', ['-lc', 'false']);
-                            notFound.on('close', () => {
-                                console.log(`Docker image '${IMAGE_NAME}' not found. Proceeding with build.`);
-                                vscode.window.showInformationMessage(`Building Docker image '${IMAGE_NAME}'. This may take a few minutes...`);
-                                try {
-                                    const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Build');
-                                    outputChannel.show();
-                                    outputChannel.appendLine(`Starting build for ${IMAGE_NAME}...\n`);
-                                    const buildProcess = spawn('docker', ['build', '-t', IMAGE_NAME, '-f', path.join(projectRootPath, 'Dockerfile'), '.'], { cwd: projectRootPath });
-                                    buildProcess.stdout.on('data', data => outputChannel.append(data.toString()));
-                                    buildProcess.stderr.on('data', data => outputChannel.append(data.toString()));
-                                    buildProcess.on('close', (buildCode) => {
-                                        if (buildCode === 0) { resolve(); }
-                                        else { reject(new Error('Failed to build Docker image.')); }
-                                    });
-                                } catch (e) { reject(e as any); }
-                            });
-                        }
-                    });
-                    return;
-                } catch { }
-
-                // Fallback: original guided flow
-                const installCommand = Installer.getInstallCommand();
-                let errorMessage = `Failed to run 'docker'. Is Docker installed and running? Error: ${err.message}`;
-                if (installCommand) {
-                    errorMessage += `\n\n${installCommand.message}`;
-                    vscode.window.showErrorMessage(errorMessage, 'Run in Terminal').then(selection => {
-                        if (selection === 'Run in Terminal') {
-                            const terminal = vscode.window.createTerminal('Docker Installer');
-                            terminal.show();
-                            if (installCommand.isUrl) {
-                                vscode.env.openExternal(vscode.Uri.parse(installCommand.command));
-                                terminal.sendText(`echo "Opening browser to: ${installCommand.command}"`);
-                            } else {
-                                terminal.sendText(installCommand.command);
-                            }
-                        }
-                    });
-                } else {
-                    vscode.window.showErrorMessage(errorMessage);
-                }
-                console.error(errorMessage);
-                reject(new Error(errorMessage));
+            check.on('error', () => {
+                resolve(false);
             });
+        });
+    }
+
+    private static async buildImage(projectRootPath: string): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            console.log(`Docker image '${IMAGE_NAME}' not found. Proceeding with build.`);
+            vscode.window.showInformationMessage(`Building Docker image '${IMAGE_NAME}'. This may take a few minutes...`);
+            
+            try {
+                const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Build');
+                outputChannel.show();
+                outputChannel.appendLine(`Starting build for ${IMAGE_NAME}...\n`);
+                
+                const buildProcess = spawn('docker', ['build', '-t', IMAGE_NAME, '-f', path.join(projectRootPath, 'Dockerfile'), '.'], { cwd: projectRootPath });
+                
+                buildProcess.stdout.on('data', data => outputChannel.append(data.toString()));
+                buildProcess.stderr.on('data', data => outputChannel.append(data.toString()));
+                
+                buildProcess.on('close', (buildCode) => {
+                    if (buildCode === 0) {
+                        outputChannel.appendLine(`\nSuccessfully built image '${IMAGE_NAME}'.`);
+                        resolve();
+                    } else {
+                        const errorMsg = `Failed to build Docker image. Exit code: ${buildCode}. Check output channel for details.`;
+                        outputChannel.appendLine(`\nERROR: ${errorMsg}`);
+                        reject(new Error(errorMsg));
+                    }
+                });
+                
+                buildProcess.on('error', (err) => {
+                    const errorMsg = `Failed to start Docker build: ${err.message}`;
+                    outputChannel.appendLine(`\nERROR: ${errorMsg}`);
+                    reject(new Error(errorMsg));
+                });
+            } catch (e) {
+                reject(e as any);
+            }
         });
     }
 

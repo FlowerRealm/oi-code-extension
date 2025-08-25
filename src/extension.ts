@@ -368,12 +368,12 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
                 const problemDir = path.join(baseDir, problemName);
                 const configDir = path.join(problemDir, 'config');
-                try { fs.mkdirSync(problemDir, { recursive: true }); } catch { }
-                try { fs.mkdirSync(configDir, { recursive: true }); } catch { }
+                await fs.promises.mkdir(problemDir, { recursive: true });
+                await fs.promises.mkdir(configDir, { recursive: true });
 
                 // Write source file
                 const sourcePath = path.join(problemDir, `main.${ext}`);
-                fs.writeFileSync(sourcePath, active.document.getText(), 'utf8');
+                await fs.promises.writeFile(sourcePath, active.document.getText(), 'utf8');
 
                 // Write config files
                 const configJson = {
@@ -384,9 +384,9 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                     opt: m.opt || '',
                     std: m.std || '',
                 };
-                fs.writeFileSync(path.join(configDir, 'problem.json'), JSON.stringify(configJson, null, 2), 'utf8');
-                if (m.statement) fs.writeFileSync(path.join(configDir, 'statement.md'), m.statement, 'utf8');
-                if (m.samples) fs.writeFileSync(path.join(configDir, 'samples.txt'), m.samples, 'utf8');
+                await fs.promises.writeFile(path.join(configDir, 'problem.json'), JSON.stringify(configJson, null, 2), 'utf8');
+                if (m.statement) await fs.promises.writeFile(path.join(configDir, 'statement.md'), m.statement, 'utf8');
+                if (m.samples) await fs.promises.writeFile(path.join(configDir, 'samples.txt'), m.samples, 'utf8');
 
                 return { sourcePath };
             }
@@ -577,7 +577,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
             vscode.window.showErrorMessage(`对拍执行错误: ${e.message}`);
             return { error: e.message };
         } finally {
-            fs.rmSync(tempDir, { recursive: true, force: true });
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
         }
     }));
 
