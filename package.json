@@ -243,11 +243,11 @@
     "copy-webpack-plugin": "^13.0.0",
     "diff": "^5.2.0",
     "eslint": "^8.47.0",
+    "glob": "^11.0.3",
+    "mocha": "^11.7.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",
-    "webpack-cli": "^5.1.4",
-    "mocha": "^11.7.1"
-  },
-  "dependencies": {}
+    "webpack-cli": "^5.1.4"
+  }
 }
