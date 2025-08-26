@@ -24,7 +24,18 @@ jobs:
         node-version: 22 # Using Node.js 22, compatible with VS Code 1.103
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
+
+    # Only install xvfb on ubuntu
+    - name: Install xvfb
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y xvfb
 
     - name: Run tests
-      run: npm run test
+      run: |
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          xvfb-run -a npm test
+        else
+          npm test
+        fi
+      shell: bash

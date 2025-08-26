@@ -224,7 +224,7 @@ suite('OI-Code Commands Test Suite', () => {
         const cppRec = `#include <bits/stdc++.h>\n using namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
         const cppDp = `#include <bits/stdc++.h>
 using namespace std;
-long long C[40];
+long long C[1000];
 int main() {
     long long n;
     if (!(cin >> n)) return 0;
@@ -256,7 +256,8 @@ n = int(sys.stdin.readline().strip() or '0')
 if n == 0:
     print(1)
 else:
-    C = [1] * (n + 1)
+    C = [0] * (n + 1)
+    C[0] = 1
     for i in range(1, n + 1):
         C[i] = 0
         for j in range(i):
