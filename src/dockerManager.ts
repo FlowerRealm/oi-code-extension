@@ -23,9 +23,10 @@ export class DockerManager {
 
     /**
      * Ensures Docker is available and ready for use.
+     * It will show progress in a VS Code terminal.
      * @returns A promise that resolves when Docker is ready.
      */
-    public static async ensureImage(projectRootPath: string): Promise<void> {
+    public static async ensureDockerIsReady(projectRootPath: string): Promise<void> {
         // Check if Docker is available
         try {
             await Installer.ensureDockerAvailableSilently();
@@ -83,7 +84,7 @@ export class DockerManager {
         spaceExceeded: boolean;
     }> {
         // Ensure Docker is available
-        await this.ensureImage(options.projectRootPath);
+        await this.ensureDockerIsReady(options.projectRootPath);
 
         const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 

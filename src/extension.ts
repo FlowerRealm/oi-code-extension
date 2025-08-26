@@ -197,6 +197,14 @@ function createDiffHtml(output1: string, output2: string): { html1: string; html
     return { html1, html2 };
 }
 
+function getLanguageIdFromEditor(editor: vscode.TextEditor): 'c' | 'cpp' | 'python' {
+    const langId = editor.document.languageId;
+    if (langId === 'c' || langId === 'cpp' || langId === 'python') {
+        return langId;
+    }
+    throw new Error(`不支持的语言: ${langId}`);
+}
+
 class PairCheckViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'oicode.pairCheckView';
     private _view?: vscode.WebviewView;
@@ -217,7 +225,11 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
-                    const langId = editor1.document.languageId;
+                    const langId = getLanguageIdFromEditor(editor1);
+                    if (langId !== 'c' && langId !== 'cpp' && langId !== 'python') {
+                        vscode.window.showErrorMessage(`对拍不支持语言: ${langId}`);
+                        return;
+                    }
                     if (editor2.document.languageId !== langId) {
                         vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
                         return;
@@ -233,8 +245,8 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 
                     const ext = langId === 'python' ? 'py' : langId;
                     const [result1, result2] = await Promise.all([
-                        runSingleInDocker(this._context.extensionPath, tempDir, langId as any, `code1.${ext}`, message.input).catch((e: any) => ({ stdout: '', stderr: e.message })),
-                        runSingleInDocker(this._context.extensionPath, tempDir, langId as any, `code2.${ext}`, message.input).catch((e: any) => ({ stdout: '', stderr: e.message }))
+                        runSingleInDocker(this._context.extensionPath, tempDir, langId, `code1.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false })),
+                        runSingleInDocker(this._context.extensionPath, tempDir, langId, `code2.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false }))
                     ]);
 
                     const output1 = result1.stderr ? `<b>错误:</b>\n${htmlEscape(result1.stderr)}` : result1.stdout;
@@ -596,8 +608,8 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
                 const input = testInput ?? '';
                 const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any)),
-                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any))
+                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any)),
+                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any))
                 ]);
 
                 const toDisplay = (r: any) => {
@@ -698,7 +710,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
             }, async (progress) => {
                 progress.report({ message: 'Building Docker image, this may take a while...' });
                 try {
-                    await DockerManager.ensureImage(context.extensionPath);
+                    await DockerManager.ensureDockerIsReady(context.extensionPath);
                     progress.report({ message: 'Docker image ready!', increment: 100 });
                     vscode.window.showInformationMessage('OI-Code Docker environment is ready!');
                 } catch (error: any) {
