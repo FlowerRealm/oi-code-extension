@@ -704,7 +704,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function getWebviewContent(context: vscode.ExtensionContext, fileName: string): Promise<string> {
-    const filePath = vscode.Uri.file(path.join(context.extensionPath, 'dist', fileName));
+    const filePath = vscode.Uri.file(path.join(context.extensionPath, 'out', fileName));
     try {
         const content = await vscode.workspace.fs.readFile(filePath);
         return content.toString();

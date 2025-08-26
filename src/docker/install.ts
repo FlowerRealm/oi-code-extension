@@ -170,11 +170,32 @@ export class Installer {
                         console.error('Failed to start Docker Desktop from PATH:', error);
                         dockerInstallOutput.appendLine(`Failed to start Docker Desktop from PATH: ${error}`);
                         try {
-                            // Fallback to common installation path
-                            cp.spawn('cmd', ['/c', 'start', '', 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'], { detached: true, stdio: 'ignore' });
+                            // Try common installation paths
+                            const commonPaths = [
+                                'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+                                'C:\\Program Files (x86)\\Docker\\Docker\\Docker Desktop.exe',
+                                'C:\\Program Files\\Docker\\Docker Desktop\\Docker Desktop.exe',
+                                'C:\\Program Files (x86)\\Docker\\Docker Desktop\\Docker Desktop.exe'
+                            ];
+                            
+                            let started = false;
+                            for (const dockerPath of commonPaths) {
+                                try {
+                                    cp.spawn('cmd', ['/c', 'start', '', `"${dockerPath}"`], { detached: true, stdio: 'ignore' });
+                                    started = true;
+                                    dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
+                                    break;
+                                } catch (pathError) {
+                                    // Continue to next path
+                                }
+                            }
+                            
+                            if (!started) {
+                                throw new Error('Could not find Docker Desktop in common installation paths');
+                            }
                         } catch (fallbackError) {
-                            console.error('Failed to start Docker Desktop from fallback path:', fallbackError);
-                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback path: ${fallbackError}`);
+                            console.error('Failed to start Docker Desktop from fallback paths:', fallbackError);
+                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback paths: ${fallbackError}`);
                         }
                     }
                 } else if (platform === 'darwin') {
