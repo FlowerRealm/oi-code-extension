@@ -221,10 +221,20 @@ suite('OI-Code Commands Test Suite', () => {
         const cRec = `#include <stdio.h>\nlong long C(int n){ if(n<=1) return 1; long long s=0; for(int i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;}\nint main(){ int n; if(scanf(\"%d\",&n)!=1) return 0; printf(\"%lld\\n\", C(n)); }`;
         const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){ int n; if(scanf(\"%d\",&n)!=1) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } printf(\"%lld\\n\", C[n]); }`;
 
-        const cppRec = `#include <bits/stdc++.h>\nusing namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
-        const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=1; C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
+        const cppRec = `#include <bits/stdc++.h>\n using namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
+        const cppDp = `#include <bits/stdc++.h>\n using namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=1; C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
 
-        const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or '0')))`;
+        const pyRec = `import sys
+sys.setrecursionlimit(10000)
+from functools import lru_cache
+@lru_cache(None)
+def C(n):
+    if n<=1: return 1
+    return sum(C(i)*C(n-1-i) for i in range(n))
+def main():
+    n = int(sys.stdin.readline().strip() or '0')
+    print(C(n))
+main()`;
         const pyDp = `import sys\nn=int(sys.stdin.readline().strip() or '0')\nC=[1]*(n+1)\nfor i in range(2,n+1):\n C[i]=sum(C[j]*C[i-1-j] for j in range(i))\nprint(C[n])`;
 
         for (const lang of ['c', 'cpp', 'python'] as const) {
