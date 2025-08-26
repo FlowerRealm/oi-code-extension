@@ -155,29 +155,50 @@ suite('OI-Code Commands Test Suite', () => {
     describe('Code Execution Tests (requires Docker environment)', () => {
         before(async function () {
             this.timeout(120000); // Increase timeout for Docker initialization
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping Code Execution Tests - extension not loading in test environment');
+            vscode.window.showInformationMessage('Initializing Docker environment for code execution tests...');
+            await vscode.commands.executeCommand('oicode.initializeEnvironment');
+            // Ensure docker compiler defaults
+            const dockerCompilers = {
+                c: { command: 'gcc', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2'] },
+                cpp: { command: 'g++', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2', '-std=c++17'] },
+                python: { command: 'python3', args: ['/sandbox/${sourceFile}'] }
+            } as any;
+            const config = vscode.workspace.getConfiguration();
+            await config.update('oicode.docker.compilers', dockerCompilers, vscode.ConfigurationTarget.Global);
+            vscode.window.showInformationMessage('Docker environment initialized.');
         });
 
         test('should create and run C Hello World', async function () {
             this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping C Hello World test - extension not loading in test environment');
-            assert.ok(true, 'Skipping C Hello World test');
+            const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
+            const created = await createProblemAndOpen('UT-Run-C', 'c', cCode);
+            vscode.window.showInformationMessage('Executing oicode.runCode for C...');
+            const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+            assert.ok(res && typeof res.output === 'string');
+            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+            await cleanupDir(path.dirname(created.sourcePath));
         });
 
         test('should create and run C++ Hello World', async function () {
             this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping C++ Hello World test - extension not loading in test environment');
-            assert.ok(true, 'Skipping C++ Hello World test');
+            const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
+            const created = await createProblemAndOpen('UT-Run-CPP', 'cpp', cppCode);
+            vscode.window.showInformationMessage('Executing oicode.runCode for C++...');
+            const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+            assert.ok(res && typeof res.output === 'string');
+            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+            await cleanupDir(path.dirname(created.sourcePath));
         });
 
         test('should create and run Python Hello World', async function () {
             this.timeout(60000);
-            // Skip this test for now since extension activation is not working in test environment
-            console.log('Skipping Python Hello World test - extension not loading in test environment');
-            assert.ok(true, 'Skipping Python Hello World test');
+            const pythonCode = `print(\"Hello, Python from Test!\")`;
+            const created = await createProblemAndOpen('UT-Run-PY', 'python', pythonCode);
+            vscode.window.showInformationMessage('Executing oicode.runCode for Python...');
+            const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+            assert.ok(res && typeof res.output === 'string');
+            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+            await cleanupDir(path.dirname(created.sourcePath));
         });
     });
 
@@ -185,6 +206,8 @@ suite('OI-Code Commands Test Suite', () => {
         const inputs = ['0\n', '1\n', '2\n', '3\n', '4\n', '5\n'];
 
         async function openBesideDocs(codeLeft: string, codeRight: string, ext: string) {
+            // Close all editors to avoid picking unrelated editors in runPairCheck
+            await vscode.commands.executeCommand('workbench.action.closeAllEditors');
             const lang = (ext === 'py' ? 'python' : ext) as 'c' | 'cpp' | 'python';
             const left = await createProblemAndOpen(`UT-${ext}-REC`, lang, codeLeft);
             const right = await createProblemAndOpen(`UT-${ext}-DP`, lang, codeRight);
@@ -199,17 +222,34 @@ suite('OI-Code Commands Test Suite', () => {
         const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){ int n; if(scanf(\"%d\",&n)!=1) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } printf(\"%lld\\n\", C[n]); }`;
 
         const cppRec = `#include <bits/stdc++.h>\nusing namespace std; long long C(long long n){ if(n<=1) return 1; long long s=0; for(long long i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;} int main(){ long long n; if(!(cin>>n)) return 0; cout<<C(n)<<\"\\n\"; }`;
-        const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
+        const cppDp = `#include <bits/stdc++.h>\nusing namespace std; long long C[40]; int main(){ long long n; if(!(cin>>n)) return 0; C[0]=1; C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
 
         const pyRec = `import sys\nsys.setrecursionlimit(10000)\nfrom functools import lru_cache\n@lru_cache(None)\ndef C(n):\n    if n<=1: return 1\n    return sum(C(i)*C(n-1-i) for i in range(n))\nprint(C(int(sys.stdin.readline().strip() or '0')))`;
-        const pyDp = `import sys\nN=int(sys.stdin.readline().strip() or '0')\nC=[0]* (N+2)\nC[0]=1\nif N>=1: C[1]=1\nfor i in range(2,N+1):\n    s=0\n    for j in range(i):\n        s+=C[j]*C[i-1-j]\n    C[i]=s\nprint(C[N])`;
+        const pyDp = `import sys\nn=int(sys.stdin.readline().strip() or '0')\nC=[1]*(n+1)\nfor i in range(2,n+1):\n C[i]=sum(C[j]*C[i-1-j] for j in range(i))\nprint(C[n])`;
 
         for (const lang of ['c', 'cpp', 'python'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
                 this.timeout(60000);
-                // Skip this test for now since extension activation is not working in test environment
-                console.log(`Skipping pair check ${lang} test - extension not loading in test environment`);
-                assert.ok(true, `Skipping pair check ${lang} test`);
+                const codes = lang === 'c' ? [cRec, cDp] : lang === 'cpp' ? [cppRec, cppDp] : [pyRec, pyDp];
+                const ext = lang === 'python' ? 'py' : lang;
+                const { leftDir, rightDir } = await openBesideDocs(codes[0], codes[1], ext);
+                try {
+                    for (const input of inputs) {
+                        const res: any = await vscode.commands.executeCommand('oicode.runPairCheck', input);
+                        if (res && res.error) {
+                            assert.fail(`pair check error: ${res.error}`);
+                        }
+                        if (!(res && res.equal === true)) {
+                            console.log('PairCheck mismatch debug:', { lang: lang, input, output1: (res?.output1 || '').slice(0, 200), output2: (res?.output2 || '').slice(0, 200) });
+                        }
+                        assert.ok(res && res.equal === true, `pair check mismatch for input=${input} in ${lang}`);
+                    }
+                } finally {
+                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                    await cleanupDir(leftDir);
+                    await cleanupDir(rightDir);
+                }
             });
         }
     });

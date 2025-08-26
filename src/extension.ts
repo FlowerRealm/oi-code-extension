@@ -163,10 +163,10 @@ async function runSingleInDocker(
         sourceDir,
         command,
         input,
-        memoryLimit: '512',
+        memoryLimit: (options?.memoryLimit ? String(options.memoryLimit) : '512'),
         projectRootPath,
         languageId,
-        timeLimit: 10
+        timeLimit: options?.timeLimit ?? 10
     });
     return {
         stdout: result.stdout,
@@ -596,12 +596,18 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
                 const input = testInput ?? '';
                 const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code1.${ext}`, input).catch((e: any) => ({ stdout: '', stderr: e.message })),
-                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code2.${ext}`, input).catch((e: any) => ({ stdout: '', stderr: e.message }))
+                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any)),
+                    runSingleInDocker(context.extensionPath, tempDir, langId as any, `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any))
                 ]);
 
-                const output1 = (result1 as any).stderr ? `ERROR:\n${(result1 as any).stderr}` : (result1 as any).stdout;
-                const output2 = (result2 as any).stderr ? `ERROR:\n${(result2 as any).stderr}` : (result2 as any).stdout;
+                const toDisplay = (r: any) => {
+                    if (r.timedOut) return 'TIMEOUT';
+                    if (r.memoryExceeded) return 'MEMORY_EXCEEDED';
+                    if (r.spaceExceeded) return 'SPACE_EXCEEDED';
+                    return r.stderr ? `ERROR:\n${r.stderr}` : r.stdout;
+                };
+                const output1 = toDisplay(result1 as any);
+                const output2 = toDisplay(result2 as any);
                 const norm = (s: string) => s.replace(/\r\n/g, '\n').trimEnd();
                 const equal = norm(output1) === norm(output2);
                 // Update panel view if present
