@@ -494,7 +494,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                             ? '#include <stdio.h>\nint main(){ /* TODO */ return 0; }\n'
                             : langId === 'cpp'
                                 ? '#include <bits/stdc++.h>\nusing namespace std; int main(){ /* TODO */ return 0; }\n'
-                                : 'print("TODO")\n';
+                                : 'print("Hello, World!")\n';
                         await fs.promises.writeFile(sourcePath, tpl, 'utf8');
                     }
                     // Default config
@@ -608,8 +608,8 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
 
                 const input = testInput ?? '';
                 const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any)),
-                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message } as any))
+                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
+                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
                 ]);
 
                 const toDisplay = (r: any) => {
@@ -664,7 +664,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                 progress.report({ increment: 0, message: 'Preparing container...' });
                 try {
                     const result = await runSingleInDocker(
-                        (vscode.extensions.getExtension('oi-code')?.extensionPath || ''),
+                        context.extensionPath,
                         path.dirname(document.uri.fsPath),
                         languageId,
                         sourceFile,

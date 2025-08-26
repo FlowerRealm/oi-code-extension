@@ -1,9 +1,9 @@
 {
   "name": "oi-code",
-  "displayName": "OI Init",
-  "description": "Initial setup for OI IDE",
+  "displayName": "OI-Code",
+  "description": "OI/ACM 竞赛编程助手",
   "version": "0.0.1",
-  "publisher": "oi-code",
+  "publisher": "FlowerRealm",
   "repository": {
     "type": "git",
     "url": "https://github.com/FlowerRealm/oi-code-extension.git"

@@ -162,8 +162,14 @@ export class Installer {
                     }
                     // Try to launch Docker Desktop
                     try {
-                        cp.spawn('cmd', ['/c', 'start', '', 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'], { detached: true, stdio: 'ignore' });
-                    } catch { }
+                        // Try to start Docker Desktop from PATH first
+                        cp.spawn('Docker Desktop.exe', [], { detached: true, stdio: 'ignore' });
+                    } catch {
+                        try {
+                            // Fallback to common installation path
+                            cp.spawn('cmd', ['/c', 'start', '', 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'], { detached: true, stdio: 'ignore' });
+                        } catch { }
+                    }
                 } else if (platform === 'darwin') {
                     if (this.isCommandAvailable('brew')) {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });

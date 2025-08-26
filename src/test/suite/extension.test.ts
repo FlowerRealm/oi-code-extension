@@ -40,7 +40,7 @@ suite('Extension Test Suite', () => {
     // 等待扩展激活
     before(async function () {
         this.timeout(35000);
-        const extId = 'oi-code.oi-code';
+        const extId = 'FlowerRealm.oi-code';
         let extension = vscode.extensions.getExtension(extId);
         let waited = 0;
         const interval = 500;
