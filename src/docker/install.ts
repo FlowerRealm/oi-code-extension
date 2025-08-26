@@ -177,7 +177,7 @@ export class Installer {
                                 'C:\\Program Files\\Docker\\Docker Desktop\\Docker Desktop.exe',
                                 'C:\\Program Files (x86)\\Docker\\Docker Desktop\\Docker Desktop.exe'
                             ];
-                            
+
                             let started = false;
                             for (const dockerPath of commonPaths) {
                                 try {
@@ -189,7 +189,7 @@ export class Installer {
                                     // Continue to next path
                                 }
                             }
-                            
+
                             if (!started) {
                                 throw new Error('Could not find Docker Desktop in common installation paths');
                             }
