@@ -573,8 +573,15 @@ export function activate(context: vscode.ExtensionContext) {
             if (!editor) {
                 return vscode.window.showErrorMessage('Please open a file to run.');
             }
+
+            let languageId: 'c' | 'cpp' | 'python';
+            try {
+                languageId = getLanguageIdFromEditor(editor);
+            } catch (e: any) {
+                return vscode.window.showErrorMessage(e.message);
+            }
+
             const document = editor.document;
-            const languageId = document.languageId as 'c' | 'cpp' | 'python';
             const sourceFile = path.basename(document.fileName);
             let input: string | undefined;
             if (testInput !== undefined) {
@@ -678,7 +685,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }));
 
-        const hasLaunchedBeforeKey = 'oi-ide.hasLaunchedBefore';
+        const hasLaunchedBeforeKey = 'oicode.hasLaunchedBefore';
         if (!context.globalState.get<boolean>(hasLaunchedBeforeKey)) {
             vscode.commands.executeCommand('oi-code.showWelcomePage');
             context.globalState.update(hasLaunchedBeforeKey, true);
