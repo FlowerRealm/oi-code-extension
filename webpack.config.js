@@ -48,6 +48,7 @@ const config = {
         { from: 'webview/completion.html', to: 'completion.html' },
         { from: 'webview/problem.html', to: 'problem.html' },
         { from: 'webview/settings-schema.json', to: 'settings-schema.json' },
+        { from: 'webview/icons', to: 'icons' },
       ],
     }),
   ],
