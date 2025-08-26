@@ -16,6 +16,5 @@ out/
 # macOS
 .DS_Store
 
-# Test logs
+# Test logs (local temporary files)
 test-output.log
-.vscode/settings.json

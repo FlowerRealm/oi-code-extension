@@ -164,20 +164,29 @@ export class Installer {
                     try {
                         // Try to start Docker Desktop from PATH first
                         cp.spawn('Docker Desktop.exe', [], { detached: true, stdio: 'ignore' });
-                    } catch {
+                    } catch (error) {
+                        console.log('Failed to start Docker Desktop from PATH:', error);
                         try {
                             // Fallback to common installation path
                             cp.spawn('cmd', ['/c', 'start', '', 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'], { detached: true, stdio: 'ignore' });
-                        } catch { }
+                        } catch (fallbackError) {
+                            console.log('Failed to start Docker Desktop from fallback path:', fallbackError);
+                        }
                     }
                 } else if (platform === 'darwin') {
                     if (this.isCommandAvailable('brew')) {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
-                        await run('brew', ['install', '--cask', 'docker']);
+                        try {
+                            cp.execSync('brew install --cask docker', { stdio: 'ignore' });
+                        } catch (error) {
+                            console.log('Failed to install Docker via Homebrew:', error);
+                        }
                     }
                     try {
-                        cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
-                    } catch { }
+                        cp.spawn('open -a Docker', { detached: true, stdio: 'ignore' });
+                    } catch (error) {
+                        console.log('Failed to start Docker Desktop on macOS:', error);
+                    }
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
                     const distro = this.getLinuxDistro();
@@ -190,9 +199,15 @@ export class Installer {
                         } else if (distro === 'fedora') {
                             await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
                         }
-                    } catch { }
+                    } catch (error) {
+                        console.log('Failed to install Docker via apt-get:', error);
+                    }
                     // Try starting docker service (if applicable)
-                    try { await run('bash', ['-lc', 'sudo systemctl start docker']); } catch { }
+                    try {
+                        cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
+                    } catch (error) {
+                        console.log('Failed to start Docker service on Linux:', error);
+                    }
                 }
 
                 progress.report({ message: 'Waiting for Docker to be ready...' });

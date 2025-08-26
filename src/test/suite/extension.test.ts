@@ -65,7 +65,7 @@ suite('Extension Test Suite', () => {
 
     test('Extension activation check', async function () {
         this.timeout(15000);
-        const extId = 'oi-code.oi-code';
+        const extId = 'FlowerRealm.oi-code';
         let extension = vscode.extensions.getExtension(extId);
         let waited = 0;
         const interval = 300;

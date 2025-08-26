@@ -290,76 +290,9 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Sidebar: Problem view (inputs, statement editor, limits, options, actions)
         context.subscriptions.push(vscode.window.registerWebviewViewProvider('oicode.problemView', {
-            resolveWebviewView(webviewView: vscode.WebviewView) {
+            async resolveWebviewView(webviewView: vscode.WebviewView) {
                 webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
-                webviewView.webview.html = `<!DOCTYPE html>
-<html lang="zh-cn"><head><meta charset="utf-8"/>
-<style>
-body { font-family: var(--vscode-font-family); padding:8px; }
-.row { margin-bottom:8px; }
-label { display:block; margin-bottom:4px; }
-input[type=text], textarea, select { width:100%; box-sizing:border-box; }
-.actions { display:flex; gap:8px; margin-top:8px; }
-.inline { display:flex; gap:8px; }
-.half { flex:1; }
-</style></head>
-<body>
-  <div class="row"><label>题目名称</label><input id="name" type="text" placeholder="如：CF1234A"/></div>
-  <div class="row"><label>题目 URL</label><input id="url" type="text" placeholder="https://..."/></div>
-  <div class="row"><label>题面 (Markdown)</label><textarea id="statement" rows="8" placeholder="在此粘贴/编辑题面...\n支持 Markdown"></textarea></div>
-  <div class="inline">
-    <div class="half"><label>时间限制(秒)</label><input id="timeLimit" type="text" value="5"/></div>
-    <div class="half"><label>内存限制(MB)</label><input id="memoryLimit" type="text" value="256"/></div>
-  </div>
-  <div class="row"><label>样例输入</label><textarea id="samples" rows="6" placeholder="每个用例之间用空行或分隔符"></textarea>
-    <button id="loadSamples">从文件读取样例</button>
-  </div>
-  <div class="inline">
-    <div class="half"><label>优化选项</label>
-      <select id="opt">
-        <option value="O2" selected>O2</option>
-        <option value="O0">O0</option>
-        <option value="O3">O3</option>
-      </select>
-    </div>
-    <div class="half"><label>语言标准</label>
-      <select id="std">
-        <option value="c++17" selected>C++17</option>
-        <option value="c++14">C++14</option>
-        <option value="c++11">C++11</option>
-        <option value="c11">C11</option>
-      </select>
-    </div>
-  </div>
-  <div class="actions">
-    <button id="run">运行</button>
-    <button id="pair">对拍</button>
-  </div>
-  <script>
-    const vscode = acquireVsCodeApi();
-    function getModel(){
-      return {
-        name: document.getElementById('name').value,
-        url: document.getElementById('url').value,
-        statement: document.getElementById('statement').value,
-        timeLimit: Number(document.getElementById('timeLimit').value)||5,
-        memoryLimit: Number(document.getElementById('memoryLimit').value)||256,
-        samples: document.getElementById('samples').value,
-        opt: document.getElementById('opt').value,
-        std: document.getElementById('std').value
-      };
-    }
-    document.getElementById('run').addEventListener('click', ()=>{
-      vscode.postMessage({ cmd:'run', ...getModel() });
-    });
-    document.getElementById('pair').addEventListener('click', ()=>{
-      vscode.postMessage({ cmd:'pair', ...getModel() });
-    });
-    document.getElementById('loadSamples').addEventListener('click', ()=>{
-      vscode.postMessage({ cmd:'loadSamples' });
-    });
-  </script>
-</body></html>`;
+                webviewView.webview.html = await getWebviewContent(context, 'problem.html');
 
                 function toSafeName(input: string): string {
                     const s = input || 'unnamed';
@@ -389,7 +322,7 @@ input[type=text], textarea, select { width:100%; box-sizing:border-box; }
                 async function ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
                     const active = vscode.window.activeTextEditor;
                     if (!active) { throw new Error('请先在编辑器中打开源文件。'); }
-                    const langId = active.document.languageId as 'c' | 'cpp' | 'python';
+                    const langId = getLanguageIdFromEditor(active);
                     const ext = langId === 'python' ? 'py' : langId;
                     const problemName = toSafeName(m.name);
 
