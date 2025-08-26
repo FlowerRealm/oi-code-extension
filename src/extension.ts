@@ -238,12 +238,14 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     this.setOutputs('<i>正在运行...</i>', '<i>正在运行...</i>');
                     await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
                     const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
-                    const file1Path = path.join(tempDir, `code1.${langId}`);
-                    const file2Path = path.join(tempDir, `code2.${langId}`);
+
+                    // 定义文件扩展名，确保与 Docker 传递的文件名一致
+                    const ext = langId === 'python' ? 'py' : langId;
+                    const file1Path = path.join(tempDir, `code1.${ext}`);
+                    const file2Path = path.join(tempDir, `code2.${ext}`);
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
                     await fs.promises.writeFile(file2Path, editor2.document.getText());
 
-                    const ext = langId === 'python' ? 'py' : langId;
                     const [result1, result2] = await Promise.all([
                         runSingleInDocker(this._context.extensionPath, tempDir, langId, `code1.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false })),
                         runSingleInDocker(this._context.extensionPath, tempDir, langId, `code2.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false }))
@@ -426,7 +428,7 @@ export function activate(context: vscode.ExtensionContext) {
                         const tpl = langId === 'c'
                             ? '#include <stdio.h>\nint main(){ /* TODO */ return 0; }\n'
                             : langId === 'cpp'
-                                ? '#include <bits/stdc++.h>\nusing namespace std; int main(){ /* TODO */ return 0; }\n'
+                                ? '#include <bits/stdc++.h>\n using namespace std; int main(){ /* TODO */ return 0; }\n'
                                 : 'print("Hello, World!")\n';
                         await fs.promises.writeFile(sourcePath, tpl, 'utf8');
                     }

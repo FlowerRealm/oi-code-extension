@@ -8,6 +8,9 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 
+// 创建统一的输出通道
+const dockerInstallOutput = vscode.window.createOutputChannel('OI-Code Docker Install');
+
 export interface InstallCommand {
     command: string;
     message: string;
@@ -137,15 +140,14 @@ export class Installer {
             title: 'Preparing to run environment...',
             cancellable: false
         }, async (progress) => {
-            const output = vscode.window.createOutputChannel('OI-Code Docker Install');
-            output.appendLine('Starting silent Docker installation...');
+            dockerInstallOutput.appendLine('Starting silent Docker installation...');
             const platform = os.platform();
 
             function run(cmd: string, args: string[], cwd?: string): Promise<number> {
                 return new Promise((resolve) => {
                     const child = cp.spawn(cmd, args, { cwd, shell: false });
-                    child.stdout.on('data', d => output.append(d.toString()));
-                    child.stderr.on('data', d => output.append(d.toString()));
+                    child.stdout.on('data', d => dockerInstallOutput.append(d.toString()));
+                    child.stderr.on('data', d => dockerInstallOutput.append(d.toString()));
                     child.on('close', code => resolve(code ?? 0));
                 });
             }
@@ -165,12 +167,14 @@ export class Installer {
                         // Try to start Docker Desktop from PATH first
                         cp.spawn('Docker Desktop.exe', [], { detached: true, stdio: 'ignore' });
                     } catch (error) {
-                        console.log('Failed to start Docker Desktop from PATH:', error);
+                        console.error('Failed to start Docker Desktop from PATH:', error);
+                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop from PATH: ${error}`);
                         try {
                             // Fallback to common installation path
                             cp.spawn('cmd', ['/c', 'start', '', 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'], { detached: true, stdio: 'ignore' });
                         } catch (fallbackError) {
-                            console.log('Failed to start Docker Desktop from fallback path:', fallbackError);
+                            console.error('Failed to start Docker Desktop from fallback path:', fallbackError);
+                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback path: ${fallbackError}`);
                         }
                     }
                 } else if (platform === 'darwin') {
@@ -179,13 +183,15 @@ export class Installer {
                         try {
                             cp.execSync('brew install --cask docker', { stdio: 'ignore' });
                         } catch (error) {
-                            console.log('Failed to install Docker via Homebrew:', error);
+                            console.error('Failed to install Docker via Homebrew:', error);
+                            dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error}`);
                         }
                     }
                     try {
-                        cp.spawn('open -a Docker', { detached: true, stdio: 'ignore' });
+                        cp.spawn('open', ['/Applications/Docker.app'], { detached: true, stdio: 'ignore' });
                     } catch (error) {
-                        console.log('Failed to start Docker Desktop on macOS:', error);
+                        console.error('Failed to start Docker Desktop on macOS:', error);
+                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error}`);
                     }
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
@@ -200,21 +206,21 @@ export class Installer {
                             await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
                         }
                     } catch (error) {
-                        console.log('Failed to install Docker via apt-get:', error);
+                        dockerInstallOutput.appendLine(`Failed to install Docker via apt-get: ${error}`);
                     }
                     // Try starting docker service (if applicable)
                     try {
                         cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
                     } catch (error) {
-                        console.log('Failed to start Docker service on Linux:', error);
+                        dockerInstallOutput.appendLine(`Failed to start Docker service on Linux: ${error}`);
                     }
                 }
 
                 progress.report({ message: 'Waiting for Docker to be ready...' });
                 await this.waitForDockerReady();
-                output.appendLine('Docker is ready.');
+                dockerInstallOutput.appendLine('Docker is ready.');
             } catch (e: any) {
-                output.appendLine(`Silent installation failed: ${e?.message || e}`);
+                dockerInstallOutput.appendLine(`Silent installation failed: ${e?.message || e}`);
                 // 向上层传递错误，让调用者决定如何处理
                 throw e;
             }

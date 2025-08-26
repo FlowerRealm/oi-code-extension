@@ -32,6 +32,14 @@ export class DockerManager {
             await Installer.ensureDockerAvailableSilently();
         } catch (error) {
             console.log('Silent Docker installation failed, proceeding with manual flow');
+            vscode.window.showWarningMessage(
+                '静默安装 Docker 失败。请检查输出通道了解详情，并考虑手动安装 Docker。',
+                '查看输出'
+            ).then(selection => {
+                if (selection === '查看输出') {
+                    vscode.commands.executeCommand('workbench.action.outputChannel.toggle', 'OI-Code Docker Install');
+                }
+            });
         }
 
         // Verify Docker is working
