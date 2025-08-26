@@ -13,8 +13,7 @@ import * as vscode from 'vscode';
 
 
 import { Installer, InstallCommand } from './docker/install';
-
-const IMAGE_NAME = 'oi-runner:stable';
+import { OI_CODE_TEST_TMP_PATH } from './constants';
 
 /**
  * Manages the Docker environment, including building the image, running containers,
@@ -23,85 +22,41 @@ const IMAGE_NAME = 'oi-runner:stable';
 export class DockerManager {
 
     /**
-     * Ensures the 'oi-runner:stable' Docker image exists, building it if necessary.
+     * Ensures Docker is available and ready for use.
      * It will show progress in a VS Code terminal.
-     * @returns A promise that resolves when the image is confirmed to be ready.
+     * @returns A promise that resolves when Docker is ready.
      */
-    public static async ensureImage(projectRootPath: string): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const check = spawn('docker', ['image', 'inspect', IMAGE_NAME], { stdio: 'ignore' });
-
-            check.on('close', async (code) => {
-                if (code === 0) {
-                    console.log(`Docker image '${IMAGE_NAME}' already exists.`);
-                    return resolve();
-                }
-
-                console.log(`Docker image '${IMAGE_NAME}' not found. Proceeding with build.`);
-                vscode.window.showInformationMessage(`Building Docker image '${IMAGE_NAME}'. This may take a few minutes...`);
-
-                try {
-                    const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Build');
-                    outputChannel.show();
-                    outputChannel.appendLine(`Starting build for ${IMAGE_NAME} from ${path.join(projectRootPath, 'Dockerfile')}...\n`);
-
-                    const buildProcess = spawn('docker', ['build', '-t', IMAGE_NAME, '-f', path.join(projectRootPath, 'Dockerfile'), '.'], { cwd: projectRootPath });
-
-                    buildProcess.stdout.on('data', data => outputChannel.append(data.toString()));
-                    buildProcess.stderr.on('data', data => outputChannel.append(data.toString()));
-
-                    buildProcess.on('close', async (buildCode) => {
-                        if (buildCode === 0) {
-                            vscode.window.showInformationMessage(`Successfully built '${IMAGE_NAME}'.`);
-                            outputChannel.appendLine(`\nSuccessfully built image '${IMAGE_NAME}'.`);
-                            resolve();
-                        } else {
-                            const errorMsg = `Failed to build Docker image. Exit code: ${buildCode}. Check output channel for details.`;
-                            vscode.window.showErrorMessage(errorMsg);
-                            outputChannel.appendLine(`\nERROR: ${errorMsg}`);
-                            reject(new Error(errorMsg));
-                        }
-                    });
-
-                    buildProcess.on('error', (err) => {
-                        vscode.window.showErrorMessage(`Failed to start Docker build process: ${err.message}`);
-                        reject(err);
-                    });
-
-                } catch (err: any) {
-                    const errorMsg = `An error occurred while preparing the Docker build: ${err.message}`;
-                    vscode.window.showErrorMessage(errorMsg);
-                    console.error(errorMsg);
-                    reject(new Error(errorMsg));
+    public static async ensureDockerIsReady(projectRootPath: string): Promise<void> {
+        // Check if Docker is available
+        try {
+            await Installer.ensureDockerAvailableSilently();
+        } catch (error) {
+            console.log('Silent Docker installation failed, proceeding with manual flow');
+            vscode.window.showWarningMessage(
+                '静默安装 Docker 失败。请检查输出通道了解详情，并考虑手动安装 Docker。',
+                '查看输出'
+            ).then(selection => {
+                if (selection === '查看输出') {
+                    vscode.commands.executeCommand('workbench.action.outputChannel.toggle', 'OI-Code Docker Install');
                 }
             });
+        }
 
-            check.on('error', (err) => {
-                const installCommand = Installer.getInstallCommand();
-                let errorMessage = `Failed to run 'docker'. Is Docker installed and running? Error: ${err.message}`;
+        // Verify Docker is working
+        const isDockerWorking = await this.checkDockerWorking();
+        if (!isDockerWorking) {
+            throw new Error('Docker is not available or not working properly');
+        }
+    }
 
-                if (installCommand) {
-                    errorMessage += `\n\n${installCommand.message}`;
-                    vscode.window.showErrorMessage(
-                        errorMessage,
-                        'Run in Terminal' // Button text
-                    ).then(selection => {
-                        if (selection === 'Run in Terminal') {
-                            const terminal = vscode.window.createTerminal('Docker Installer');
-                            terminal.show();
-                            if (installCommand.isUrl) {
-                                vscode.env.openExternal(vscode.Uri.parse(installCommand.command));
-                                terminal.sendText(`echo "Opening browser to: ${installCommand.command}"`);
-                            } else {
-                                terminal.sendText(installCommand.command);
-                            }
-                        }
-                    });
-                } else {
-                    vscode.window.showErrorMessage(errorMessage);
-                }
-                console.error(errorMessage);
-                reject(new Error(errorMessage));
+    private static async checkDockerWorking(): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
+            const check = spawn('docker', ['info'], { stdio: 'ignore' });
+            check.on('close', (code) => {
+                resolve(code === 0);
+            });
+            check.on('error', () => {
+                resolve(false);
             });
         });
     }
@@ -122,20 +77,30 @@ export class DockerManager {
      * @returns A promise that resolves with the execution result.
      */
     public static async run(options: {
-        projectRootPath: string; // New: Project root path for ensureImage
-        sourceDir: string;      // Directory containing source code, mounted read-only at /sandbox
-        command: string;        // The full shell command to execute inside the container
+        sourceDir: string;
+        command: string;
         input: string;
-        timeLimit: number;      // in seconds, for soft timeout
-        memoryLimit: number;    // in megabytes
-    }): Promise<{ verdict: string; output: string; error: string }> {
-        // Ensure the image is ready before running.
-        await this.ensureImage(options.projectRootPath);
+        memoryLimit: string;
+        projectRootPath: string;
+        languageId: string;
+        timeLimit: number;
+    }): Promise<{
+        stdout: string;
+        stderr: string;
+        timedOut: boolean;
+        memoryExceeded: boolean;
+        spaceExceeded: boolean;
+    }> {
+        // Ensure Docker is available
+        await this.ensureDockerIsReady(options.projectRootPath);
 
-        const { sourceDir, command, input, memoryLimit } = options;
+        const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 
         // Create a temporary directory on the host for writable output (e.g., compiled binary)
-        const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'oi-run-'));
+        await fs.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
+        const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
+        const image = this.selectImageForCommand(languageId);
+
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         const args = [
@@ -149,39 +114,52 @@ export class DockerManager {
             '--pids-limit=64',
             '-v', `${sourceDir}:/sandbox:ro`,
             '-v', `${tempDir}:/tmp:rw`, // Mount a writable temp dir for output
-            IMAGE_NAME,
+            image,
             'bash', '-c', command
         ];
 
+        const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
+        outputChannel.show(true);
         return new Promise((resolve) => {
+            outputChannel.appendLine(`[DockerManager] docker ${args.join(' ')}`);
             const dockerProcess = spawn('docker', args);
 
             let stdout = '';
             let stderr = '';
+            let timedOut = false;
 
-            dockerProcess.stdout.on('data', (data) => stdout += data.toString());
-            dockerProcess.stderr.on('data', (data) => stderr += data.toString());
+            dockerProcess.stdout.on('data', (data) => {
+                const text = data.toString();
+                stdout += text;
+                outputChannel.appendLine(`[docker stdout] ${text.trimEnd()}`);
+            });
+            dockerProcess.stderr.on('data', (data) => {
+                const text = data.toString();
+                stderr += text;
+                outputChannel.appendLine(`[docker stderr] ${text.trimEnd()}`);
+            });
 
-            // TODO: Implement hard timeout with 'docker kill'
-            // TODO: Implement real-time monitoring with 'docker stats' for MLE detection
+            // Hard timeout: kill container if timeLimit exceeded
+            const killTimer = setTimeout(() => {
+                console.warn(`[DockerManager] Timeout exceeded, killing container ${containerName}`);
+                spawn('docker', ['kill', containerName]).on('close', () => { /* noop */ });
+                timedOut = true;
+            }, (timeLimit + 1) * 1000);
 
             dockerProcess.on('close', async (code) => {
+                clearTimeout(killTimer);
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
-
-                if (stderr.includes('command not found')) {
-                    resolve({ verdict: 'COMPILE_ERROR', output: stdout, error: stderr });
-                } else if (code === 124) {
-                    resolve({ verdict: 'TLE', output: stdout, error: stderr });
-                } else if (code !== 0) {
-                    resolve({ verdict: 'RE', output: stdout, error: stderr });
-                } else {
-                    resolve({ verdict: 'AC', output: stdout, error: stderr });
-                }
+                const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
+                const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
+                resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
+                outputChannel.appendLine(`[DockerManager] exit code=${code}`);
             });
 
             dockerProcess.on('error', async (err) => {
+                clearTimeout(killTimer);
                 await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
-                resolve({ verdict: 'SYSTEM_ERROR', output: '', error: `Failed to start Docker: ${err.message}` });
+                resolve({ stdout: '', stderr: `Failed to start Docker: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
+                outputChannel.appendLine(`[DockerManager] error: ${err.message}`);
             });
 
             // Provide input to the process
@@ -190,5 +168,19 @@ export class DockerManager {
             }
             dockerProcess.stdin.end();
         });
+    }
+
+    private static selectImageForCommand(languageId: string): string {
+        switch (languageId.toLowerCase()) {
+            case 'python':
+                return 'python:3.11';
+            case 'cpp':
+            case 'c++':
+                return 'gcc:13';
+            case 'c':
+                return 'gcc:13';
+            default:
+                return 'ubuntu:24.04';
+        }
     }
 }
