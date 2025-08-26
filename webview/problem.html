@@ -1,25 +1,55 @@
 <!DOCTYPE html>
 <html lang="zh-cn">
+
 <head>
-    <meta charset="utf-8"/>
+    <meta charset="utf-8" />
     <style>
-        body { font-family: var(--vscode-font-family); padding:8px; }
-        .row { margin-bottom:8px; }
-        label { display:block; margin-bottom:4px; }
-        input[type=text], textarea, select { width:100%; box-sizing:border-box; }
-        .actions { display:flex; gap:8px; margin-top:8px; }
-        .inline { display:flex; gap:8px; }
-        .half { flex:1; }
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 8px;
+        }
+
+        .row {
+            margin-bottom: 8px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        input[type=text],
+        textarea,
+        select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .inline {
+            display: flex;
+            gap: 8px;
+        }
+
+        .half {
+            flex: 1;
+        }
     </style>
 </head>
+
 <body>
     <div class="row">
         <label>题目名称</label>
-        <input id="name" type="text" placeholder="如：CF1234A"/>
+        <input id="name" type="text" placeholder="如：CF1234A" />
     </div>
     <div class="row">
         <label>题目 URL</label>
-        <input id="url" type="text" placeholder="https://..."/>
+        <input id="url" type="text" placeholder="https://..." />
     </div>
     <div class="row">
         <label>题面 (Markdown)</label>
@@ -28,11 +58,11 @@
     <div class="inline">
         <div class="half">
             <label>时间限制(秒)</label>
-            <input id="timeLimit" type="text" value="5"/>
+            <input id="timeLimit" type="text" value="5" />
         </div>
         <div class="half">
             <label>内存限制(MB)</label>
-            <input id="memoryLimit" type="text" value="256"/>
+            <input id="memoryLimit" type="text" value="256" />
         </div>
     </div>
     <div class="row">
@@ -65,7 +95,7 @@
     </div>
     <script>
         const vscode = acquireVsCodeApi();
-        
+
         function getModel() {
             return {
                 name: document.getElementById('name').value,
@@ -78,18 +108,19 @@
                 std: document.getElementById('std').value
             };
         }
-        
+
         document.getElementById('run').addEventListener('click', () => {
             vscode.postMessage({ cmd: 'run', ...getModel() });
         });
-        
+
         document.getElementById('pair').addEventListener('click', () => {
             vscode.postMessage({ cmd: 'pair', ...getModel() });
         });
-        
+
         document.getElementById('loadSamples').addEventListener('click', () => {
             vscode.postMessage({ cmd: 'loadSamples' });
         });
     </script>
 </body>
+
 </html>

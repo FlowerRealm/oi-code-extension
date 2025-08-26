@@ -524,7 +524,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return { error: 'NEED_TWO_EDITORS' };
             }
             const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
-            const langId = editor1.document.languageId;
+            const langId = getLanguageIdFromEditor(editor1);
             if (editor2.document.languageId !== langId) {
                 vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
                 return { error: 'LANG_MISMATCH' };
@@ -541,8 +541,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                 const input = testInput ?? '';
                 const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
-                    runSingleInDocker(context.extensionPath, tempDir, langId as 'c' | 'cpp' | 'python', `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
+                    runSingleInDocker(context.extensionPath, tempDir, langId, `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
+                    runSingleInDocker(context.extensionPath, tempDir, langId, `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
                 ]);
 
                 const toDisplay = (r: any) => {
