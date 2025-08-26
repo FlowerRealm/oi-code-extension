@@ -225,7 +225,19 @@ suite('OI-Code Commands Test Suite', () => {
         const cppDp = `#include <bits/stdc++.h>
 using namespace std;
 long long C[40];
-int main(){ long long n; if(!(cin>>n)) return 0; C[0]=1; C[1]=1; for(int i=2;i<=n;i++){ C[i]=0; for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j]; } cout<<C[n]<<\"\\n\"; }`;
+int main() {
+    long long n;
+    if (!(cin >> n)) return 0;
+    C[0] = 1;
+    for (int i = 1; i <= n; i++) {
+        C[i] = 0;
+        for (int j = 0; j < i; j++) {
+            C[i] += C[j] * C[i - 1 - j];
+        }
+    }
+    cout << C[n] << endl;
+    return 0;
+}`;
 
         const pyRec = `import sys
 sys.setrecursionlimit(10000)
@@ -239,7 +251,17 @@ def main():
     print(C(n))
 main()`;
 
-        const pyDp = `import sys\nn = int(sys.stdin.readline().strip() or '0')\nif n == 0:\n    print(1)\nelse:\n    C = [1] * (n + 1)\n    for i in range(2, n + 1):\n        C[i] = sum(C[j] * C[i - 1 - j] for j in range(i))\n    print(C[n])`;
+        const pyDp = `import sys
+n = int(sys.stdin.readline().strip() or '0')
+if n == 0:
+    print(1)
+else:
+    C = [1] * (n + 1)
+    for i in range(1, n + 1):
+        C[i] = 0
+        for j in range(i):
+            C[i] += C[j] * C[i - 1 - j]
+    print(C[n])`;
 
         for (const lang of ['c', 'cpp', 'python'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {

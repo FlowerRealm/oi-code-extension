@@ -368,12 +368,12 @@ export function activate(context: vscode.ExtensionContext) {
                             const { sourcePath } = await ensureProblemStructure(m);
                             const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
                             await vscode.window.showTextDocument(doc, { preview: false });
-                            await vscode.commands.executeCommand('oicode.runCode', m.samples || '');
+                            await vscode.commands.executeCommand('oicode.runCode', m.samples || '', { timeLimit: m.timeLimit, memoryLimit: m.memoryLimit });
                         } catch (e: any) {
                             vscode.window.showErrorMessage(e.message || String(e));
                         }
                     } else if (m.cmd === 'pair') {
-                        await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '');
+                        await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '', { timeLimit: m.timeLimit, memoryLimit: m.memoryLimit });
                     }
                 });
             }
@@ -519,7 +519,7 @@ export function activate(context: vscode.ExtensionContext) {
         }));
 
         // Programmatic pair-check command for tests and headless execution
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string) => {
+        context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
             const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'python' || e.document.languageId === 'c'));
             if (editors.length < 2) {
                 vscode.window.showErrorMessage('需要打开至少两个C/C++/Python代码文件才能进行对拍。');
@@ -542,9 +542,12 @@ export function activate(context: vscode.ExtensionContext) {
                 await fs.promises.writeFile(file2Path, editor2.document.getText());
 
                 const input = testInput ?? '';
+                // Use provided options or fallback to defaults
+                const timeLimit = options?.timeLimit ?? 20; // seconds
+                const memoryLimit = options?.memoryLimit ?? 256; // MB
                 const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId, `code1.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
-                    runSingleInDocker(context.extensionPath, tempDir, langId, `code2.${ext}`, input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
+                    runSingleInDocker(context.extensionPath, tempDir, langId, `code1.${ext}`, input, { timeLimit, memoryLimit }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
+                    runSingleInDocker(context.extensionPath, tempDir, langId, `code2.${ext}`, input, { timeLimit, memoryLimit }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
                 ]);
 
                 const toDisplay = (r: any) => {
@@ -568,20 +571,13 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }));
 
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.runCode', async (testInput?: string) => {
+        context.subscriptions.push(vscode.commands.registerCommand('oicode.runCode', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 return vscode.window.showErrorMessage('Please open a file to run.');
             }
-
-            let languageId: 'c' | 'cpp' | 'python';
-            try {
-                languageId = getLanguageIdFromEditor(editor);
-            } catch (e: any) {
-                return vscode.window.showErrorMessage(e.message);
-            }
-
             const document = editor.document;
+            const languageId = document.languageId as 'c' | 'cpp' | 'python';
             const sourceFile = path.basename(document.fileName);
             let input: string | undefined;
             if (testInput !== undefined) {
@@ -595,9 +591,9 @@ export function activate(context: vscode.ExtensionContext) {
                     return; // User cancelled
                 }
             }
-            // Placeholder values for time and memory limits
-            const timeLimit = 5; // seconds
-            const memoryLimit = 256; // MB
+            // Use provided options or fallback to defaults
+            const timeLimit = options?.timeLimit ?? 5; // seconds
+            const memoryLimit = options?.memoryLimit ?? 256; // MB
             return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `正在运行 ${sourceFile}...`,

@@ -168,7 +168,7 @@ export class Installer {
                         cp.spawn('Docker Desktop.exe', [], { detached: true, stdio: 'ignore' });
                     } catch (error) {
                         console.error('Failed to start Docker Desktop from PATH:', error);
-                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop from PATH: ${error}`);
+                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop from PATH: ${(error as any)?.message || String(error)}`);
                         try {
                             // Try common installation paths
                             const commonPaths = [
@@ -185,7 +185,7 @@ export class Installer {
                                     started = true;
                                     dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
                                     break;
-                                } catch (pathError) {
+                                } catch (pathError: any) {
                                     // Continue to next path
                                 }
                             }
@@ -193,9 +193,9 @@ export class Installer {
                             if (!started) {
                                 throw new Error('Could not find Docker Desktop in common installation paths');
                             }
-                        } catch (fallbackError) {
+                        } catch (fallbackError: any) {
                             console.error('Failed to start Docker Desktop from fallback paths:', fallbackError);
-                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback paths: ${fallbackError}`);
+                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback paths: ${fallbackError?.message || String(fallbackError)}`);
                         }
                     }
                 } else if (platform === 'darwin') {
@@ -203,16 +203,16 @@ export class Installer {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
                         try {
                             cp.execSync('brew install --cask docker', { stdio: 'ignore' });
-                        } catch (error) {
+                        } catch (error: any) {
                             console.error('Failed to install Docker via Homebrew:', error);
-                            dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error}`);
+                            dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error?.message || String(error)}`);
                         }
                     }
                     try {
                         cp.spawn('open', ['/Applications/Docker.app'], { detached: true, stdio: 'ignore' });
-                    } catch (error) {
+                    } catch (error: any) {
                         console.error('Failed to start Docker Desktop on macOS:', error);
-                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error}`);
+                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error?.message || String(error)}`);
                     }
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
@@ -227,13 +227,13 @@ export class Installer {
                             await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
                         }
                     } catch (error) {
-                        dockerInstallOutput.appendLine(`Failed to install Docker via apt-get: ${error}`);
+                        dockerInstallOutput.appendLine(`Failed to install Docker via apt-get: ${(error as any)?.message || String(error)}`);
                     }
                     // Try starting docker service (if applicable)
                     try {
                         cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
-                    } catch (error) {
-                        dockerInstallOutput.appendLine(`Failed to start Docker service on Linux: ${error}`);
+                    } catch (error: any) {
+                        dockerInstallOutput.appendLine(`Failed to start Docker service on Linux: ${error?.message || String(error)}`);
                     }
                 }
 
@@ -241,7 +241,7 @@ export class Installer {
                 await this.waitForDockerReady();
                 dockerInstallOutput.appendLine('Docker is ready.');
             } catch (e: any) {
-                dockerInstallOutput.appendLine(`Silent installation failed: ${e?.message || e}`);
+                dockerInstallOutput.appendLine(`Silent installation failed: ${e?.message || String(e)}`);
                 // 向上层传递错误，让调用者决定如何处理
                 throw e;
             }
