@@ -46,10 +46,10 @@ suite('Extension Test Suite', () => {
         const interval = 500;
         // 输出所有扩展id和name
         console.log('All extensions in test env:', vscode.extensions.all.map(e => ({ id: e.id, name: e.packageJSON?.name })));
-        // 输出当前工作目录和 dist/extension.js 是否存在
+        // 输出当前工作目录和 out/extension.js 是否存在
         const fs = require('fs');
         console.log('CWD:', process.cwd());
-        console.log('dist/extension.js exists:', fs.existsSync('./dist/extension.js'));
+        console.log('out/extension.js exists:', fs.existsSync('./out/extension.js'));
         while ((!extension || !extension.isActive) && waited < 30000) {
             if (extension && !extension.isActive) {
                 try { await extension.activate(); } catch { }
