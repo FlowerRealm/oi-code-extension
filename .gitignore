@@ -6,11 +6,15 @@ npm-debug.log*
 .vscode/*.log
 .vscode/*.bak
 .vscode/*.code-workspace
+.vscode-test/
 *.vsix
 
 # Build artifacts
-dist/
+
 out/
 
 # macOS
 .DS_Store
+
+# Test logs (local temporary files)
+test-output.log

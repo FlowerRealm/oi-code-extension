@@ -1,16 +1,20 @@
 {
   "name": "oi-code",
-  "displayName": "OI Init",
-  "description": "Initial setup for OI IDE",
+  "displayName": "OI-Code",
+  "description": "OI/ACM 竞赛编程助手",
   "version": "0.0.1",
-  "publisher": "oi-code",
+  "publisher": "FlowerRealm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FlowerRealm/oi-code-extension.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
   ],
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "activationEvents": [
     "*"
   ],
@@ -19,6 +23,10 @@
       {
         "command": "oi-code.showWelcomePage",
         "title": "OI-Code: 重新初始化"
+      },
+      {
+        "command": "oicode.createProblem",
+        "title": "OI-Code: 新建题目"
       },
       {
         "command": "oi-code.showSettingsPage",
@@ -41,21 +49,15 @@
         "title": "OI-Code: 安装Docker"
       }
     ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "oicode.startPairCheck",
-          "group": "navigation",
-          "icon": "$(compare-changes)"
-        },
-        {
-          "command": "oicode.runCode",
-          "group": "navigation",
-          "icon": "$(play)"
-        }
-      ]
-    },
+    "menus": {},
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "oicode-activity",
+          "title": "OI-Code",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ],
       "panel": [
         {
           "id": "oicode-panel",
@@ -65,6 +67,13 @@
       ]
     },
     "views": {
+      "oicode-activity": [
+        {
+          "id": "oicode.problemView",
+          "name": "题目",
+          "icon": "webview/icons/beaker.svg"
+        }
+      ],
       "oicode-panel": [
         {
           "id": "oicode.pairCheckView",
@@ -76,6 +85,29 @@
     "configuration": {
       "title": "OI-Code Configuration",
       "properties": {
+        "oicode.compile.opt": {
+          "type": "string",
+          "enum": [
+            "O0",
+            "O1",
+            "O2",
+            "O3"
+          ],
+          "default": "O2",
+          "description": "默认优化等级，会在 C/C++ 编译命令中注入/覆盖 -O?。"
+        },
+        "oicode.compile.std": {
+          "type": "string",
+          "enum": [
+            "c++17",
+            "c++14",
+            "c++11",
+            "c11",
+            "c99"
+          ],
+          "default": "c++17",
+          "description": "默认语言标准，会在 C/C++ 编译命令中注入/覆盖 -std=...。"
+        },
         "oicode.docker.compilers": {
           "type": "object",
           "description": "Configure Docker compiler commands and arguments for different languages.",
@@ -199,13 +231,14 @@
     "compile": "webpack --mode development",
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
+    "test:log": "npm test > test-output.log 2>&1"
   },
   "devDependencies": {
     "@types/diff": "^5.0.9",
-    "@types/mocha": "^10.0.1",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "16.x",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
@@ -214,6 +247,9 @@
     "copy-webpack-plugin": "^13.0.0",
     "diff": "^5.2.0",
     "eslint": "^8.47.0",
+    "glob": "^11.0.3",
+    "mocha": "^11.7.1",
+    "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",

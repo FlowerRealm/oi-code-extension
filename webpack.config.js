@@ -14,7 +14,7 @@ const config = {
   entry: './src/extension.ts', // Use the .ts file as the entry point
   output: {
     // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'out'),
     filename: 'extension.js',
     libraryTarget: 'commonjs2',
     devtoolModuleFilenameTemplate: '../[resource-path]'
@@ -46,7 +46,9 @@ const config = {
         { from: 'webview/init.html', to: 'init.html' },
         { from: 'webview/settings.html', to: 'settings.html' },
         { from: 'webview/completion.html', to: 'completion.html' },
+        { from: 'webview/problem.html', to: 'problem.html' },
         { from: 'webview/settings-schema.json', to: 'settings-schema.json' },
+        { from: 'webview/icons', to: 'icons' },
       ],
     }),
   ],
