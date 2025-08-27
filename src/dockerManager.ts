@@ -717,7 +717,7 @@ export class DockerManager {
             '--pids-limit=64',
             '-i', // 交互模式
             image,
-            'bash', '-c', 'mkdir -p /tmp/source /tmp && chmod 777 /tmp/source /tmp && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            'bash', '-c', 'mkdir -p /tmp/source && chmod 777 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
         ];
 
         return new Promise((resolve, reject) => {

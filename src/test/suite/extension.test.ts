@@ -354,7 +354,7 @@ def C(n):
     if n<=1: return 1
     return sum(C(i)*C(n-1-i) for i in range(n))
 def main():
-    n = int(sys.stdin.readline().strip())
+    n = int(sys.stdin.readline().strip() or '0')
     print(C(n))
 main()`;
 
