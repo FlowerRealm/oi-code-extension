@@ -799,10 +799,13 @@ export class DockerManager {
         if (containerIds.length === 0) {
             return;
         }
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
             const stopProcess = spawn('docker', ['stop', ...containerIds]);
             stopProcess.on('close', () => resolve());
-            stopProcess.on('error', (err) => reject(err));
+            stopProcess.on('error', (err) => {
+                console.warn(`[DockerManager] Error stopping containers: ${err.message}`);
+                resolve(); // 出错也继续，保证后续清理流程
+            });
         });
     }
 
@@ -810,14 +813,17 @@ export class DockerManager {
      * 批量删除容器的辅助函数
      */
     private static async _removeContainers(containerIds: string[]): Promise<void> {
-        const rmPromises = containerIds.map(id =>
-            new Promise<void>((resolve) => {
-                const rmProcess = spawn('docker', ['rm', '-f', id]);
-                rmProcess.on('close', () => resolve());
-                rmProcess.on('error', () => resolve());
-            })
-        );
-        await Promise.all(rmPromises);
+        if (containerIds.length === 0) {
+            return;
+        }
+        await new Promise<void>((resolve) => {
+            const rmProcess = spawn('docker', ['rm', '-f', ...containerIds]);
+            rmProcess.on('close', () => resolve());
+            rmProcess.on('error', (err) => {
+                console.warn(`[DockerManager] Error removing containers: ${err.message}`);
+                resolve(); // 出错也继续，保证清理流程完整
+            });
+        });
     }
 
     /**
