@@ -437,7 +437,7 @@ main()`;
             await vscode.commands.executeCommand('oicode.initializeEnvironment');
         });
 
-        test('should initialize container pool', async function () {
+                test('should initialize container pool', async function () {
             this.timeout(60000);
 
             // 确保容器池已初始化
@@ -446,7 +446,7 @@ main()`;
             assert.ok(true, 'Container pool should be initialized during extension activation');
         });
 
-        test('should reuse containers for code execution', async function () {
+                test('should reuse containers for code execution', async function () {
             this.timeout(60000);
 
             // 创建一个简单的 C 程序

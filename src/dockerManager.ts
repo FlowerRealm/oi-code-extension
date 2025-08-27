@@ -178,8 +178,8 @@ export class DockerManager {
                 outputChannel.show(true);
 
                 // 构建管道命令 - 使用文件方式处理输入
-                const pipeCommand = `docker exec -i ${container.containerId} bash -c "cd /tmp/source && ${command}"`;
-                const dockerProcess = spawn('docker', ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`]);
+                const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
+                const dockerProcess = spawn('docker', dockerExecArgs);
 
                 let stdout = '';
                 let stderr = '';
@@ -236,7 +236,7 @@ export class DockerManager {
      */
     private static async checkContainerHasCacheMount(containerId: string): Promise<boolean> {
         return new Promise((resolve) => {
-            const inspectProcess = spawn('docker', ['inspect', containerId]);
+            const inspectProcess = spawn('docker', ['inspect', '--format', '{{json .Mounts}}', containerId]);
             let stdout = '';
 
             inspectProcess.stdout.on('data', (data) => {
@@ -244,10 +244,9 @@ export class DockerManager {
             });
 
             inspectProcess.on('close', (code) => {
-                if (code === 0) {
+                if (code === 0 && stdout) {
                     try {
-                        const info = JSON.parse(stdout);
-                        const mounts = info[0].Mounts || [];
+                        const mounts = JSON.parse(stdout);
                         const hasCacheMount = mounts.some((mount: any) =>
                             mount.Destination === '/cache' || mount.Destination === '/tmp/source'
                         );
@@ -769,25 +768,6 @@ export class DockerManager {
                 // 即使出错也继续清理
                 console.warn(`[DockerManager] Error stopping container ${container.containerId}, continuing cleanup`);
                 resolve();
-            });
-        });
-    }
-
-    /**
-     * 执行Docker命令的辅助函数
-     */
-    private static async _runDockerCommand(args: string[]): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const process = spawn('docker', args);
-            process.on('close', (code) => {
-                if (code === 0) {
-                    resolve();
-                } else {
-                    reject(new Error(`Docker command failed with code ${code}: ${args.join(' ')}`));
-                }
-            });
-            process.on('error', (err) => {
-                reject(new Error(`Failed to execute docker command: ${err.message}`));
             });
         });
     }
