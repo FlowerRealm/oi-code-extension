@@ -553,7 +553,7 @@ export class DockerManager {
                             });
                             rmProcess.on('error', (err) => {
                                 console.warn(`[DockerManager] Error force removing oi-containers: ${err.message}`);
-                                reject(err);
+                                resolve();
                             });
                         } else {
                             console.log('[DockerManager] No oi-containers found to remove');
@@ -561,13 +561,13 @@ export class DockerManager {
                         }
                     } else {
                         console.warn(`[DockerManager] Failed to find oi-containers: ${code}`);
-                        reject(new Error("Failed to find oi-containers with code " + code));
+                        resolve();
                     }
                 });
 
                 findProcess.on('error', (err) => {
                     console.warn(`[DockerManager] Error finding oi-containers: ${err.message}`);
-                    reject(err);
+                    resolve();
                 });
             });
 
