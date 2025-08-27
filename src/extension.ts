@@ -143,18 +143,18 @@ async function runSingleInDocker(
         const effStd = options?.std || defaultStd;
 
         if (languageId === 'cpp') {
-            compileCommand = `g++ ${sourceFilePath} -o ${executableName} -O${finalOpt} -std=${effStd}`;
+            compileCommand = `g++ '${sourceFilePath}' -o '${executableName}' -O${finalOpt} -std=${effStd}`;
         } else {
-            compileCommand = `gcc ${sourceFilePath} -o ${executableName} -O${finalOpt}`;
+            compileCommand = `gcc '${sourceFilePath}' -o '${executableName}' -O${finalOpt}`;
         }
     }
 
     // 构建运行命令
     let runCommand: string;
     if (languageId === 'python') {
-        runCommand = `python3 ${sourceFilePath}`;
+        runCommand = `python3 '${sourceFilePath}'`;
     } else {
-        runCommand = executableName;
+        runCommand = `'${executableName}'`;
     }
 
     // 组合完整的命令：编译 + 运行

@@ -360,7 +360,7 @@ main()`;
 
         const pyDp = `import sys
 def main():
-    n = int(sys.stdin.readline().strip())
+    n = int(sys.stdin.readline().strip() or '0')
     if n == 0:
         print(1)
     else:
