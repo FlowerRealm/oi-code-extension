@@ -184,8 +184,6 @@ suite('OI-Code Commands Test Suite', () => {
                 await vscode.commands.executeCommand('oicode.downloadDocker');
                 assert.ok(true, 'oi-code.downloadDocker command executed without crashing');
             } catch (error: any) {
-                // Expected to fail in CI environment without Docker
-                assert.ok(true, `oi-code.downloadDocker command failed as expected: ${error.message}`);
             }
         }
     });
@@ -558,8 +556,6 @@ main()`;
 
             } catch (error: any) {
                 console.error('[Deactivate Test] Error during deactivate test:', error);
-                // 即使测试失败，也不要让整个测试 suite 失败
-                assert.ok(true, `Deactivate test completed with error: ${error.message}`);
             }
         });
     });
