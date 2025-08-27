@@ -117,51 +117,64 @@ async function runSingleInDocker(
     input: string,
     options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
 ): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
-    // Prefer configured docker compilers; fallback to sane defaults
-    const config = vscode.workspace.getConfiguration();
-    const compilers = config.get<any>('oicode.docker.compilers') || {};
-    const defaultOpt = config.get<string>('oicode.compile.opt');
-    const defaultStd = config.get<string>('oicode.compile.std');
+    // 生成唯一的可执行文件名，避免冲突
+    const baseName = path.parse(sourceFileName).name;
+    const uniqueId = Math.random().toString(36).substr(2, 5);
+    const executableName = `/tmp/${baseName}_${uniqueId}.out`;
 
-    // Helper function to apply compiler options
-    function applyCompilerOptions(args: string[], options?: { opt?: string; std?: string }): string[] {
-        let result = [...args];
+    // 构建完整的源文件路径
+    const sourceFilePath = `/tmp/source/${sourceFileName}`;
+
+    // 构建编译命令
+    let compileCommand: string;
+    if (languageId === 'python') {
+        // Python不需要编译，直接运行
+        compileCommand = '';
+    } else {
+        // 获取编译器选项
+        const config = vscode.workspace.getConfiguration();
+        const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
+        const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
 
         const effOpt = options?.opt || defaultOpt;
-        if (effOpt) {
-            result = result.map(a => /^-O[0-3]$/.test(a) ? `-${effOpt}` : a);
-            if (!result.some(a => /^-O[0-3]$/.test(a))) result.push(`-${effOpt}`);
-        }
-
+        // 确保优化级别是有效的
+        const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
+        const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
         const effStd = options?.std || defaultStd;
-        if (effStd) {
-            result = result.map(a => a.startsWith('-std=') ? `-std=${effStd}` : a);
-            if (!result.some(a => a.startsWith('-std='))) result.push(`-std=${effStd}`);
+
+        if (languageId === 'cpp') {
+            compileCommand = `g++ ${sourceFilePath} -o ${executableName} -O${finalOpt} -std=${effStd}`;
+        } else {
+            compileCommand = `gcc ${sourceFilePath} -o ${executableName} -O${finalOpt}`;
         }
-
-        return result;
     }
 
-    let command: string;
+    // 构建运行命令
+    let runCommand: string;
     if (languageId === 'python') {
-        const py = compilers.python || { command: 'python3', args: ['/sandbox/${sourceFile}'] };
-        const args = (py.args as string[]).map(a => a.replace(/\$\{sourceFile\}/g, sourceFileName));
-        command = [py.command as string, ...args].join(' ');
-    } else if (languageId === 'cpp') {
-        const cpp = compilers.cpp || { command: 'g++', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2', '-std=c++17'] };
-        let args = (cpp.args as string[]).map(a => a.replace(/\$\{sourceFile\}/g, sourceFileName));
-        args = applyCompilerOptions(args, options);
-        command = [cpp.command as string, ...args, '&&', '/tmp/a.out'].join(' ');
+        runCommand = `python3 ${sourceFilePath}`;
     } else {
-        const c = compilers.c || { command: 'gcc', args: ['/sandbox/${sourceFile}', '-o', '/tmp/a.out', '-O2'] };
-        let args = (c.args as string[]).map(a => a.replace(/\$\{sourceFile\}/g, sourceFileName));
-        args = applyCompilerOptions(args, options);
-        command = [c.command as string, ...args, '&&', '/tmp/a.out'].join(' ');
+        runCommand = executableName;
     }
 
+    // 组合完整的命令：编译 + 运行
+    let fullCommand: string;
+    if (languageId === 'python') {
+        fullCommand = runCommand;
+    } else {
+        fullCommand = `${compileCommand} && ${runCommand}`;
+    }
+
+    // 添加调试信息
+    console.log(`[RunSingleInDocker] Language: ${languageId}, Source file: ${sourceFileName}`);
+    console.log(`[RunSingleInDocker] Executable name: ${executableName}`);
+    console.log(`[RunSingleInDocker] Source file path: ${sourceFilePath}`);
+    console.log(`[RunSingleInDocker] Command: ${fullCommand}`);
+
+    // 直接使用编译和运行命令，不需要额外的文件复制，因为 dockerManager 会处理文件复制
     const result = await DockerManager.run({
         sourceDir,
-        command,
+        command: fullCommand,
         input,
         memoryLimit: (options?.memoryLimit ? String(options.memoryLimit) : '512'),
         projectRootPath,
@@ -219,9 +232,9 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'python'));
+                    const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp' || e.document.languageId === 'python'));
                     if (editors.length < 2) {
-                        vscode.window.showErrorMessage('需要打开至少两个C++/Python代码文件才能进行对拍。');
+                        vscode.window.showErrorMessage('需要打开至少两个C/C++/Python代码文件才能进行对拍。');
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
@@ -285,6 +298,11 @@ export function activate(context: vscode.ExtensionContext) {
     try {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
+
+        // 初始化容器池
+        DockerManager.initializeContainerPool().catch(error => {
+            console.error('Failed to initialize container pool:', error);
+        });
 
         // Register WebviewView providers
         console.log('PairCheckViewProvider will be registered later');
@@ -420,17 +438,13 @@ export function activate(context: vscode.ExtensionContext) {
                     const configDir = path.join(problemDir, 'config');
                     await fs.promises.mkdir(problemDir, { recursive: true });
                     await fs.promises.mkdir(configDir, { recursive: true });
-                    // Template source
+                    // Template source - 使用空文件而不是模板代码
                     const sourcePath = path.join(problemDir, `main.${ext}`);
                     try {
                         await fs.promises.access(sourcePath);
                     } catch {
-                        const tpl = langId === 'c'
-                            ? '#include <stdio.h>\nint main(){ /* TODO */ return 0; }\n'
-                            : langId === 'cpp'
-                                ? '#include <bits/stdc++.h>\n using namespace std; int main(){ /* TODO */ return 0; }\n'
-                                : 'print("Hello, World!")\n';
-                        await fs.promises.writeFile(sourcePath, tpl, 'utf8');
+                        // 创建空文件，让用户自己编写代码
+                        await fs.promises.writeFile(sourcePath, '', 'utf8');
                     }
                     // Default config
                     const problemJsonPath = path.join(configDir, 'problem.json');
@@ -531,6 +545,18 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
                 return { error: 'LANG_MISMATCH' };
             }
+
+            // 等待编辑器内容完全加载
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // 再次检查编辑器内容
+            const content1 = editor1.document.getText();
+            const content2 = editor2.document.getText();
+            if (content1.length === 0 || content2.length === 0) {
+                vscode.window.showErrorMessage('编辑器内容尚未完全加载，请稍后再试。');
+                return { error: 'EDITOR_CONTENT_NOT_LOADED' };
+            }
+
             // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
             await fs.promises.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
             const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-code-'));
@@ -538,8 +564,8 @@ export function activate(context: vscode.ExtensionContext) {
                 const ext = langId === 'python' ? 'py' : langId;
                 const file1Path = path.join(tempDir, `code1.${ext}`);
                 const file2Path = path.join(tempDir, `code2.${ext}`);
-                await fs.promises.writeFile(file1Path, editor1.document.getText());
-                await fs.promises.writeFile(file2Path, editor2.document.getText());
+                await fs.promises.writeFile(file1Path, content1);
+                await fs.promises.writeFile(file2Path, content2);
 
                 const input = testInput ?? '';
                 // Use provided options or fallback to defaults
@@ -563,9 +589,6 @@ export function activate(context: vscode.ExtensionContext) {
                 // Update panel view if present
                 pairCheckProvider.setOutputs(htmlEscape(output1), htmlEscape(output2));
                 return { output1, output2, equal };
-            } catch (e: any) {
-                vscode.window.showErrorMessage(`对拍执行错误: ${e.message}`);
-                return { error: e.message };
             } finally {
                 await fs.promises.rm(tempDir, { recursive: true, force: true });
             }
@@ -710,4 +733,9 @@ async function getWebviewContent(context: vscode.ExtensionContext, fileName: str
     }
 }
 
-export function deactivate() { }
+export function deactivate() {
+    // 彻底清理所有Docker资源，包括删除容器
+    DockerManager.cleanupAllDockerResources().catch(error => {
+        console.error('Failed to cleanup all Docker resources:', error);
+    });
+}
