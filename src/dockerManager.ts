@@ -553,7 +553,7 @@ export class DockerManager {
                             });
                             rmProcess.on('error', (err) => {
                                 console.warn(`[DockerManager] Error force removing oi-containers: ${err.message}`);
-                                resolve();
+                                reject(err);
                             });
                         } else {
                             console.log('[DockerManager] No oi-containers found to remove');
@@ -561,13 +561,13 @@ export class DockerManager {
                         }
                     } else {
                         console.warn(`[DockerManager] Failed to find oi-containers: ${code}`);
-                        resolve();
+                        reject(new Error("Failed to find oi-containers with code " + code));
                     }
                 });
 
                 findProcess.on('error', (err) => {
                     console.warn(`[DockerManager] Error finding oi-containers: ${err.message}`);
-                    resolve();
+                    reject(err);
                 });
             });
 
@@ -796,14 +796,14 @@ export class DockerManager {
      * 批量停止容器的辅助函数
      */
     private static async _stopContainers(containerIds: string[]): Promise<void> {
-        const stopPromises = containerIds.map(id =>
-            new Promise<void>((resolve) => {
-                const stopProcess = spawn('docker', ['stop', id]);
-                stopProcess.on('close', () => resolve());
-                stopProcess.on('error', () => resolve());
-            })
-        );
-        await Promise.all(stopPromises);
+        if (containerIds.length === 0) {
+            return;
+        }
+        await new Promise<void>((resolve, reject) => {
+            const stopProcess = spawn('docker', ['stop', ...containerIds]);
+            stopProcess.on('close', () => resolve());
+            stopProcess.on('error', (err) => reject(err));
+        });
     }
 
     /**
