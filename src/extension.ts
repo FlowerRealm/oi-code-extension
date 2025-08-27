@@ -136,7 +136,7 @@ async function runSingleInDocker(
         const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
         const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
 
-        const effOpt = options?.opt || defaultOpt;
+        const effOpt = (options?.opt || defaultOpt).replace(/^O/, '');
         // 确保优化级别是有效的
         const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
         const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';

@@ -394,7 +394,7 @@ main()`;
                         if (!(res && res.equal === true)) {
                             console.log('PairCheck mismatch debug:', {
                                 lang: lang,
-                                input: input.trim(),
+                                input: JSON.stringify(input),
                                 inputHex: [...input].map((c: string) => c.charCodeAt(0).toString(16)).join(' '),
                                 output1: (res?.output1 || '').split('\n').map((line: string) => line.trim()).filter((line: string) => line),
                                 output2: (res?.output2 || '').split('\n').map((line: string) => line.trim()).filter((line: string) => line),
@@ -403,7 +403,7 @@ main()`;
                                 output2Raw: res?.output2
                             });
                         }
-                        assert.ok(res && res.equal === true, `pair check mismatch for input=${input.trim()} in ${lang}`);
+                        assert.ok(res && res.equal === true, `pair check mismatch for input=${JSON.stringify(input)} in ${lang}`);
                         console.log(`[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}"`);
                     }
                 } finally {
@@ -437,7 +437,7 @@ main()`;
             await vscode.commands.executeCommand('oicode.initializeEnvironment');
         });
 
-                test('should initialize container pool', async function () {
+        test('should initialize container pool', async function () {
             this.timeout(60000);
 
             // 确保容器池已初始化
@@ -446,7 +446,7 @@ main()`;
             assert.ok(true, 'Container pool should be initialized during extension activation');
         });
 
-                test('should reuse containers for code execution', async function () {
+        test('should reuse containers for code execution', async function () {
             this.timeout(60000);
 
             // 创建一个简单的 C 程序

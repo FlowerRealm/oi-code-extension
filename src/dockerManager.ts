@@ -163,15 +163,9 @@ export class DockerManager {
                 // 检查容器是否使用了.cache挂载
                 const hasCacheMount = await this.checkContainerHasCacheMount(container.containerId);
 
-                if (hasCacheMount) {
-                    // 使用.cache挂载，复制文件到缓存目录
-                    await this.copyFilesToContainer(sourceDir, container.containerId, true);
-                    console.log(`[DockerManager] Using cache mount for container ${container.containerId}`);
-                } else {
-                    // 不使用挂载，直接复制文件到容器
-                    await this.copyFilesToContainer(sourceDir, container.containerId, false);
-                    console.log(`[DockerManager] Using direct copy for container ${container.containerId}`);
-                }
+                                // 暂时回退到原来的文件同步逻辑，确保基本功能正常
+                await this.copyFilesToContainer(sourceDir, container.containerId, hasCacheMount);
+                console.log(`[DockerManager] Using ${hasCacheMount ? 'cache mount' : 'direct copy'} for container ${container.containerId}`);
 
                 // 使用管道格式执行命令
                 const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
@@ -664,7 +658,7 @@ export class DockerManager {
             // 挂载缓存目录到容器内，实现文件自动同步
             '-v', `${cacheDir}:/tmp/source:rw`, // 直接挂载到/tmp/source
             image,
-            'bash', '-c', 'mkdir -p /tmp/source && chmod 777 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            'bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
         ];
 
         return new Promise((resolve, reject) => {
@@ -716,7 +710,7 @@ export class DockerManager {
             '--pids-limit=64',
             '-i', // 交互模式
             image,
-            'bash', '-c', 'mkdir -p /tmp/source && chmod 777 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            'bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
         ];
 
         return new Promise((resolve, reject) => {
