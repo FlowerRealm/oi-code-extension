@@ -550,7 +550,7 @@ export function activate(context: vscode.ExtensionContext) {
             let attempts = 0;
             const maxAttempts = 10;
             const checkInterval = 200; // 200ms检查一次
-            
+
             while (attempts < maxAttempts) {
                 const editor1Content = editor1.document.getText();
                 const editor2Content = editor2.document.getText();
@@ -560,7 +560,7 @@ export function activate(context: vscode.ExtensionContext) {
                 attempts++;
                 await new Promise(resolve => setTimeout(resolve, checkInterval));
             }
-            
+
             // 最终检查
             const finalEditor1Content = editor1.document.getText();
             const finalEditor2Content = editor2.document.getText();

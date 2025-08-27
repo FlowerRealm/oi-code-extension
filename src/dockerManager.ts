@@ -20,13 +20,11 @@ interface DockerContainer {
     image: string;
     isReady: boolean;
     lastUsed: number;
-    process?: any; // 容器进程
 }
 
 interface ContainerPool {
     containers: Map<string, DockerContainer>;
     isActive: boolean;
-    lastUsed: Map<string, number>;
 }
 
 // 容器池配置
@@ -44,8 +42,7 @@ export class DockerManager {
     // 容器池实例
     public static containerPool: ContainerPool = {
         containers: new Map(),
-        isActive: false,
-        lastUsed: new Map()
+        isActive: false
     };
 
     // 健康检查定时器
@@ -126,7 +123,12 @@ export class DockerManager {
 
         // 如果容器池已激活，则使用容器池
         if (this.containerPool.isActive) {
-            return this.runWithContainerPool(options);
+            try {
+                return await this.runWithContainerPool(options);
+            } catch (err) {
+                console.warn(`[DockerManager] Running with container pool failed, falling back to non-pool mode: ${err}`);
+                return this.runWithoutContainerPool(options);
+            }
         }
 
         // 否则使用原来的实现
@@ -268,13 +270,11 @@ export class DockerManager {
      * 复制文件到容器
      */
     private static async copyFilesToContainer(sourceDir: string, containerId: string, useCache: boolean = false): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const logMessage = useCache ? 
-                `[DockerManager] Copying files from ${sourceDir} to /tmp/source in container ${containerId}` :
-                `[DockerManager] Copying files from ${sourceDir} to container ${containerId}`;
-            
-            console.log(logMessage);
+        const targetDescription = useCache ? '/tmp/source in container' : 'container';
+        const logMessage = `[DockerManager] Copying files from ${sourceDir} to ${targetDescription} ${containerId}`;
+        console.log(logMessage);
 
+        return new Promise((resolve, reject) => {
             // 首先清空目标目录
             const cleanProcess = spawn('docker', ['exec', containerId, 'bash', '-c', 'rm -rf /tmp/source/*']);
             cleanProcess.on('close', (cleanCode) => {
@@ -283,36 +283,21 @@ export class DockerManager {
                     const cpProcess = spawn('docker', ['cp', `${sourceDir}/.`, `${containerId}:/tmp/source/`]);
                     cpProcess.on('close', (code) => {
                         if (code === 0) {
-                            const successMessage = useCache ? 
-                                `[DockerManager] Files copied to /tmp/source successfully` :
-                                `[DockerManager] Files copied to container successfully`;
-                            console.log(successMessage);
+                            console.log(`[DockerManager] Files copied to ${targetDescription} successfully`);
                             resolve();
                         } else {
-                            const errorMessage = useCache ? 
-                                `Failed to copy files to /tmp/source: ${code}` :
-                                `Failed to copy files to container: ${code}`;
-                            reject(new Error(errorMessage));
+                            reject(new Error(`Failed to copy files to ${targetDescription}: ${code}`));
                         }
                     });
                     cpProcess.on('error', (err) => {
-                        const errorMessage = useCache ? 
-                            `Failed to copy files to /tmp/source: ${err.message}` :
-                            `Failed to copy files to container: ${err.message}`;
-                        reject(new Error(errorMessage));
+                        reject(new Error(`Failed to copy files to ${targetDescription}: ${err.message}`));
                     });
                 } else {
-                    const errorMessage = useCache ? 
-                        `Failed to clean /tmp/source directory: ${cleanCode}` :
-                        `Failed to clean target directory: ${cleanCode}`;
-                    reject(new Error(errorMessage));
+                    reject(new Error(`Failed to clean ${targetDescription}: ${cleanCode}`));
                 }
             });
             cleanProcess.on('error', (err) => {
-                const errorMessage = useCache ? 
-                    `Failed to clean /tmp/source directory: ${err.message}` :
-                    `Failed to clean target directory: ${err.message}`;
-                reject(new Error(errorMessage));
+                reject(new Error(`Failed to clean ${targetDescription}: ${err.message}`));
             });
         });
     }
@@ -401,22 +386,6 @@ export class DockerManager {
             dockerProcess.on('close', async (code) => {
                 clearTimeout(killTimer);
 
-                // 读取输出文件
-                let finalOutput = '';
-                if (code === 0) {
-                    try {
-                        const outputPath = path.join(tempDir, 'output.txt');
-                        try {
-                            await fs.access(outputPath);
-                            finalOutput = await fs.readFile(outputPath, 'utf8');
-                        } catch (accessErr) {
-                            // 文件不存在，忽略错误
-                        }
-                    } catch (err) {
-                        console.warn(`[DockerManager] Failed to read output file: ${err}`);
-                    }
-                }
-
                 await fs.rm(tempDir, { recursive: true, force: true }); // 清理临时目录
 
                 // 自动清理Docker资源 - 只清理测试相关的容器
@@ -428,7 +397,7 @@ export class DockerManager {
 
                 const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
                 const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
-                resolve({ stdout: finalOutput, stderr, timedOut, memoryExceeded, spaceExceeded });
+                resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
                 outputChannel.appendLine(`[DockerManager] exit code=${code}`);
             });
 
@@ -453,12 +422,12 @@ export class DockerManager {
         // 读取用户配置的编译器设置
         const config = vscode.workspace.getConfiguration();
         const compilers = config.get<any>('oicode.docker.compilers') || {};
-        
+
         // 优先使用用户配置的镜像
         if (compilers[languageId]) {
             return compilers[languageId];
         }
-        
+
         // 回退到默认镜像
         switch (languageId.toLowerCase()) {
             case 'python':
@@ -556,23 +525,8 @@ export class DockerManager {
             }
 
             if (containerIds.length > 0) {
-                const stopPromises = containerIds.map(id =>
-                    new Promise<void>((resolve) => {
-                        const stopProcess = spawn('docker', ['stop', id]);
-                        stopProcess.on('close', () => resolve());
-                        stopProcess.on('error', () => resolve());
-                    })
-                );
-                await Promise.all(stopPromises);
-
-                const rmPromises = containerIds.map(id =>
-                    new Promise<void>((resolve) => {
-                        const rmProcess = spawn('docker', ['rm', '-f', id]);
-                        rmProcess.on('close', () => resolve());
-                        rmProcess.on('error', () => resolve());
-                    })
-                );
-                await Promise.all(rmPromises);
+                await this._stopContainers(containerIds);
+                await this._removeContainers(containerIds);
             }
 
             // 2. 强制删除所有oi-container容器（直接扫描并强杀）
@@ -820,6 +774,53 @@ export class DockerManager {
     }
 
     /**
+     * 执行Docker命令的辅助函数
+     */
+    private static async _runDockerCommand(args: string[]): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const process = spawn('docker', args);
+            process.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`Docker command failed with code ${code}: ${args.join(' ')}`));
+                }
+            });
+            process.on('error', (err) => {
+                reject(new Error(`Failed to execute docker command: ${err.message}`));
+            });
+        });
+    }
+
+    /**
+     * 批量停止容器的辅助函数
+     */
+    private static async _stopContainers(containerIds: string[]): Promise<void> {
+        const stopPromises = containerIds.map(id =>
+            new Promise<void>((resolve) => {
+                const stopProcess = spawn('docker', ['stop', id]);
+                stopProcess.on('close', () => resolve());
+                stopProcess.on('error', () => resolve());
+            })
+        );
+        await Promise.all(stopPromises);
+    }
+
+    /**
+     * 批量删除容器的辅助函数
+     */
+    private static async _removeContainers(containerIds: string[]): Promise<void> {
+        const rmPromises = containerIds.map(id =>
+            new Promise<void>((resolve) => {
+                const rmProcess = spawn('docker', ['rm', '-f', id]);
+                rmProcess.on('close', () => resolve());
+                rmProcess.on('error', () => resolve());
+            })
+        );
+        await Promise.all(rmPromises);
+    }
+
+    /**
      * 启动健康检查定时器
      */
     private static startHealthCheck(): void {
@@ -934,10 +935,6 @@ export class DockerManager {
                 throw new Error(`Failed to start container for ${languageId}: ${error.message}`);
             }
         }
-
-        // 更新最后使用时间
-        container.lastUsed = Date.now();
-        this.containerPool.lastUsed.set(languageId, container.lastUsed);
 
         return container;
     }
