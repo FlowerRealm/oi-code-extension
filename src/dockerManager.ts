@@ -179,7 +179,7 @@ export class DockerManager {
 
                 // 构建管道命令 - 使用文件方式处理输入
                 const pipeCommand = `docker exec -i ${container.containerId} bash -c "cd /tmp/source && ${command}"`;
-                const dockerProcess = spawn('bash', ['-c', pipeCommand]);
+                const dockerProcess = spawn('docker', ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`]);
 
                 let stdout = '';
                 let stderr = '';
@@ -532,7 +532,7 @@ export class DockerManager {
             // 2. 强制删除所有oi-container容器（直接扫描并强杀）
             console.log('[DockerManager] Force removing all oi-container containers...');
             await new Promise<void>((resolve, reject) => {
-                const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container']);
+                const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
                 let containerIds = '';
 
                 findProcess.stdout.on('data', (data) => {
