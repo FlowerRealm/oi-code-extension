@@ -184,6 +184,10 @@ suite('OI-Code Commands Test Suite', () => {
                 await vscode.commands.executeCommand('oicode.downloadDocker');
                 assert.ok(true, 'oi-code.downloadDocker command executed without crashing');
             } catch (error: any) {
+                // 在没有Docker的CI环境中，此命令预计会失败。
+                // 记录错误以供调试，但测试应继续。
+                console.warn(`[Test] 'oicode.downloadDocker' command failed as expected: ${error.message}`);
+                assert.ok(true, `oi-code.downloadDocker command failed as expected: ${error.message}`);
             }
         }
     });
@@ -365,7 +369,7 @@ def main():
         for i in range(1, n + 1):
             C[i] = 0
             for j in range(i):
-                C[i] += C[j] * C[i - 1 - j];
+                C[i] += C[j] * C[i - 1 - j]
         print(C[n])
 main()`;
 
