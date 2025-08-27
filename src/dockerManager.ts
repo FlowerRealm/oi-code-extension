@@ -665,7 +665,7 @@ export class DockerManager {
             // 挂载缓存目录到容器内，实现文件自动同步
             '-v', `${cacheDir}:/tmp/source:rw`, // 直接挂载到/tmp/source
             image,
-            'bash', '-c', 'mkdir -p /tmp && chmod 777 /tmp /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            'bash', '-c', 'mkdir -p /tmp/source && chmod 777 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
         ];
 
         return new Promise((resolve, reject) => {
