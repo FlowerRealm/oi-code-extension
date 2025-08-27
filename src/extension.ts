@@ -546,15 +546,27 @@ export function activate(context: vscode.ExtensionContext) {
                 return { error: 'LANG_MISMATCH' };
             }
 
-            // 等待编辑器内容完全加载
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // 再次检查编辑器内容
-            const content1 = editor1.document.getText();
-            const content2 = editor2.document.getText();
-            if (content1.length === 0 || content2.length === 0) {
-                vscode.window.showErrorMessage('编辑器内容尚未完全加载，请稍后再试。');
-                return { error: 'EDITOR_CONTENT_NOT_LOADED' };
+            // 等待编辑器内容完全加载（使用更可靠的机制）
+            let attempts = 0;
+            const maxAttempts = 10;
+            const checkInterval = 200; // 200ms检查一次
+            
+            while (attempts < maxAttempts) {
+                const editor1Content = editor1.document.getText();
+                const editor2Content = editor2.document.getText();
+                if (editor1Content.length > 0 && editor2Content.length > 0) {
+                    break; // 内容已加载完成
+                }
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+            
+            // 最终检查
+            const finalEditor1Content = editor1.document.getText();
+            const finalEditor2Content = editor2.document.getText();
+            if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
+                vscode.window.showErrorMessage('编辑器内容加载超时，请稍后再试。');
+                return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
             }
 
             // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
@@ -564,8 +576,8 @@ export function activate(context: vscode.ExtensionContext) {
                 const ext = langId === 'python' ? 'py' : langId;
                 const file1Path = path.join(tempDir, `code1.${ext}`);
                 const file2Path = path.join(tempDir, `code2.${ext}`);
-                await fs.promises.writeFile(file1Path, content1);
-                await fs.promises.writeFile(file2Path, content2);
+                await fs.promises.writeFile(file1Path, finalEditor1Content);
+                await fs.promises.writeFile(file2Path, finalEditor2Content);
 
                 const input = testInput ?? '';
                 // Use provided options or fallback to defaults
@@ -589,6 +601,9 @@ export function activate(context: vscode.ExtensionContext) {
                 // Update panel view if present
                 pairCheckProvider.setOutputs(htmlEscape(output1), htmlEscape(output2));
                 return { output1, output2, equal };
+            } catch (e: any) {
+                vscode.window.showErrorMessage(`对拍执行错误: ${e.message}`);
+                return { error: e.message };
             } finally {
                 await fs.promises.rm(tempDir, { recursive: true, force: true });
             }
