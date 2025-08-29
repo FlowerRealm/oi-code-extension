@@ -749,9 +749,9 @@ async function getWebviewContent(context: vscode.ExtensionContext, fileName: str
     }
 }
 
-export function deactivate() {
+export function deactivate(): Promise<void> {
     // 彻底清理所有Docker资源，包括删除容器
-    DockerManager.cleanupAllDockerResources().catch(error => {
+    return DockerManager.cleanupAllDockerResources().catch(error => {
         console.error('Failed to cleanup all Docker resources:', error);
     });
 }

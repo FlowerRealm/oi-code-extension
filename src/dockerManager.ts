@@ -199,8 +199,8 @@ export class DockerManager {
             // 通过stdin传递输入（如果有）
             if (input) {
                 dockerProcess.stdin.write(input);
-                dockerProcess.stdin.end();
             }
+            dockerProcess.stdin.end();
 
             // 硬超时：如果超过时间限制则杀死进程
             const killTimer = setTimeout(() => {
@@ -418,8 +418,8 @@ export class DockerManager {
             // 通过stdin传递输入（如果有）
             if (input) {
                 dockerProcess.stdin.write(input);
-                dockerProcess.stdin.end();
             }
+            dockerProcess.stdin.end();
 
             // 硬超时：如果超过时间限制则杀死进程
             const killTimer = setTimeout(() => {
