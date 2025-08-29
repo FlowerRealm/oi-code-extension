@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
 
-import { Installer, InstallCommand } from './docker/install';
+import { Installer } from './docker/install';
 import { OI_CODE_TEST_TMP_PATH } from './constants';
 
 // 容器池管理接口
