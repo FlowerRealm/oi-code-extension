@@ -162,8 +162,8 @@ async function runSingleInDocker(
     if (languageId === 'python') {
         fullCommand = runCommand;
     } else {
-        // 在运行后总是尝试删除可执行文件，以防止文件在容器池中累积
-        fullCommand = `${compileCommand} && ${runCommand}; rm -f '${executableName}'`;
+        // 使用 trap 命令确保临时编译产物能被可靠清理，即使在进程被意外终止时也能执行
+        fullCommand = `trap "rm -f '${executableName}'" EXIT; ${compileCommand} && ${runCommand}`;
     }
 
     // 添加调试信息

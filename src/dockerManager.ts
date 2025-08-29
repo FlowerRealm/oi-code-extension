@@ -250,24 +250,13 @@ export class DockerManager {
             // 确保缓存目录存在
             await fs.mkdir(cacheDir, { recursive: true });
 
-            // 清空缓存目录
-            const cacheFiles = await fs.readdir(cacheDir);
-            for (const file of cacheFiles) {
-                const filePath = path.join(cacheDir, file);
-                try {
-                    const stat = await fs.stat(filePath);
-                    if (stat.isDirectory()) {
-                        await fs.rm(filePath, { recursive: true, force: true });
-                    } else {
-                        await fs.unlink(filePath);
-                    }
-                } catch (fileError: unknown) {
-                    // 只记录非"文件不存在"错误
-                    if (fileError instanceof Error && 'code' in fileError && (fileError as { code?: string }).code !== 'ENOENT') {
-                        console.warn(`[DockerManager] Failed to remove cache file ${filePath}: ${fileError}`);
-                    }
-                    // 继续处理其他文件
-                }
+            // 清空缓存目录：直接删除整个目录然后重新创建，更简洁高效
+            try {
+                await fs.rm(cacheDir, { recursive: true, force: true });
+                await fs.mkdir(cacheDir, { recursive: true });
+            } catch (error) {
+                console.warn(`[DockerManager] Failed to recreate cache directory: ${error}`);
+                throw new Error(`Failed to recreate cache directory: ${error}`);
             }
 
             // 复制源目录的文件到缓存目录
@@ -760,45 +749,7 @@ export class DockerManager {
 
             // 2. 强制删除所有oi-container容器（直接扫描并强杀）
             console.log('[DockerManager] Force removing all oi-container containers...');
-            await new Promise<void>((resolve, reject) => {
-                const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
-                let containerIds = '';
-
-                findProcess.stdout.on('data', (data) => {
-                    containerIds += data.toString();
-                });
-
-                findProcess.on('close', (code) => {
-                    if (code === 0) {
-                        const ids = containerIds.trim().split('\n').filter(id => id);
-                        if (ids.length > 0) {
-                            console.log(`[DockerManager] Found ${ids.length} oi-container(s) to force remove`);
-
-                            // 强制删除所有oi-container容器
-                            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
-                            rmProcess.on('close', (rmCode) => {
-                                console.log(`[DockerManager] Force removed oi-containers with code: ${rmCode}`);
-                                resolve();
-                            });
-                            rmProcess.on('error', (err) => {
-                                console.warn(`[DockerManager] Error force removing oi-containers: ${err.message}`);
-                                resolve();
-                            });
-                        } else {
-                            console.log('[DockerManager] No oi-containers found to remove');
-                            resolve();
-                        }
-                    } else {
-                        console.warn(`[DockerManager] Failed to find oi-containers: ${code}`);
-                        resolve();
-                    }
-                });
-
-                findProcess.on('error', (err) => {
-                    console.warn(`[DockerManager] Error finding oi-containers: ${err.message}`);
-                    resolve();
-                });
-            });
+            await this.forceRemoveOiContainers();
 
             // 3. 只删除oi-code创建的镜像，保留基础镜像
             // 注意：这里不再删除gcc:13和python:3.11等基础镜像
@@ -1182,6 +1133,50 @@ export class DockerManager {
         }
 
         return container;
+    }
+
+    /**
+     * 强制删除所有oi-container容器
+     */
+    private static async forceRemoveOiContainers(): Promise<void> {
+        try {
+            // 查找所有oi-container容器
+            const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
+            let containerIds = '';
+
+            findProcess.stdout.on('data', (data) => {
+                containerIds += data.toString();
+            });
+
+            const findCode = await new Promise<number>((resolve) => {
+                findProcess.on('close', resolve);
+                findProcess.on('error', () => resolve(-1));
+            });
+
+            if (findCode !== 0) {
+                console.warn(`[DockerManager] Failed to find oi-containers: ${findCode}`);
+                return;
+            }
+
+            const ids = containerIds.trim().split('\n').filter(id => id);
+            if (ids.length === 0) {
+                console.log('[DockerManager] No oi-containers found to remove');
+                return;
+            }
+
+            console.log(`[DockerManager] Found ${ids.length} oi-container(s) to force remove`);
+
+            // 强制删除所有oi-container容器
+            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
+            const rmCode = await new Promise<number>((resolve) => {
+                rmProcess.on('close', resolve);
+                rmProcess.on('error', () => resolve(-1));
+            });
+
+            console.log(`[DockerManager] Force removed oi-containers with code: ${rmCode}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Error force removing oi-containers: ${error}`);
+        }
     }
 
     /**
