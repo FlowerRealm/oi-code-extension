@@ -579,15 +579,11 @@ main()`;
                 assert.ok(res1, 'Should return execution result for first run');
 
                 // 验证第一次执行成功
-                if (res1.output) {
-                    console.log('[Container Pool Test] First run output:', res1.output);
-                    assert.ok(res1.output.includes('Container reuse test'), 'First run should execute successfully');
-                } else if (res1.error) {
-                    console.log('[Container Pool Test] First run error:', res1.error);
-                    assert.ok(res1.error.includes('Container reuse test'), 'First run error should contain expected output');
-                } else {
-                    assert.fail('No output or error returned from first execution');
+                if (res1.error) {
+                    assert.fail(`First run should not have stderr, but got: ${res1.error}`);
                 }
+                assert.ok(res1.output, 'Should have output from first run');
+                assert.ok(res1.output.includes('Container reuse test'), 'First run should execute successfully');
 
                 // 获取第一次执行后的容器数量
                 const afterFirstContainers = await new Promise<string>((resolve) => {
@@ -604,15 +600,11 @@ main()`;
                 assert.ok(res2, 'Should return execution result for second run');
 
                 // 验证第二次执行成功
-                if (res2.output) {
-                    console.log('[Container Pool Test] Second run output:', res2.output);
-                    assert.ok(res2.output.includes('Container reuse test'), 'Second run should execute successfully');
-                } else if (res2.error) {
-                    console.log('[Container Pool Test] Second run error:', res2.error);
-                    assert.ok(res2.error.includes('Container reuse test'), 'Second run error should contain expected output');
-                } else {
-                    assert.fail('No output or error returned from second execution');
+                if (res2.error) {
+                    assert.fail(`Second run should not have stderr, but got: ${res2.error}`);
                 }
+                assert.ok(res2.output, 'Should have output from second run');
+                assert.ok(res2.output.includes('Container reuse test'), 'Second run should execute successfully');
 
                 // 获取第二次执行后的容器数量
                 const afterSecondContainers = await new Promise<string>((resolve) => {

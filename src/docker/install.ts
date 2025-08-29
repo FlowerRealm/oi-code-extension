@@ -239,12 +239,14 @@ export class Installer {
                             cp.spawn('open', [dockerPath], { detached: true, stdio: 'ignore' });
                             dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
                         } else {
-                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations');
-                            // 尝试通过Spotlight查找
+                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations. Trying to open via Launch Services...');
                             try {
-                                cp.spawn('mdfind', ['-name', 'Docker.app'], { stdio: 'ignore' });
-                            } catch {
-                                dockerInstallOutput.appendLine('Could not search for Docker.app via Spotlight');
+                                // 使用 'open -a' 让系统通过名称查找并打开应用
+                                cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
+                                dockerInstallOutput.appendLine('Attempted to start Docker via Launch Services.');
+                            } catch (error: any) {
+                                console.error('Failed to start Docker via Launch Services:', error);
+                                dockerInstallOutput.appendLine(`Failed to start Docker via Launch Services: ${error?.message || String(error)}`);
                             }
                         }
                     } catch (error: any) {
