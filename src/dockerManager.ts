@@ -13,6 +13,50 @@ import * as vscode from 'vscode';
 import { Installer } from './docker/install';
 import { OI_CODE_TEST_TMP_PATH } from './constants';
 
+// Docker inspect 输出接口定义
+interface DockerMount {
+    Type: string;
+    Source: string;
+    Destination: string;
+    Mode?: string;
+    RW?: boolean;
+    Propagation?: string;
+}
+
+interface DockerContainerState {
+    Status: string;
+    Running: boolean;
+    Paused: boolean;
+    Restarting: boolean;
+    OOMKilled: boolean;
+    Dead: boolean;
+    Pid?: number;
+    ExitCode?: number;
+    Error?: string;
+    StartedAt: string;
+    FinishedAt: string;
+}
+
+interface DockerContainerConfig {
+    Image: string;
+    Labels: Record<string, string>;
+    Env?: string[];
+    Cmd?: string[];
+    WorkingDir?: string;
+}
+
+interface DockerContainerInfo {
+    Id: string;
+    Name: string;
+    Image: string;
+    State: DockerContainerState;
+    Config: DockerContainerConfig;
+    Mounts: DockerMount[];
+    NetworkSettings?: {
+        Networks?: Record<string, any>;
+    };
+}
+
 // 容器池管理接口
 interface DockerContainer {
     containerId: string;
@@ -562,7 +606,7 @@ export class DockerManager {
                 }
 
                 try {
-                    const info = JSON.parse(stdout);
+                    const info: DockerContainerInfo[] = JSON.parse(stdout);
                     if (!info || info.length === 0) {
                         resolve(null);
                         return;
@@ -599,7 +643,7 @@ export class DockerManager {
                     }
 
                     // 检查容器是否有缓存挂载
-                    const hasCacheMount = containerInfo.Mounts?.some((mount: { Destination: string; Type: string }) =>
+                    const hasCacheMount = containerInfo.Mounts?.some((mount: DockerMount) =>
                         mount.Destination === '/tmp/source' && mount.Type === 'bind'
                     ) || false;
 
@@ -1045,7 +1089,7 @@ export class DockerManager {
                     inspectProcess.on('close', resolve);
                 });
 
-                const info = JSON.parse(stdout);
+                const info: DockerContainerInfo[] = JSON.parse(stdout);
                 if (!info[0] || info[0].State?.Running !== true) {
                     console.log(`[DockerManager] Container ${container.containerId} not running, restarting`);
                     cleanupPromises.push(this.restartContainer(container));

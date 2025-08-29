@@ -231,12 +231,11 @@ suite('OI-Code Commands Test Suite', () => {
 
 
     describe('Code Execution Tests (requires Docker environment)', () => {
-        let isDockerAvailable = false;
-
         before(async function () {
             this.timeout(120000); // Increase timeout for Docker initialization
+
             // Check if Docker is available and working before running tests
-            isDockerAvailable = await new Promise<boolean>(resolve => {
+            const isDockerAvailable = await new Promise<boolean>(resolve => {
                 const { exec } = require('child_process');
                 // First check if docker command exists
                 exec('docker --version', (error: any, stdout: any, stderr: any) => {
@@ -252,8 +251,9 @@ suite('OI-Code Commands Test Suite', () => {
             });
 
             if (!isDockerAvailable) {
-                console.log('[Test Setup] Docker not available or not working, will test Docker installation instead');
-                vscode.window.showInformationMessage('Docker not available, will test Docker installation functionality.');
+                console.log('[Test Setup] Docker not available, skipping Docker-dependent tests');
+                vscode.window.showInformationMessage('Docker not available, skipping Docker-dependent tests.');
+                this.skip(); // Skip all tests in this describe block
                 return;
             }
 
@@ -268,20 +268,6 @@ suite('OI-Code Commands Test Suite', () => {
 
         test('should create and run C Hello World', async function () {
             this.timeout(60000);
-
-            if (!isDockerAvailable) {
-                console.log('[C Test] Docker not available, testing Docker installation instead');
-                // Test Docker installation when Docker is not available
-                try {
-                    await vscode.commands.executeCommand('oicode.downloadDocker');
-                    console.log('[C Test] Docker installation command executed successfully');
-                    assert.ok(true, 'Docker installation command should execute without crashing');
-                } catch (error: any) {
-                    console.log('[C Test] Docker installation failed as expected:', error.message);
-                    assert.ok(true, 'Docker installation should fail gracefully in CI environment');
-                }
-                return;
-            }
 
             const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C from Test!\\n\"); return 0; }`;
             const created = await createProblemAndOpen('UT-Run-C', 'c', cCode);
@@ -301,20 +287,6 @@ suite('OI-Code Commands Test Suite', () => {
         test('should create and run C++ Hello World', async function () {
             this.timeout(60000);
 
-            if (!isDockerAvailable) {
-                console.log('[C++ Test] Docker not available, testing Docker installation instead');
-                // Test Docker installation when Docker is not available
-                try {
-                    await vscode.commands.executeCommand('oicode.downloadDocker');
-                    console.log('[C++ Test] Docker installation command executed successfully');
-                    assert.ok(true, 'Docker installation command should execute without crashing');
-                } catch (error: any) {
-                    console.log('[C++ Test] Docker installation failed as expected:', error.message);
-                    assert.ok(true, 'Docker installation should fail gracefully in CI environment');
-                }
-                return;
-            }
-
             const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++ from Test!\\n\"; return 0; }`;
             const created = await createProblemAndOpen('UT-Run-CPP', 'cpp', cppCode);
             vscode.window.showInformationMessage('Executing oicode.runCode for C++...');
@@ -333,20 +305,6 @@ suite('OI-Code Commands Test Suite', () => {
         test('should create and run Python Hello World', async function () {
             this.timeout(60000);
 
-            if (!isDockerAvailable) {
-                console.log('[Python Test] Docker not available, testing Docker installation instead');
-                // Test Docker installation when Docker is not available
-                try {
-                    await vscode.commands.executeCommand('oicode.downloadDocker');
-                    console.log('[Python Test] Docker installation command executed successfully');
-                    assert.ok(true, 'Docker installation command should execute without crashing');
-                } catch (error: any) {
-                    console.log('[Python Test] Docker installation failed as expected:', error.message);
-                    assert.ok(true, 'Docker installation should fail gracefully in CI environment');
-                }
-                return;
-            }
-
             const pythonCode = `print("Hello, Python from Test!")`;
             const created = await createProblemAndOpen('UT-Run-PY', 'python', pythonCode);
             vscode.window.showInformationMessage('Executing oicode.runCode for Python...');
@@ -361,6 +319,36 @@ suite('OI-Code Commands Test Suite', () => {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
             await cleanupDir(path.dirname(created.sourcePath));
         });
+    });
+
+    // Separate test for Docker installation when Docker is not available
+    test('should handle Docker installation flow when Docker is not available', async function () {
+        this.timeout(120000);
+
+        // Check if Docker is available
+        const isDockerAvailable = await new Promise<boolean>(resolve => {
+            const { exec } = require('child_process');
+            exec('docker --version', (error: any, stdout: any, stderr: any) => {
+                resolve(!error);
+            });
+        });
+
+        if (isDockerAvailable) {
+            console.log('[Docker Installation Test] Docker is already available, skipping installation test');
+            assert.ok(true, 'Docker already available, test passed.');
+            return;
+        }
+
+        console.log('[Docker Installation Test] Docker not available, testing Docker installation command...');
+        // Test Docker installation when Docker is not available
+        try {
+            await vscode.commands.executeCommand('oicode.downloadDocker');
+            console.log('[Docker Installation Test] Docker installation command executed successfully');
+            assert.ok(true, 'Docker installation command should execute without crashing');
+        } catch (error: any) {
+            console.log('[Docker Installation Test] Docker installation failed as expected:', error.message);
+            assert.ok(true, `Docker installation should fail gracefully in CI environment: ${error.message}`);
+        }
     });
 
     describe('Pair Check Tests (Catalan numbers)', () => {
