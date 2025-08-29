@@ -245,12 +245,7 @@ export class DockerManager {
 
         try {
             // 检查源目录是否存在
-            try {
-                await fs.access(sourceDir);
-            } catch (error) {
-                console.warn(`[DockerManager] Source directory does not exist: ${sourceDir}`);
-                throw new Error(`Source directory does not exist: ${sourceDir}`);
-            }
+            await fs.access(sourceDir);
 
             // 确保缓存目录存在
             await fs.mkdir(cacheDir, { recursive: true });
@@ -266,9 +261,9 @@ export class DockerManager {
                     } else {
                         await fs.unlink(filePath);
                     }
-                } catch (fileError: any) {
+                } catch (fileError: unknown) {
                     // 只记录非"文件不存在"错误
-                    if (fileError.code !== 'ENOENT') {
+                    if (fileError instanceof Error && 'code' in fileError && (fileError as { code?: string }).code !== 'ENOENT') {
                         console.warn(`[DockerManager] Failed to remove cache file ${filePath}: ${fileError}`);
                     }
                     // 继续处理其他文件
@@ -610,7 +605,7 @@ export class DockerManager {
                     }
 
                     // 检查容器是否有缓存挂载
-                    const hasCacheMount = containerInfo.Mounts?.some((mount: any) =>
+                    const hasCacheMount = containerInfo.Mounts?.some((mount: { Destination: string; Type: string }) =>
                         mount.Destination === '/tmp/source' && mount.Type === 'bind'
                     ) || false;
 

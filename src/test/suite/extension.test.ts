@@ -298,22 +298,7 @@ int main(){
     return 0;
 }`;
 
-        const cDp = `#include <stdio.h>
-long long C[40];
-int main(){
-    int n;
-    if(scanf("%d", &n) != 1) {
-        return 1;
-    }
-    C[0]=1;
-    if(n>=1) C[1]=1;
-    for(int i=2;i<=n;i++){
-        C[i]=0;
-        for(int j=0;j<i;j++) C[i]+=C[j]*C[i-1-j];
-    }
-    printf("%lld\\n", C[n]);
-    return 0;
-}`;
+        const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){\n    int n;\n    if(scanf("%d", &n) != 1) {\n        return 1;\n    }\n    C[0] = 1;\n    for (int i = 1; i <= n; i++) {\n        C[i] = 0;\n        for (int j = 0; j < i; j++) {\n            C[i] += C[j] * C[i - 1 - j];\n        }\n    }\n    printf("%lld\\n", C[n]);\n    return 0;\n}`;
 
         const cppRec = `#include <iostream>
 using namespace std;
