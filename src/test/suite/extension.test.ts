@@ -512,13 +512,14 @@ main()`;
                 assert.strictEqual(afterCount, 0, `All oi-container containers should be removed after deactivate, but ${afterCount} remain. Remaining containers: ${afterContainers}`);
 
                 // 验证基础镜像仍然存在
-                const images = await new Promise<string>((resolve) => {
-                    exec('docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "^(gcc:13|python:3.11)$"', (error: any, stdout: any) => {
+                const imagesOutput = await new Promise<string>((resolve) => {
+                    exec('docker images --format "{{.Repository}}:{{.Tag}}"', (error: any, stdout: any) => {
                         resolve(stdout.trim());
                     });
                 });
 
-                const baseImages = images ? images.split('\n').filter(img => img) : [];
+                const allImages = imagesOutput ? imagesOutput.split('\n').filter(img => img) : [];
+                const baseImages = allImages.filter(img => img === 'gcc:13' || img === 'python:3.11');
                 console.log(`[Deactivate Test] Base images (gcc:13, python:3.11): ${baseImages.join(', ')}`);
                 assert.ok(baseImages.length >= 2, 'Base images (gcc:13, python:3.11) should be preserved');
 
