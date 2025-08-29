@@ -231,39 +231,7 @@ export class DockerManager {
         }
     }
 
-    /**
-     * 检查容器是否使用了.cache挂载
-     */
-    private static async checkContainerHasCacheMount(containerId: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            const inspectProcess = spawn('docker', ['inspect', '--format', '{{json .Mounts}}', containerId]);
-            let stdout = '';
 
-            inspectProcess.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            inspectProcess.on('close', (code) => {
-                if (code === 0 && stdout) {
-                    try {
-                        const mounts = JSON.parse(stdout);
-                        const hasCacheMount = mounts.some((mount: any) =>
-                            mount.Destination === '/cache' || mount.Destination === '/tmp/source'
-                        );
-                        resolve(hasCacheMount);
-                    } catch (error) {
-                        resolve(false);
-                    }
-                } else {
-                    resolve(false);
-                }
-            });
-
-            inspectProcess.on('error', () => {
-                resolve(false);
-            });
-        });
-    }
 
     /**
      * 高效的文件同步：直接在宿主机上操作缓存目录
@@ -276,6 +244,14 @@ export class DockerManager {
         const cacheDir = path.join(homedir, '.cache', 'oi-code', languageId);
 
         try {
+            // 检查源目录是否存在
+            try {
+                await fs.access(sourceDir);
+            } catch (error) {
+                console.warn(`[DockerManager] Source directory does not exist: ${sourceDir}`);
+                throw new Error(`Source directory does not exist: ${sourceDir}`);
+            }
+
             // 确保缓存目录存在
             await fs.mkdir(cacheDir, { recursive: true });
 
@@ -283,11 +259,19 @@ export class DockerManager {
             const cacheFiles = await fs.readdir(cacheDir);
             for (const file of cacheFiles) {
                 const filePath = path.join(cacheDir, file);
-                const stat = await fs.stat(filePath);
-                if (stat.isDirectory()) {
-                    await fs.rm(filePath, { recursive: true, force: true });
-                } else {
-                    await fs.unlink(filePath);
+                try {
+                    const stat = await fs.stat(filePath);
+                    if (stat.isDirectory()) {
+                        await fs.rm(filePath, { recursive: true, force: true });
+                    } else {
+                        await fs.unlink(filePath);
+                    }
+                } catch (fileError: any) {
+                    // 只记录非"文件不存在"错误
+                    if (fileError.code !== 'ENOENT') {
+                        console.warn(`[DockerManager] Failed to remove cache file ${filePath}: ${fileError}`);
+                    }
+                    // 继续处理其他文件
                 }
             }
 
@@ -304,18 +288,28 @@ export class DockerManager {
      * 递归复制目录
      */
     private static async copyDirectoryRecursive(source: string, destination: string): Promise<void> {
-        const entries = await fs.readdir(source, { withFileTypes: true });
+        try {
+            const entries = await fs.readdir(source, { withFileTypes: true });
 
-        for (const entry of entries) {
-            const sourcePath = path.join(source, entry.name);
-            const destPath = path.join(destination, entry.name);
+            for (const entry of entries) {
+                const sourcePath = path.join(source, entry.name);
+                const destPath = path.join(destination, entry.name);
 
-            if (entry.isDirectory()) {
-                await fs.mkdir(destPath, { recursive: true });
-                await this.copyDirectoryRecursive(sourcePath, destPath);
-            } else if (entry.isFile()) {
-                await fs.copyFile(sourcePath, destPath);
+                try {
+                    if (entry.isDirectory()) {
+                        await fs.mkdir(destPath, { recursive: true });
+                        await this.copyDirectoryRecursive(sourcePath, destPath);
+                    } else if (entry.isFile()) {
+                        await fs.copyFile(sourcePath, destPath);
+                    }
+                } catch (fileError) {
+                    console.warn(`[DockerManager] Failed to copy ${sourcePath} to ${destPath}: ${fileError}`);
+                    // 继续处理其他文件，不要因为单个文件失败而中断整个复制过程
+                }
             }
+        } catch (dirError) {
+            console.warn(`[DockerManager] Failed to read directory ${source}: ${dirError}`);
+            throw new Error(`Failed to read source directory: ${source}`);
         }
     }
 
@@ -595,15 +589,13 @@ export class DockerManager {
                         return;
                     }
 
-                    // 从容器名称中提取语言ID
-                    const languageMatch = containerName.match(/oi-container-([a-z]+)-/);
-                    if (!languageMatch) {
-                        console.log(`[DockerManager] Cannot determine language from container name: ${containerName}`);
+                    // 从容器标签中获取语言ID
+                    const languageId = containerInfo.Config.Labels?.['oi-code.language'];
+                    if (!languageId) {
+                        console.log(`[DockerManager] Cannot determine language from container labels: ${containerName}`);
                         resolve(null);
                         return;
                     }
-
-                    const languageId = languageMatch[1];
                     if (!CONTAINER_POOL_CONFIG.supportedLanguages.includes(languageId as any)) {
                         console.log(`[DockerManager] Unsupported language: ${languageId}`);
                         resolve(null);
@@ -891,6 +883,7 @@ export class DockerManager {
             'run',
             '-d', // 后台运行
             '--name', containerName,
+            '--label', `oi-code.language=${languageId}`, // 添加语言标签
             '--network=none',
             '--memory=512m',
             '--memory-swap=512m',
@@ -946,6 +939,7 @@ export class DockerManager {
             'run',
             '-d', // 后台运行
             '--name', containerName,
+            '--label', `oi-code.language=${languageId}`, // 添加语言标签
             '--network=none',
             '--memory=512m',
             '--memory-swap=512m',
