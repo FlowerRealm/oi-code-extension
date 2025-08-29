@@ -166,9 +166,10 @@ export class DockerManager {
         // 确保 Docker 可用
         await this.ensureDockerIsReady(options.projectRootPath);
 
-        // 如果容器池已激活，并且未使用自定义内存限制，则使用容器池
-        const isCustomMemoryLimit = options.memoryLimit !== '256';
-        if (this.containerPool.isActive && !isCustomMemoryLimit) {
+        // 如果容器池已激活，并且内存限制与容器池匹配，则使用容器池
+        // 容器池中的容器默认配置为512MB内存
+        const isPoolCompatibleMemory = options.memoryLimit === '512';
+        if (this.containerPool.isActive && isPoolCompatibleMemory) {
             try {
                 return await this.runWithContainerPool(options);
             } catch (err) {
@@ -200,6 +201,10 @@ export class DockerManager {
         spaceExceeded: boolean;
     }> {
         const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
+
+        // 注意：在容器池模式下，内存限制在容器创建时已预设为512MB
+        // 这里解构出的memoryLimit仅用于保持接口一致性，实际不使用
+        console.log(`[DockerManager] Using container pool with pre-configured 512MB memory limit (requested: ${memoryLimit}MB)`);
 
         // 获取容器
         const container = await this.getContainerForLanguage(languageId);
