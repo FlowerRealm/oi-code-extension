@@ -740,11 +740,8 @@ export class DockerManager {
             }
 
             if (containerIds.length > 0) {
-                // 并行执行停止和删除操作，大幅提升性能
-                await Promise.all([
-                    this._stopContainers(containerIds),
-                    this._removeContainers(containerIds)
-                ]);
+                // 直接删除容器，docker rm -f 会自动停止容器
+                await this._removeContainers(containerIds);
             }
 
             // 2. 强制删除所有oi-container容器（直接扫描并强杀）
