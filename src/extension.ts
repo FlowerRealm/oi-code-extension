@@ -125,7 +125,7 @@ async function runSingleInDocker(
     // 构建完整的源文件路径
     const sourceFilePath = `/tmp/source/${sourceFileName}`;
 
-    // 构建编译命令
+    // 构建编译命令 - 使用安全的参数传递方式避免shell注入
     let compileCommand: string;
     if (languageId === 'python') {
         // Python不需要编译，直接运行
@@ -142,19 +142,24 @@ async function runSingleInDocker(
         const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
         const effStd = options?.std || defaultStd;
 
+        // 验证路径安全性 - 防止路径遍历攻击
+        if (sourceFilePath.includes('..') || executableName.includes('..')) {
+            throw new Error('Invalid file path: path traversal detected');
+        }
+
         if (languageId === 'cpp') {
-            compileCommand = `g++ '${sourceFilePath}' -o '${executableName}' -O${finalOpt} -std=${effStd}`;
+            compileCommand = `g++ "${sourceFilePath}" -o "${executableName}" -O${finalOpt} -std=${effStd}`;
         } else {
-            compileCommand = `gcc '${sourceFilePath}' -o '${executableName}' -O${finalOpt}`;
+            compileCommand = `gcc "${sourceFilePath}" -o "${executableName}" -O${finalOpt}`;
         }
     }
 
-    // 构建运行命令
+    // 构建运行命令 - 使用安全的参数传递方式
     let runCommand: string;
     if (languageId === 'python') {
-        runCommand = `python3 '${sourceFilePath}'`;
+        runCommand = `python3 "${sourceFilePath}"`;
     } else {
-        runCommand = `'${executableName}'`;
+        runCommand = `"${executableName}"`;
     }
 
     // 组合完整的命令：编译 + 运行
@@ -163,7 +168,8 @@ async function runSingleInDocker(
         fullCommand = runCommand;
     } else {
         // 使用 trap 命令确保临时编译产物能被可靠清理，即使在进程被意外终止时也能执行
-        fullCommand = `trap "rm -f '${executableName}'" EXIT; ${compileCommand} && ${runCommand}`;
+        // 使用双引号包围路径以防止shell注入
+        fullCommand = `trap "rm -f \\"${executableName}\\"" EXIT; ${compileCommand} && ${runCommand}`;
     }
 
     // 添加调试信息

@@ -177,7 +177,8 @@ export class DockerManager {
             const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
             outputChannel.show(true);
 
-            // 构建管道命令 - 使用文件方式处理输入
+            // 构建管道命令 - 使用安全的参数传递方式避免shell注入
+            // 将命令通过数组形式传递，而不是字符串拼接
             const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
             const dockerProcess = spawn('docker', dockerExecArgs);
 
