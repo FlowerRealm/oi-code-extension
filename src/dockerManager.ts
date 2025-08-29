@@ -492,7 +492,7 @@ export class DockerManager {
 
         try {
             // 扫描所有oi-container-*容器
-            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container', '--format', '{{.Names}}']);
+            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container*', '--format', '{{.Names}}']);
             let containerNames = '';
 
             psProcess.stdout.on('data', (data) => {

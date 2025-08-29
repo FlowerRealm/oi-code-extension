@@ -508,27 +508,8 @@ main()`;
 
                 console.log(`[Deactivate Test] Container count before: ${beforeCount}, after: ${afterCount}`);
 
-                // 容器数量应该减少（至少减少一些oi-container容器）
-                assert.ok(afterCount <= beforeCount, 'Container count should not increase after deactivate');
-
-                // 如果有oi-container容器，验证它们是否被停止
-                if (afterContainers) {
-                    const containerIds = afterContainers.split('\n').filter(id => id);
-                    const stoppedContainers = await Promise.all(
-                        containerIds.map(async (id) => {
-                            return new Promise<boolean>((resolve) => {
-                                exec(`docker inspect --format '{{.State.Status}}' ${id}`, (error: any, stdout: any) => {
-                                    resolve(stdout.trim() === 'exited');
-                                });
-                            });
-                        })
-                    );
-
-                    // 所有剩余的oi-container容器都应该处于停止状态
-                    const allStopped = stoppedContainers.every(stopped => stopped);
-                    console.log(`[Deactivate Test] All oi-containers stopped: ${allStopped}`);
-                    assert.ok(allStopped, 'All oi-containers should be stopped after deactivate');
-                }
+                // 验证所有oi-container容器都已被清理
+                assert.strictEqual(afterCount, 0, `All oi-container containers should be removed after deactivate, but ${afterCount} remain. Remaining containers: ${afterContainers}`);
 
                 // 验证基础镜像仍然存在
                 const images = await new Promise<string>((resolve) => {
