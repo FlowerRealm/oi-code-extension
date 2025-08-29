@@ -365,9 +365,6 @@ export class DockerManager {
 
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-        // 检测操作系统以实现跨平台兼容性
-        const isWindows = os.platform() === 'win32';
-
         // 构建docker run参数，使用安全的stdin方式传递输入
         const dockerArgs = [
             'run',
@@ -377,17 +374,14 @@ export class DockerManager {
             '--network=none'
         ];
 
-        // Windows Docker不支持某些参数，需要条件性添加
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificRunArgs(memoryLimit);
+        dockerArgs.push(...platformArgs);
+
+        // Windows不支持只读挂载，条件性添加
+        const isWindows = os.platform() === 'win32';
         if (!isWindows) {
-            // Linux/macOS支持的选项
             dockerArgs.push('--read-only');
-            dockerArgs.push(`--memory=${memoryLimit}m`);
-            dockerArgs.push(`--memory-swap=${memoryLimit}m`);
-            dockerArgs.push('--cpus=1.0');
-            dockerArgs.push('--pids-limit=64');
-        } else {
-            // Windows Docker的简化配置
-            dockerArgs.push(`--memory=${memoryLimit}m`);
         }
 
         // 挂载源目录为只读（Windows也支持）
@@ -846,9 +840,6 @@ export class DockerManager {
             return this.startContainerWithoutMount(languageId, image, containerName);
         }
 
-        // 检测操作系统以实现跨平台兼容性
-        const isWindows = os.platform() === 'win32';
-
         // 创建容器并启动它，预设置必要的目录和权限，并挂载缓存目录
         const createArgs = [
             'run',
@@ -858,17 +849,9 @@ export class DockerManager {
             '--network=none'
         ];
 
-        // Windows Docker不支持某些参数，需要条件性添加
-        if (!isWindows) {
-            // Linux/macOS支持的选项
-            createArgs.push('--memory=512m');
-            createArgs.push('--memory-swap=512m');
-            createArgs.push('--cpus=1.0');
-            createArgs.push('--pids-limit=64');
-        } else {
-            // Windows Docker的简化配置
-            createArgs.push('--memory=512m');
-        }
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificCreateArgs();
+        createArgs.push(...platformArgs);
 
         // 添加交互模式和挂载选项
         createArgs.push('-i');
@@ -915,9 +898,6 @@ export class DockerManager {
     private static async startContainerWithoutMount(languageId: string, image: string, containerName: string): Promise<DockerContainer> {
         console.log(`[DockerManager] Starting container for ${languageId} without mount using ${image}`);
 
-        // 检测操作系统以实现跨平台兼容性
-        const isWindows = os.platform() === 'win32';
-
         const createArgs = [
             'run',
             '-d', // 后台运行
@@ -926,17 +906,9 @@ export class DockerManager {
             '--network=none'
         ];
 
-        // Windows Docker不支持某些参数，需要条件性添加
-        if (!isWindows) {
-            // Linux/macOS支持的选项
-            createArgs.push('--memory=512m');
-            createArgs.push('--memory-swap=512m');
-            createArgs.push('--cpus=1.0');
-            createArgs.push('--pids-limit=64');
-        } else {
-            // Windows Docker的简化配置
-            createArgs.push('--memory=512m');
-        }
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificCreateArgs();
+        createArgs.push(...platformArgs);
 
         // 添加交互模式和命令
         createArgs.push('-i');
@@ -1192,6 +1164,51 @@ export class DockerManager {
         } catch (error) {
             console.warn(`[DockerManager] Error force removing oi-containers: ${error}`);
         }
+    }
+
+    /**
+     * 获取平台特定的Docker运行参数
+     * @param memoryLimit 内存限制（MB）
+     * @returns Docker参数数组
+     */
+    private static _getPlatformSpecificRunArgs(memoryLimit: string): string[] {
+        const isWindows = os.platform() === 'win32';
+        const args: string[] = [];
+
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--memory-swap=' + memoryLimit + 'm');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            args.push('--memory=' + memoryLimit + 'm');
+        }
+
+        return args;
+    }
+
+    /**
+     * 获取平台特定的容器创建参数
+     * @returns Docker参数数组
+     */
+    private static _getPlatformSpecificCreateArgs(): string[] {
+        const isWindows = os.platform() === 'win32';
+        const args: string[] = [];
+
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            args.push('--memory=512m');
+            args.push('--memory-swap=512m');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            args.push('--memory=512m');
+        }
+
+        return args;
     }
 
     /**
