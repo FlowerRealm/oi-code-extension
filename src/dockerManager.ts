@@ -122,8 +122,9 @@ export class DockerManager {
         // 确保 Docker 可用
         await this.ensureDockerIsReady(options.projectRootPath);
 
-        // 如果容器池已激活，则使用容器池
-        if (this.containerPool.isActive) {
+        // 如果容器池已激活，并且未使用自定义内存限制，则使用容器池
+        const isCustomMemoryLimit = options.memoryLimit !== '256';
+        if (this.containerPool.isActive && !isCustomMemoryLimit) {
             try {
                 return await this.runWithContainerPool(options);
             } catch (err) {
@@ -132,7 +133,7 @@ export class DockerManager {
             }
         }
 
-        // 否则使用原来的实现
+        // 否则使用原来的实现（包括自定义内存限制的情况）
         return this.runWithoutContainerPool(options);
     }
 
