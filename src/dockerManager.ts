@@ -271,9 +271,9 @@ export class DockerManager {
     private static async syncFilesToCacheMount(sourceDir: string, languageId: string): Promise<void> {
         console.log(`[DockerManager] Syncing files from ${sourceDir} to cache mount for ${languageId}`);
 
-        // 获取缓存目录路径
+        // 获取缓存目录路径，为每种语言创建独立的子目录
         const homedir = os.homedir();
-        const cacheDir = path.join(homedir, '.cache', 'oi-code');
+        const cacheDir = path.join(homedir, '.cache', 'oi-code', languageId);
 
         try {
             // 确保缓存目录存在
@@ -691,9 +691,9 @@ export class DockerManager {
 
         console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
 
-        // 获取用户主目录路径，多平台兼容
+        // 获取用户主目录路径，多平台兼容，为每种语言创建独立的子目录
         const homedir = os.homedir();
-        const cacheDir = path.join(homedir, '.cache', 'oi-code');
+        const cacheDir = path.join(homedir, '.cache', 'oi-code', languageId);
 
         // 确保缓存目录存在
         try {

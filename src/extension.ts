@@ -119,7 +119,7 @@ async function runSingleInDocker(
 ): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
     // 生成唯一的可执行文件名，避免冲突
     const baseName = path.parse(sourceFileName).name;
-    const uniqueId = Math.random().toString(36).substr(2, 5);
+    const uniqueId = Math.random().toString(36).slice(2, 7);
     const executableName = `/tmp/${baseName}_${uniqueId}.out`;
 
     // 构建完整的源文件路径
