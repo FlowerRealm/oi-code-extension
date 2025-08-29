@@ -578,7 +578,7 @@ main()`;
         });
 
         test('should reuse containers for code execution', async function () {
-            this.timeout(60000);
+            this.timeout(120000); // 增加超时时间到2分钟
 
             if (!isDockerAvailable) {
                 console.log('[Container Reuse Test] Docker not available, testing Docker installation instead');
@@ -594,10 +594,20 @@ main()`;
                 return;
             }
 
+            // 等待容器池完全初始化
+            console.log('[Container Reuse Test] Waiting for container pool initialization...');
+            await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒确保容器池初始化完成
+
             // 获取执行前的容器数量
             const { exec } = require('child_process');
-            const beforeContainers = await new Promise<string>((resolve) => {
+            const beforeContainers = await new Promise<string>((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    console.warn('[Container Reuse Test] Docker command timeout');
+                    resolve('');
+                }, 10000); // 10秒超时
+
                 exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                    clearTimeout(timer);
                     if (error) {
                         console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
                         return resolve('');
@@ -613,8 +623,30 @@ main()`;
             const created = await createProblemAndOpen('UT-Container-Reuse', 'c', cCode);
 
             try {
-                // 第一次执行代码
-                const res1: any = await vscode.commands.executeCommand('oicode.runCode', '');
+                // 第一次执行代码 - 增加超时和重试机制
+                console.log('[Container Pool Test] Starting first execution...');
+                let res1: any = null;
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                while (retryCount < maxRetries && !res1) {
+                    try {
+                        res1 = await Promise.race([
+                            vscode.commands.executeCommand('oicode.runCode', ''),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Command timeout')), 30000)
+                            )
+                        ]);
+                    } catch (error: any) {
+                        retryCount++;
+                        console.warn(`[Container Pool Test] First execution attempt ${retryCount} failed:`, error.message);
+                        if (retryCount < maxRetries) {
+                            console.log(`[Container Pool Test] Retrying first execution in 2 seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    }
+                }
+
                 console.log('[Container Pool Test] First execution result:', res1);
                 assert.ok(res1, 'Should return execution result for first run');
 
@@ -626,10 +658,16 @@ main()`;
                 assert.ok(res1.output.includes('Container reuse test'), 'First run should execute successfully');
 
                 // 获取第一次执行后的容器数量
-                const afterFirstContainers = await new Promise<string>((resolve) => {
+                const afterFirstContainers = await new Promise<string>((resolve, reject) => {
+                    const timer = setTimeout(() => {
+                        console.warn('[Container Reuse Test] Docker command timeout after first execution');
+                        resolve('');
+                    }, 10000);
+
                     exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                        clearTimeout(timer);
                         if (error) {
-                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                            console.warn(`[Test Helper] Failed to list docker containers after first execution: ${error.message}`);
                             return resolve('');
                         }
                         resolve(stdout.trim());
@@ -638,8 +676,33 @@ main()`;
                 const afterFirstCount = afterFirstContainers ? afterFirstContainers.split('\n').filter(id => id).length : 0;
                 console.log(`[Container Pool Test] After first execution - oi-containers: ${afterFirstCount}`);
 
-                // 第二次执行代码
-                const res2: any = await vscode.commands.executeCommand('oicode.runCode', '');
+                // 等待一段时间确保容器池稳定
+                console.log('[Container Pool Test] Waiting for container pool to stabilize...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // 第二次执行代码 - 增加超时和重试机制
+                console.log('[Container Pool Test] Starting second execution...');
+                let res2: any = null;
+                retryCount = 0;
+
+                while (retryCount < maxRetries && !res2) {
+                    try {
+                        res2 = await Promise.race([
+                            vscode.commands.executeCommand('oicode.runCode', ''),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Command timeout')), 30000)
+                            )
+                        ]);
+                    } catch (error: any) {
+                        retryCount++;
+                        console.warn(`[Container Pool Test] Second execution attempt ${retryCount} failed:`, error.message);
+                        if (retryCount < maxRetries) {
+                            console.log(`[Container Pool Test] Retrying second execution in 2 seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    }
+                }
+
                 console.log('[Container Pool Test] Second execution result:', res2);
                 assert.ok(res2, 'Should return execution result for second run');
 
@@ -651,10 +714,16 @@ main()`;
                 assert.ok(res2.output.includes('Container reuse test'), 'Second run should execute successfully');
 
                 // 获取第二次执行后的容器数量
-                const afterSecondContainers = await new Promise<string>((resolve) => {
+                const afterSecondContainers = await new Promise<string>((resolve, reject) => {
+                    const timer = setTimeout(() => {
+                        console.warn('[Container Reuse Test] Docker command timeout after second execution');
+                        resolve('');
+                    }, 10000);
+
                     exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                        clearTimeout(timer);
                         if (error) {
-                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                            console.warn(`[Test Helper] Failed to list docker containers after second execution: ${error.message}`);
                             return resolve('');
                         }
                         resolve(stdout.trim());

@@ -251,25 +251,12 @@ export class DockerManager {
             // 确保缓存目录存在
             await fs.mkdir(cacheDir, { recursive: true });
 
-            // 清空缓存目录：先检查目录是否存在，然后只删除内容而不是删除整个目录
+            // 清空缓存目录
             try {
-                // 检查目录是否存在
-                try {
-                    await fs.access(cacheDir);
-                    // 如果目录存在，清空其内容
-                    const entries = await fs.readdir(cacheDir);
-                    for (const entry of entries) {
-                        await fs.rm(path.join(cacheDir, entry), { recursive: true, force: true });
-                    }
-                } catch (accessError: any) {
-                    // 如果目录不存在（ENOENT），说明是首次创建，这是正常情况
-                    if (accessError.code !== 'ENOENT') {
-                        throw accessError;
-                    }
-                    // 目录不存在时，mkdir会自动创建
+                const entries = await fs.readdir(cacheDir);
+                for (const entry of entries) {
+                    await fs.rm(path.join(cacheDir, entry), { recursive: true, force: true });
                 }
-                // 确保目录存在
-                await fs.mkdir(cacheDir, { recursive: true });
             } catch (error: any) {
                 console.warn(`[DockerManager] Failed to clean cache directory: ${error}`);
                 throw new Error(`Failed to clean cache directory: ${error}`);
@@ -737,13 +724,13 @@ export class DockerManager {
     }
 
     /**
-     * 彻底清理所有Docker资源（容器、镜像、网络等）
+     * 彻底清理所有Docker资源（容器、镜像、网络等）- 优化版本
      */
     public static async cleanupAllDockerResources(): Promise<void> {
         console.log('[DockerManager] Starting comprehensive Docker cleanup...');
 
         try {
-            // 1. 先停止并删除所有容器池中的容器
+            // 1. 并行停止和删除容器池中的容器
             console.log('[DockerManager] Stopping and removing container pool containers...');
             const containerIds: string[] = [];
             for (const container of this.containerPool.containers.values()) {
@@ -753,8 +740,11 @@ export class DockerManager {
             }
 
             if (containerIds.length > 0) {
-                await this._stopContainers(containerIds);
-                await this._removeContainers(containerIds);
+                // 并行执行停止和删除操作，大幅提升性能
+                await Promise.all([
+                    this._stopContainers(containerIds),
+                    this._removeContainers(containerIds)
+                ]);
             }
 
             // 2. 强制删除所有oi-container容器（直接扫描并强杀）
