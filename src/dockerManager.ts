@@ -761,7 +761,7 @@ export class DockerManager {
                     containerIds += data.toString();
                 });
 
-                findProcess.on('close', async (code) => {
+                findProcess.on('close', (code) => {
                     if (code === 0) {
                         const ids = containerIds.trim().split('\n').filter(id => id);
                         if (ids.length > 0) {
