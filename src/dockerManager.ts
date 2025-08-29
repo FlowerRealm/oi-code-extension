@@ -283,28 +283,18 @@ export class DockerManager {
      * 递归复制目录
      */
     private static async copyDirectoryRecursive(source: string, destination: string): Promise<void> {
-        try {
-            const entries = await fs.readdir(source, { withFileTypes: true });
+        const entries = await fs.readdir(source, { withFileTypes: true });
 
-            for (const entry of entries) {
-                const sourcePath = path.join(source, entry.name);
-                const destPath = path.join(destination, entry.name);
+        for (const entry of entries) {
+            const sourcePath = path.join(source, entry.name);
+            const destPath = path.join(destination, entry.name);
 
-                try {
-                    if (entry.isDirectory()) {
-                        await fs.mkdir(destPath, { recursive: true });
-                        await this.copyDirectoryRecursive(sourcePath, destPath);
-                    } else if (entry.isFile()) {
-                        await fs.copyFile(sourcePath, destPath);
-                    }
-                } catch (fileError) {
-                    console.warn(`[DockerManager] Failed to copy ${sourcePath} to ${destPath}: ${fileError}`);
-                    // 继续处理其他文件，不要因为单个文件失败而中断整个复制过程
-                }
+            if (entry.isDirectory()) {
+                await fs.mkdir(destPath, { recursive: true });
+                await this.copyDirectoryRecursive(sourcePath, destPath);
+            } else if (entry.isFile()) {
+                await fs.copyFile(sourcePath, destPath);
             }
-        } catch (dirError) {
-            console.warn(`[DockerManager] Failed to read directory ${source}: ${dirError}`);
-            throw new Error(`Failed to read source directory: ${source}`);
         }
     }
 
