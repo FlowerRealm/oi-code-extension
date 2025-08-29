@@ -463,11 +463,11 @@ main()`;
                 // 验证代码执行成功（输出应该包含预期的内容）
                 if (res.output) {
                     console.log('[Container Pool Test] Code output:', res.output);
-                    assert.ok(res.output.includes('Container reuse test') || res.output.includes('Hello, C from Test') || res.output.includes('Hello, C!'), 'Code should execute successfully');
+                    assert.ok(res.output.includes('Container reuse test'), 'Code should execute successfully');
                 } else if (res.error) {
                     // 如果有错误，检查是否是预期的错误
                     console.log('[Container Pool Test] Execution error:', res.error);
-                    assert.ok(res.error.includes('Container reuse test') || res.error.includes('Hello, C'), 'Error should contain expected output');
+                    assert.ok(res.error.includes('Container reuse test'), 'Error should contain expected output');
                 } else {
                     console.log('[Container Pool Test] No output or error returned');
                     assert.fail('No output or error returned from execution');
