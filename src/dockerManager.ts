@@ -20,6 +20,7 @@ interface DockerContainer {
     image: string;
     isReady: boolean;
     lastUsed: number;
+    hasCacheMount?: boolean;
 }
 
 interface ContainerPool {
@@ -158,52 +159,57 @@ export class DockerManager {
         // 获取容器
         const container = await this.getContainerForLanguage(languageId);
 
-        return new Promise(async (resolve, reject) => {
-            try {
-                // 检查容器是否使用了.cache挂载
-                const hasCacheMount = await this.checkContainerHasCacheMount(container.containerId);
+        try {
+            // 使用缓存挂载进行高效的文件同步
+            const hasCacheMount = container.hasCacheMount ?? false;
+            if (hasCacheMount) {
+                // 高效的文件同步：直接在宿主机上操作缓存目录
+                await this.syncFilesToCacheMount(sourceDir, languageId);
+                console.log(`[DockerManager] Using cache mount for container ${container.containerId}`);
+            } else {
+                // 回退到原来的文件同步逻辑
+                await this.copyFilesToContainer(sourceDir, container.containerId, false);
+                console.log(`[DockerManager] Using direct copy for container ${container.containerId}`);
+            }
 
-                                // 暂时回退到原来的文件同步逻辑，确保基本功能正常
-                await this.copyFilesToContainer(sourceDir, container.containerId, hasCacheMount);
-                console.log(`[DockerManager] Using ${hasCacheMount ? 'cache mount' : 'direct copy'} for container ${container.containerId}`);
+            // 使用管道格式执行命令
+            const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
+            outputChannel.show(true);
 
-                // 使用管道格式执行命令
-                const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
-                outputChannel.show(true);
+            // 构建管道命令 - 使用文件方式处理输入
+            const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
+            const dockerProcess = spawn('docker', dockerExecArgs);
 
-                // 构建管道命令 - 使用文件方式处理输入
-                const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
-                const dockerProcess = spawn('docker', dockerExecArgs);
+            let stdout = '';
+            let stderr = '';
+            let timedOut = false;
 
-                let stdout = '';
-                let stderr = '';
-                let timedOut = false;
+            dockerProcess.stdout.on('data', (data) => {
+                const text = data.toString();
+                stdout += text;
+                outputChannel.appendLine(`[pipe stdout] ${text.trimEnd()}`);
+            });
 
-                dockerProcess.stdout.on('data', (data) => {
-                    const text = data.toString();
-                    stdout += text;
-                    outputChannel.appendLine(`[pipe stdout] ${text.trimEnd()}`);
-                });
+            dockerProcess.stderr.on('data', (data) => {
+                const text = data.toString();
+                stderr += text;
+                outputChannel.appendLine(`[pipe stderr] ${text.trimEnd()}`);
+            });
 
-                dockerProcess.stderr.on('data', (data) => {
-                    const text = data.toString();
-                    stderr += text;
-                    outputChannel.appendLine(`[pipe stderr] ${text.trimEnd()}`);
-                });
+            // 通过stdin传递输入（如果有）
+            if (input) {
+                dockerProcess.stdin.write(input);
+                dockerProcess.stdin.end();
+            }
 
-                // 通过stdin传递输入（如果有）
-                if (input) {
-                    dockerProcess.stdin.write(input);
-                    dockerProcess.stdin.end();
-                }
+            // 硬超时：如果超过时间限制则杀死进程
+            const killTimer = setTimeout(() => {
+                console.warn(`[DockerManager] Timeout exceeded, killing process`);
+                dockerProcess.kill('SIGTERM');
+                timedOut = true;
+            }, (timeLimit + 1) * 1000);
 
-                // 硬超时：如果超过时间限制则杀死进程
-                const killTimer = setTimeout(() => {
-                    console.warn(`[DockerManager] Timeout exceeded, killing process`);
-                    dockerProcess.kill('SIGTERM');
-                    timedOut = true;
-                }, (timeLimit + 1) * 1000);
-
+            return new Promise((resolve) => {
                 dockerProcess.on('close', async (pipeCode) => {
                     clearTimeout(killTimer);
 
@@ -219,10 +225,10 @@ export class DockerManager {
                     resolve({ stdout: '', stderr: `Failed to execute pipe command: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
                     outputChannel.appendLine(`[DockerManager] pipe error: ${err.message}`);
                 });
-            } catch (err) {
-                reject(err);
-            }
-        });
+            });
+        } catch (err) {
+            throw err;
+        }
     }
 
     /**
@@ -257,6 +263,60 @@ export class DockerManager {
                 resolve(false);
             });
         });
+    }
+
+    /**
+     * 高效的文件同步：直接在宿主机上操作缓存目录
+     */
+    private static async syncFilesToCacheMount(sourceDir: string, languageId: string): Promise<void> {
+        console.log(`[DockerManager] Syncing files from ${sourceDir} to cache mount for ${languageId}`);
+
+        // 获取缓存目录路径
+        const homedir = os.homedir();
+        const cacheDir = path.join(homedir, '.cache', 'oi-code');
+
+        try {
+            // 确保缓存目录存在
+            await fs.mkdir(cacheDir, { recursive: true });
+
+            // 清空缓存目录
+            const cacheFiles = await fs.readdir(cacheDir);
+            for (const file of cacheFiles) {
+                const filePath = path.join(cacheDir, file);
+                const stat = await fs.stat(filePath);
+                if (stat.isDirectory()) {
+                    await fs.rm(filePath, { recursive: true, force: true });
+                } else {
+                    await fs.unlink(filePath);
+                }
+            }
+
+            // 复制源目录的文件到缓存目录
+            await this.copyDirectoryRecursive(sourceDir, cacheDir);
+            console.log(`[DockerManager] Files synced to cache mount successfully for ${languageId}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Failed to sync files to cache mount: ${error}`);
+            throw new Error(`Failed to sync files to cache mount: ${error}`);
+        }
+    }
+
+    /**
+     * 递归复制目录
+     */
+    private static async copyDirectoryRecursive(source: string, destination: string): Promise<void> {
+        const entries = await fs.readdir(source, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const sourcePath = path.join(source, entry.name);
+            const destPath = path.join(destination, entry.name);
+
+            if (entry.isDirectory()) {
+                await fs.mkdir(destPath, { recursive: true });
+                await this.copyDirectoryRecursive(sourcePath, destPath);
+            } else if (entry.isFile()) {
+                await fs.copyFile(sourcePath, destPath);
+            }
+        }
     }
 
     /**
@@ -677,7 +737,8 @@ export class DockerManager {
                         languageId,
                         image,
                         isReady: true,
-                        lastUsed: Date.now()
+                        lastUsed: Date.now(),
+                        hasCacheMount: true // 记录使用了缓存挂载
                     };
 
                     this.containerPool.containers.set(languageId, container);
@@ -729,7 +790,8 @@ export class DockerManager {
                         languageId,
                         image,
                         isReady: true,
-                        lastUsed: Date.now()
+                        lastUsed: Date.now(),
+                        hasCacheMount: false // 记录未使用缓存挂载
                     };
 
                     this.containerPool.containers.set(languageId, container);
