@@ -202,14 +202,51 @@ export class Installer {
                     if (this.isCommandAvailable('brew')) {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
                         try {
-                            cp.execSync('brew install --cask docker', { stdio: 'ignore' });
+                            // 尝试非交互式安装，如果失败则记录错误但不抛出
+                            const result = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
+                                stdio: ['ignore', 'pipe', 'pipe'],
+                                timeout: 300000 // 5分钟超时
+                            });
+
+                            if (result.status === 0) {
+                                dockerInstallOutput.appendLine('Docker Desktop installed successfully via Homebrew');
+                            } else {
+                                const errorMsg = result.stderr?.toString() || 'Unknown error';
+                                dockerInstallOutput.appendLine(`Homebrew installation failed: ${errorMsg}`);
+                                console.warn('Homebrew Docker installation failed:', errorMsg);
+                            }
                         } catch (error: any) {
                             console.error('Failed to install Docker via Homebrew:', error);
                             dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error?.message || String(error)}`);
                         }
+                    } else {
+                        dockerInstallOutput.appendLine('Homebrew not available for Docker installation');
                     }
+
+                    // 尝试启动Docker Desktop
+                    progress.report({ message: 'Attempting to start Docker Desktop...' });
                     try {
-                        cp.spawn('open', ['/Applications/Docker.app'], { detached: true, stdio: 'ignore' });
+                        // 首先检查Docker.app是否存在于标准位置
+                        const standardPath = '/Applications/Docker.app';
+                        const altPath = `${os.homedir()}/Applications/Docker.app`;
+
+                        let dockerPath = standardPath;
+                        if (!fs.existsSync(standardPath) && fs.existsSync(altPath)) {
+                            dockerPath = altPath;
+                        }
+
+                        if (fs.existsSync(dockerPath)) {
+                            cp.spawn('open', [dockerPath], { detached: true, stdio: 'ignore' });
+                            dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
+                        } else {
+                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations');
+                            // 尝试通过Spotlight查找
+                            try {
+                                cp.spawn('mdfind', ['-name', 'Docker.app'], { stdio: 'ignore' });
+                            } catch {
+                                dockerInstallOutput.appendLine('Could not search for Docker.app via Spotlight');
+                            }
+                        }
                     } catch (error: any) {
                         console.error('Failed to start Docker Desktop on macOS:', error);
                         dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error?.message || String(error)}`);

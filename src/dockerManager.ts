@@ -371,25 +371,38 @@ export class DockerManager {
 
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+        // 检测操作系统以实现跨平台兼容性
+        const isWindows = os.platform() === 'win32';
+
         // 构建docker run参数，使用安全的stdin方式传递输入
         const dockerArgs = [
             'run',
             '--rm',
             '-i',
             '--name', containerName,
-            '--network=none',
-            '--read-only',
-            `--memory=${memoryLimit}m`,
-            `--memory-swap=${memoryLimit}m`,
-            '--cpus=1.0',
-            '--pids-limit=64',
-            // 挂载源目录为只读
-            '-v', `${sourceDir}:/tmp/source:ro`,
-            // 挂载临时目录为可写，用于编译产物
-            '-v', `${tempDir}:/tmp:rw`,
-            image,
-            'bash', '-c', `cd /tmp/source && ${command}`
+            '--network=none'
         ];
+
+        // Windows Docker不支持某些参数，需要条件性添加
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            dockerArgs.push('--read-only');
+            dockerArgs.push(`--memory=${memoryLimit}m`);
+            dockerArgs.push(`--memory-swap=${memoryLimit}m`);
+            dockerArgs.push('--cpus=1.0');
+            dockerArgs.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            dockerArgs.push(`--memory=${memoryLimit}m`);
+        }
+
+        // 挂载源目录为只读（Windows也支持）
+        dockerArgs.push('-v', `${sourceDir}:/tmp/source:ro`);
+        // 挂载临时目录为可写，用于编译产物
+        dockerArgs.push('-v', `${tempDir}:/tmp:rw`);
+
+        // 添加镜像和命令
+        dockerArgs.push(image, 'bash', '-c', `cd /tmp/source && ${command}`);
 
         const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
         outputChannel.show(true);
@@ -437,7 +450,7 @@ export class DockerManager {
                     console.warn(`[DockerManager] Failed to cleanup test containers: ${cleanupError}`);
                 }
 
-                const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
+                const memoryExceeded = !timedOut && (code === 137 || /Out of memory|Killed process/m.test(stderr));
                 const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
                 resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
                 outputChannel.appendLine(`[DockerManager] exit code=${code}`);
@@ -873,23 +886,35 @@ export class DockerManager {
             return this.startContainerWithoutMount(languageId, image, containerName);
         }
 
+        // 检测操作系统以实现跨平台兼容性
+        const isWindows = os.platform() === 'win32';
+
         // 创建容器并启动它，预设置必要的目录和权限，并挂载缓存目录
         const createArgs = [
             'run',
             '-d', // 后台运行
             '--name', containerName,
             '--label', `oi-code.language=${languageId}`, // 添加语言标签
-            '--network=none',
-            '--memory=512m',
-            '--memory-swap=512m',
-            '--cpus=1.0',
-            '--pids-limit=64',
-            '-i', // 交互模式
-            // 挂载缓存目录到容器内，实现文件自动同步
-            '-v', `${cacheDir}:/tmp/source:rw`, // 直接挂载到/tmp/source
-            image,
-            'bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            '--network=none'
         ];
+
+        // Windows Docker不支持某些参数，需要条件性添加
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            createArgs.push('--memory=512m');
+            createArgs.push('--memory-swap=512m');
+            createArgs.push('--cpus=1.0');
+            createArgs.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            createArgs.push('--memory=512m');
+        }
+
+        // 添加交互模式和挂载选项
+        createArgs.push('-i');
+        createArgs.push('-v', `${cacheDir}:/tmp/source:rw`); // 直接挂载到/tmp/source
+        createArgs.push(image);
+        createArgs.push('bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done'); // 保持容器运行并创建必要目录，设置权限
 
         return new Promise((resolve, reject) => {
             const dockerProcess = spawn('docker', createArgs);
@@ -930,20 +955,33 @@ export class DockerManager {
     private static async startContainerWithoutMount(languageId: string, image: string, containerName: string): Promise<DockerContainer> {
         console.log(`[DockerManager] Starting container for ${languageId} without mount using ${image}`);
 
+        // 检测操作系统以实现跨平台兼容性
+        const isWindows = os.platform() === 'win32';
+
         const createArgs = [
             'run',
             '-d', // 后台运行
             '--name', containerName,
             '--label', `oi-code.language=${languageId}`, // 添加语言标签
-            '--network=none',
-            '--memory=512m',
-            '--memory-swap=512m',
-            '--cpus=1.0',
-            '--pids-limit=64',
-            '-i', // 交互模式
-            image,
-            'bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done' // 保持容器运行并创建必要目录，设置权限
+            '--network=none'
         ];
+
+        // Windows Docker不支持某些参数，需要条件性添加
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            createArgs.push('--memory=512m');
+            createArgs.push('--memory-swap=512m');
+            createArgs.push('--cpus=1.0');
+            createArgs.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            createArgs.push('--memory=512m');
+        }
+
+        // 添加交互模式和命令
+        createArgs.push('-i');
+        createArgs.push(image);
+        createArgs.push('bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done'); // 保持容器运行并创建必要目录，设置权限
 
         return new Promise((resolve, reject) => {
             const dockerProcess = spawn('docker', createArgs);
