@@ -214,7 +214,7 @@ export class DockerManager {
                     clearTimeout(killTimer);
 
                     // 直接使用管道的输出，不需要额外获取
-                    const memoryExceeded = pipeCode === 137 || /Out of memory|Killed process/m.test(stderr);
+                    const memoryExceeded = !timedOut && (pipeCode === 137 || /Out of memory|Killed process/m.test(stderr));
                     const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
                     resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
                     outputChannel.appendLine(`[DockerManager] pipe exit code=${pipeCode}`);
@@ -483,7 +483,11 @@ export class DockerManager {
             return compilers[languageId];
         }
 
-        // 回退到默认镜像
+        // 检测操作系统以选择合适的镜像
+        const isWindows = os.platform() === 'win32';
+
+        // 对于Windows环境，我们使用Linux镜像（假设Docker Desktop支持Linux容器）
+        // 如果用户的Docker不支持Linux容器，他们需要手动配置自定义镜像
         switch (languageId.toLowerCase()) {
             case 'python':
                 return 'python:3.11';
