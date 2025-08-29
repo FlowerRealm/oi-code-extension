@@ -496,6 +496,185 @@ export class DockerManager {
     }
 
     /**
+     * 接管现有的健康容器，避免资源泄漏
+     */
+    private static async adoptExistingContainers(): Promise<void> {
+        console.log('[DockerManager] Scanning for existing oi-container containers...');
+
+        try {
+            // 扫描所有oi-container-*容器
+            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container', '--format', '{{.Names}}']);
+            let containerNames = '';
+
+            psProcess.stdout.on('data', (data) => {
+                containerNames += data.toString();
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                psProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to list containers: ${code}`));
+                    }
+                });
+                psProcess.on('error', (err) => {
+                    reject(new Error(`Error listing containers: ${err.message}`));
+                });
+            });
+
+            const names = containerNames.trim().split('\n').filter(name => name);
+            if (names.length === 0) {
+                console.log('[DockerManager] No existing oi-container containers found');
+                return;
+            }
+
+            console.log(`[DockerManager] Found ${names.length} existing containers: ${names.join(', ')}`);
+
+            // 检查每个容器的健康状态并尝试接管
+            for (const containerName of names) {
+                try {
+                    const container = await this.inspectAndAdoptContainer(containerName);
+                    if (container) {
+                        console.log(`[DockerManager] Successfully adopted container ${containerName} for ${container.languageId}`);
+                    } else {
+                        console.log(`[DockerManager] Container ${containerName} is not healthy, will be cleaned up`);
+                        // 清理不健康的容器
+                        await this.cleanupUnhealthyContainer(containerName);
+                    }
+                } catch (error) {
+                    console.warn(`[DockerManager] Failed to adopt container ${containerName}:`, error);
+                    // 清理无法接管的容器
+                    await this.cleanupUnhealthyContainer(containerName);
+                }
+            }
+        } catch (error) {
+            console.warn('[DockerManager] Error during container adoption:', error);
+            // 即使接管失败也继续初始化，不要影响正常功能
+        }
+    }
+
+    /**
+     * 检查并接管单个容器
+     */
+    private static async inspectAndAdoptContainer(containerName: string): Promise<DockerContainer | null> {
+        return new Promise((resolve) => {
+            const inspectProcess = spawn('docker', ['inspect', containerName]);
+            let stdout = '';
+            let stderr = '';
+
+            inspectProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            inspectProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            inspectProcess.on('close', (code) => {
+                if (code !== 0) {
+                    console.warn(`[DockerManager] Failed to inspect container ${containerName}: ${stderr}`);
+                    resolve(null);
+                    return;
+                }
+
+                try {
+                    const info = JSON.parse(stdout);
+                    if (!info || info.length === 0) {
+                        resolve(null);
+                        return;
+                    }
+
+                    const containerInfo = info[0];
+                    const state = containerInfo.State;
+
+                    // 检查容器是否正在运行
+                    if (state.Status !== 'running') {
+                        console.log(`[DockerManager] Container ${containerName} is not running (status: ${state.Status})`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 从容器名称中提取语言ID
+                    const languageMatch = containerName.match(/oi-container-([a-z]+)-/);
+                    if (!languageMatch) {
+                        console.log(`[DockerManager] Cannot determine language from container name: ${containerName}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    const languageId = languageMatch[1];
+                    if (!CONTAINER_POOL_CONFIG.supportedLanguages.includes(languageId as any)) {
+                        console.log(`[DockerManager] Unsupported language: ${languageId}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 检查是否已经有该语言的容器
+                    if (this.containerPool.containers.has(languageId)) {
+                        console.log(`[DockerManager] Already have a container for ${languageId}, skipping ${containerName}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 检查容器是否有缓存挂载
+                    const hasCacheMount = containerInfo.Mounts?.some((mount: any) =>
+                        mount.Destination === '/tmp/source' && mount.Type === 'bind'
+                    ) || false;
+
+                    // 创建容器对象并添加到池中
+                    const container: DockerContainer = {
+                        containerId: containerName,
+                        languageId,
+                        image: containerInfo.Config.Image,
+                        isReady: true,
+                        lastUsed: Date.now(),
+                        hasCacheMount
+                    };
+
+                    this.containerPool.containers.set(languageId, container);
+                    resolve(container);
+
+                } catch (error) {
+                    console.warn(`[DockerManager] Failed to parse container info for ${containerName}:`, error);
+                    resolve(null);
+                }
+            });
+
+            inspectProcess.on('error', (err) => {
+                console.warn(`[DockerManager] Error inspecting container ${containerName}:`, err);
+                resolve(null);
+            });
+        });
+    }
+
+    /**
+     * 清理不健康的容器
+     */
+    private static async cleanupUnhealthyContainer(containerName: string): Promise<void> {
+        try {
+            console.log(`[DockerManager] Cleaning up unhealthy container: ${containerName}`);
+            await new Promise<void>((resolve) => {
+                const rmProcess = spawn('docker', ['rm', '-f', containerName]);
+                rmProcess.on('close', (code) => {
+                    if (code === 0) {
+                        console.log(`[DockerManager] Successfully removed unhealthy container: ${containerName}`);
+                    } else {
+                        console.warn(`[DockerManager] Failed to remove unhealthy container ${containerName}: ${code}`);
+                    }
+                    resolve();
+                });
+                rmProcess.on('error', (err) => {
+                    console.warn(`[DockerManager] Error removing unhealthy container ${containerName}:`, err);
+                    resolve();
+                });
+            });
+        } catch (error) {
+            console.warn(`[DockerManager] Error during cleanup of ${containerName}:`, error);
+        }
+    }
+
+    /**
      * 初始化容器池，在扩展激活时调用
      */
     public static async initializeContainerPool(): Promise<void> {
@@ -506,6 +685,9 @@ export class DockerManager {
 
         console.log('[DockerManager] Initializing container pool...');
         this.containerPool.isActive = true;
+
+        // 首先尝试接管现有的健康容器
+        await this.adoptExistingContainers();
 
         // 为支持的语言预启动容器，确保每种语言只有一个容器
         for (const language of CONTAINER_POOL_CONFIG.supportedLanguages) {
