@@ -250,13 +250,28 @@ export class DockerManager {
             // 确保缓存目录存在
             await fs.mkdir(cacheDir, { recursive: true });
 
-            // 清空缓存目录：直接删除整个目录然后重新创建，更简洁高效
+            // 清空缓存目录：先检查目录是否存在，然后只删除内容而不是删除整个目录
             try {
-                await fs.rm(cacheDir, { recursive: true, force: true });
+                // 检查目录是否存在
+                try {
+                    await fs.access(cacheDir);
+                    // 如果目录存在，清空其内容
+                    const entries = await fs.readdir(cacheDir);
+                    for (const entry of entries) {
+                        await fs.rm(path.join(cacheDir, entry), { recursive: true, force: true });
+                    }
+                } catch (accessError: any) {
+                    // 如果目录不存在（ENOENT），说明是首次创建，这是正常情况
+                    if (accessError.code !== 'ENOENT') {
+                        throw accessError;
+                    }
+                    // 目录不存在时，mkdir会自动创建
+                }
+                // 确保目录存在
                 await fs.mkdir(cacheDir, { recursive: true });
-            } catch (error) {
-                console.warn(`[DockerManager] Failed to recreate cache directory: ${error}`);
-                throw new Error(`Failed to recreate cache directory: ${error}`);
+            } catch (error: any) {
+                console.warn(`[DockerManager] Failed to clean cache directory: ${error}`);
+                throw new Error(`Failed to clean cache directory: ${error}`);
             }
 
             // 复制源目录的文件到缓存目录

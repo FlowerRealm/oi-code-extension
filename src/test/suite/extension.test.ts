@@ -598,6 +598,10 @@ main()`;
             const { exec } = require('child_process');
             const beforeContainers = await new Promise<string>((resolve) => {
                 exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                    if (error) {
+                        console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                        return resolve('');
+                    }
                     resolve(stdout.trim());
                 });
             });
@@ -624,6 +628,10 @@ main()`;
                 // 获取第一次执行后的容器数量
                 const afterFirstContainers = await new Promise<string>((resolve) => {
                     exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                        if (error) {
+                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                            return resolve('');
+                        }
                         resolve(stdout.trim());
                     });
                 });
@@ -645,6 +653,10 @@ main()`;
                 // 获取第二次执行后的容器数量
                 const afterSecondContainers = await new Promise<string>((resolve) => {
                     exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                        if (error) {
+                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                            return resolve('');
+                        }
                         resolve(stdout.trim());
                     });
                 });
@@ -709,6 +721,10 @@ main()`;
                 // 验证容器被清理
                 const afterContainers = await new Promise<string>((resolve) => {
                     exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                        if (error) {
+                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                            return resolve('');
+                        }
                         resolve(stdout.trim());
                     });
                 });
@@ -727,6 +743,10 @@ main()`;
                 // 验证基础镜像仍然存在
                 const imagesOutput = await new Promise<string>((resolve) => {
                     exec('docker images --format "{{.Repository}}:{{.Tag}}"', (error: any, stdout: any) => {
+                        if (error) {
+                            console.warn(`[Test Helper] Failed to list docker images: ${error.message}`);
+                            return resolve('');
+                        }
                         resolve(stdout.trim());
                     });
                 });
@@ -808,6 +828,10 @@ main()`;
             const { exec } = require('child_process');
             const remainingContainers = await new Promise<string>((resolve) => {
                 exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+                    if (error) {
+                        console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
+                        return resolve('');
+                    }
                     resolve(stdout.trim());
                 });
             });
