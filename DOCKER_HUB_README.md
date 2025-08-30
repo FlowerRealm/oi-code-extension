@@ -114,20 +114,29 @@ RUN useradd -m -s /bin/bash runner && \
 
 ### Windows 版本 (`Dockerfile.windows`)
 ```dockerfile
-# 基于 Windows Nano Server，包含 MSVC 兼容层
+# 基于 Windows Nano Server，专用 Clang 工具链
 FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 
-# 安装 clang 工具链及调试工具
+# 安装 Clang 工具链及调试工具
 USER ContainerAdministrator
 
-# Nano Server 需要手动复制 Clang 二进制文件。
-# 例如，使用 PowerShell 解压并添加到 PATH：
-# RUN powershell -Command Expand-Archive C:\clang.zip -DestinationPath C:\; setx /M PATH "%PATH%;C:\clang\bin"
+# Nano Server 不支持直接包管理，需要手动设置
+# Windows 容器中设置 Clang 的最佳实践：
 
-# 具体安装步骤：
-# 1. 下载 Clang 二进制文件到 C:\clang.zip
-# 2. 解压并添加到系统 PATH
-# 3. 验证安装 (在 SET LOCAL 步骤中)
+# 方法1: 使用 PowerShell 预下载二进制文件
+RUN powershell -Command \
+    Invoke-WebRequest -Uri 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile 'C:\llvm-installer.exe'; \
+    Start-Process 'C:\llvm-installer.exe' -ArgumentList '/S /D=C:\llvm' -NoNewWindow -Wait; \
+    setx /M PATH '%PATH%;C:\llvm\bin'; \
+    Remove-Item 'C:\llvm-installer.exe' -Force;
+
+# 方法2: 如果使用预构建的 ZIP 文件
+# RUN powershell -Command \
+#     Expand-Archive -Path C:\llvm-18.1.8-win64.zip -DestinationPath C:\llvm; \
+#     setx /M PATH '%PATH%;C:\llvm\bin';
+
+# 验证安装
+RUN clang --version
 
 USER ContainerUser
 ```

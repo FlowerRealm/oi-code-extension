@@ -429,6 +429,9 @@ export class DockerManager {
         const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
         const image = this.selectImageForCommand(languageId);
 
+        // Ensure Clang image exists before running the container
+        await this.ensureClangImageExists(image, os.platform());
+
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         // Build docker run parameters, use secure stdin method to pass input
@@ -990,9 +993,6 @@ export class DockerManager {
         });
     }
 
-    /**
-     * Start container for specified language - optimized version with Docker Volumes support
-     */
     private static async startContainerForLanguage(languageId: string): Promise<DockerContainer> {
         const image = this.selectImageForCommand(languageId);
         const platform = os.platform();
@@ -1001,6 +1001,9 @@ export class DockerManager {
         await this.ensureClangImageExists(image, platform);
 
         const containerName = `oi-container-${languageId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
+        console.log(`[DockerManager] Container pool:`, this.containerPool.containers.size);
 
         console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
 
