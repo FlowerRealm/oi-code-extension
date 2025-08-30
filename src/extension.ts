@@ -162,7 +162,7 @@ async function runSingleInDocker(
     console.log(`[RunSingleInDocker] Source file path: ${sourceFilePath}`);
     console.log(`[RunSingleInDocker] Command: ${fullCommand}`);
 
-    // 直接使用编译和运行命令，不需要额外的文件复制，因为 dockerManager 会处理文件复制
+    // Run compilation and execution commands directly, no additional file copying needed as dockerManager handles it
     const result = await DockerManager.run({
         sourceDir,
         command: fullCommand,
@@ -244,7 +244,7 @@ function getLanguageIdFromEditor(editor: vscode.TextEditor): 'c' | 'cpp' | 'pyth
     if (langId === 'c' || langId === 'cpp' || langId === 'python') {
         return langId;
     }
-    throw new Error(`不支持的语言: ${langId}`);
+    throw new Error(`Unsupported language: ${langId}`);
 }
 
 class PairCheckViewProvider implements vscode.WebviewViewProvider {
@@ -595,7 +595,7 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oicode.startPairCheck', async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
-                vscode.window.showErrorMessage('请先打开一个文件再开始对拍。');
+                vscode.window.showErrorMessage('Please open a file first to start pair check.');
                 return;
             }
 
@@ -721,7 +721,7 @@ export function activate(context: vscode.ExtensionContext) {
             const memoryLimit = options?.memoryLimit ?? 512; // MB (use 512MB to enable container pool)
             return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `正在运行 ${sourceFile}...`,
+                title: `Running ${sourceFile}...`,
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 0, message: 'Preparing container...' });

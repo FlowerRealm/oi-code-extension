@@ -8,7 +8,7 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 
-// 创建统一的输出通道
+// Create unified output channel
 const dockerInstallOutput = vscode.window.createOutputChannel('OI-Code Docker Install');
 
 export interface InstallCommand {
@@ -112,7 +112,7 @@ export class Installer {
         }
     }
 
-    private static async waitForDockerReady(timeoutMs = 300000): Promise<void> { // 增加到5分钟
+    private static async waitForDockerReady(timeoutMs = 300000): Promise<void> { // Increased to 5 minutes
         const start = Date.now();
         let attempts = 0;
         let lastError = '';
@@ -124,7 +124,7 @@ export class Installer {
             try {
                 dockerInstallOutput.appendLine(`Docker readiness check #${attempts}...`);
 
-                // 首先检查Docker守护进程是否运行
+                // First check if Docker daemon is running
                 cp.execSync('docker ps', { stdio: 'ignore', timeout: 5000 });
                 dockerInstallOutput.appendLine(`Docker is ready after ${attempts} attempts (${((Date.now() - start) / 1000).toFixed(1)}s)`);
                 return;
@@ -132,7 +132,7 @@ export class Installer {
                 lastError = error.message;
                 dockerInstallOutput.appendLine(`Attempt ${attempts} failed: ${error.message}`);
 
-                // 如果是权限错误，尝试为当前用户添加docker组（会话后生效）
+                // If permission error, try to add current user to docker group (takes effect in next session)
                 if (lastError.includes('permission denied') || lastError.includes('connection refused')) {
                     dockerInstallOutput.appendLine('Attempting to add current user to docker group...');
                     try {
@@ -144,7 +144,7 @@ export class Installer {
                     }
                 }
 
-                await new Promise(r => setTimeout(r, 5000)); // 每5秒检查一次，更频繁一些
+                await new Promise(r => setTimeout(r, 5000)); // Check every 5 seconds, more frequent
             }
         }
         throw new Error(`Docker failed to start after ${attempts} attempts (${((Date.now() - start) / 1000).toFixed(1)}s). Last error: ${lastError}`);
@@ -227,10 +227,10 @@ export class Installer {
                     if (this.isCommandAvailable('brew')) {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
                         try {
-                            // 尝试非交互式安装，如果失败则记录错误但不抛出
+                            // Try non-interactive installation, log errors but don't throw if failed
                             const result = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
                                 stdio: ['ignore', 'pipe', 'pipe'],
-                                timeout: 300000 // 5分钟超时
+                                timeout: 300000 // 5 minute timeout
                             });
 
                             if (result.status === 0) {
@@ -248,10 +248,10 @@ export class Installer {
                         dockerInstallOutput.appendLine('Homebrew not available for Docker installation');
                     }
 
-                    // 尝试启动Docker Desktop
+                    // Attempting to start Docker Desktop
                     progress.report({ message: 'Attempting to start Docker Desktop...' });
                     try {
-                        // 首先检查Docker.app是否存在于标准位置
+                        // First check if Docker.app exists in standard location
                         const standardPath = '/Applications/Docker.app';
                         const altPath = `${os.homedir()}/Applications/Docker.app`;
 
@@ -266,7 +266,7 @@ export class Installer {
                         } else {
                             dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations. Trying to open via Launch Services...');
                             try {
-                                // 使用 'open -a' 让系统通过名称查找并打开应用
+                                // Use 'open -a' to let system find and open application by name
                                 cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
                                 dockerInstallOutput.appendLine('Attempted to start Docker via Launch Services.');
                             } catch (error: any) {
@@ -294,7 +294,7 @@ export class Installer {
                             await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
                         }
 
-                        // 验证安装
+                        // Verify installation
                         const dockerVersion = cp.execSync('docker --version', { encoding: 'utf8', stdio: 'ignore' }).trim();
                         dockerInstallOutput.appendLine(`Docker installed successfully: ${dockerVersion}`);
 
@@ -303,7 +303,7 @@ export class Installer {
                         throw error;
                     }
 
-                    // 启动和启用Docker服务
+                    // Start and enable Docker service
                     progress.report({ message: 'Starting Docker service...' });
                     try {
                         dockerInstallOutput.appendLine('Enabling Docker service...');
@@ -312,7 +312,7 @@ export class Installer {
                         dockerInstallOutput.appendLine('Starting Docker service...');
                         cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
 
-                        // 检查服务状态
+                        // Check service status
                         const serviceStatus = cp.execSync('sudo systemctl is-active docker', { encoding: 'utf8' }).trim();
                         dockerInstallOutput.appendLine(`Docker service status: ${serviceStatus}`);
 
@@ -331,7 +331,7 @@ export class Installer {
                 dockerInstallOutput.appendLine('Docker is ready.');
             } catch (e: any) {
                 dockerInstallOutput.appendLine(`Silent installation failed: ${e?.message || String(e)}`);
-                // 向上层传递错误，让调用者决定如何处理
+                // Pass error to upper layer, let caller decide how to handle
                 throw e;
             }
         });
