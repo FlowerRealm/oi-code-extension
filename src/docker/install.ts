@@ -224,59 +224,90 @@ export class Installer {
                         }
                     }
                 } else if (platform === 'darwin') {
-                    if (this.isCommandAvailable('brew')) {
-                        progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
+                    // Check if Homebrew is available first
+                    if (!this.isCommandAvailable('brew')) {
+                        dockerInstallOutput.appendLine('Homebrew not found. For macOS, Docker must be installed manually.');
+                        dockerInstallOutput.appendLine('Please install Docker Desktop from: https://desktop.docker.com/mac/main/amd64/Docker.dmg');
+                        throw new Error('Homebrew not available for Docker installation');
+                    }
+
+                    // Check if Docker Desktop is already installed
+                    progress.report({ message: 'Checking Docker Desktop installation...' });
+                    const dockerPaths = [
+                        '/Applications/Docker.app',
+                        `${os.homedir()}/Applications/Docker.app`,
+                        '/Volumes/Docker/Docker.app' // Installation location
+                    ];
+
+                    let dockerInstalled = false;
+                    let dockerPath = '';
+
+                    for (const path of dockerPaths) {
+                        if (fs.existsSync(path)) {
+                            dockerInstalled = true;
+                            dockerPath = path;
+                            dockerInstallOutput.appendLine(`Found Docker Desktop at: ${path}`);
+                            break;
+                        }
+                    }
+
+                    // If Docker is not installed, install it via Homebrew
+                    if (!dockerInstalled) {
+                        progress.report({ message: 'Installing Docker Desktop via Homebrew...' });
+                        dockerInstallOutput.appendLine('Installing Docker Desktop via Homebrew...');
+
                         try {
-                            // Try non-interactive installation, log errors but don't throw if failed
-                            const result = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
+                            const installResult = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
                                 stdio: ['ignore', 'pipe', 'pipe'],
-                                timeout: 300000 // 5 minute timeout
+                                timeout: 600000, // 10 minute timeout for installation
+                                maxBuffer: 1024 * 1024
                             });
 
-                            if (result.status === 0) {
+                            if (installResult.status === 0) {
                                 dockerInstallOutput.appendLine('Docker Desktop installed successfully via Homebrew');
+                                dockerPath = '/Applications/Docker.app';
                             } else {
-                                const errorMsg = result.stderr?.toString() || 'Unknown error';
+                                const errorMsg = installResult.stderr?.toString() || 'Unknown error';
+                                const stdoutMsg = installResult.stdout?.toString() || '';
+
                                 dockerInstallOutput.appendLine(`Homebrew installation failed: ${errorMsg}`);
-                                console.warn('Homebrew Docker installation failed:', errorMsg);
+                                if (stdoutMsg) {
+                                    dockerInstallOutput.appendLine(`Installation output: ${stdoutMsg}`);
+                                }
+                                console.warn('Homebrew Docker installation failed');
+                                throw new Error(`Failed to install Docker Desktop: ${errorMsg}`);
                             }
                         } catch (error: any) {
                             console.error('Failed to install Docker via Homebrew:', error);
                             dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error?.message || String(error)}`);
+                            throw error;
                         }
-                    } else {
-                        dockerInstallOutput.appendLine('Homebrew not available for Docker installation');
                     }
 
-                    // Attempting to start Docker Desktop
-                    progress.report({ message: 'Attempting to start Docker Desktop...' });
+                    // Launch Docker Desktop if we have a path or just installed it
+                    progress.report({ message: 'Starting Docker Desktop...' });
                     try {
-                        // First check if Docker.app exists in standard location
-                        const standardPath = '/Applications/Docker.app';
-                        const altPath = `${os.homedir()}/Applications/Docker.app`;
+                        const launchPath = dockerPath || '/Applications/Docker.app';
 
-                        let dockerPath = standardPath;
-                        if (!fs.existsSync(standardPath) && fs.existsSync(altPath)) {
-                            dockerPath = altPath;
-                        }
+                        if (fs.existsSync(launchPath)) {
+                            dockerInstallOutput.appendLine(`Attempting to start Docker Desktop from: ${launchPath}`);
+                            cp.spawn('open', ['-j', '-g', '-a', 'Docker'], { detached: true, stdio: 'ignore' });
 
-                        if (fs.existsSync(dockerPath)) {
-                            cp.spawn('open', [dockerPath], { detached: true, stdio: 'ignore' });
-                            dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
+                            // Wait a bit for it to start
+                            dockerInstallOutput.appendLine('Docker Desktop launched. Waiting for daemon to be ready...');
+                            await new Promise(resolve => setTimeout(resolve, 10000));
                         } else {
-                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations. Trying to open via Launch Services...');
-                            try {
-                                // Use 'open -a' to let system find and open application by name
-                                cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
-                                dockerInstallOutput.appendLine('Attempted to start Docker via Launch Services.');
-                            } catch (error: any) {
-                                console.error('Failed to start Docker via Launch Services:', error);
-                                dockerInstallOutput.appendLine(`Failed to start Docker via Launch Services: ${error?.message || String(error)}`);
-                            }
+                            dockerInstallOutput.appendLine('Docker Desktop app not found after installation');
+                            throw new Error('Docker Desktop app not found after installation');
                         }
                     } catch (error: any) {
-                        console.error('Failed to start Docker Desktop on macOS:', error);
-                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error?.message || String(error)}`);
+                        if (error.code === 'ENOENT') {
+                            dockerInstallOutput.appendLine('Docker Desktop launch failed. Please start it manually.');
+                        } else {
+                            console.error('Failed to start Docker Desktop on macOS:', error);
+                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop: ${error?.message || String(error)}`);
+                        }
+                        throw error;
                     }
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
