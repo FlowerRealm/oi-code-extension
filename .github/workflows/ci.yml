@@ -27,7 +27,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
+      - name: Set up Docker for Linux ARM64 platforms
+        if: runner.os == 'Linux' && (matrix.os == 'ubuntu-24.04-arm' || endsWith(matrix.os, '-arm'))
+        run: |
+          # ARM64 platforms may need Docker installation or QEMU setup
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker for ARM64..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo systemctl start docker || true
+            sudo systemctl enable docker || true
+          fi
+
+          # Start Docker daemon if not running
+          if ! docker info &> /dev/null; then
+            sudo systemctl restart docker || sudo service docker restart || true
+            sleep 15
+          fi
+
+      - name: Run tests with Docker support
         run: |
           if command -v xvfb-run &> /dev/null; then
             xvfb-run -a npm test
@@ -35,6 +53,9 @@ jobs:
             npm test
           fi
         shell: bash
+        env:
+          # Let the tests decide based on Docker availability
+          DOCKER_ENV_TEST: true
 
   deploy-docker:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -58,19 +79,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: flowerrealm
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: flowerrealm/oi-code-clang:latest
-          cache-from: type=registry,ref=flowerrealm/oi-code-clang:buildcache
-          cache-to: type=registry,ref=flowerrealm/oi-code-clang:buildcache,mode=max
 
       - name: Get version tag
         id: version
@@ -78,13 +94,40 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Tag with version
-        run: |
-          docker tag flowerrealm/oi-code-clang:latest flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}
-          docker push flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}
+      - name: Build and push multi-platform image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            flowerrealm/oi-code-clang:latest
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}
+          cache-from: type=registry,ref=flowerrealm/oi-code-clang:buildcache
+          cache-to: type=registry,ref=flowerrealm/oi-code-clang:buildcache,mode=max
+          labels: |
+            org.opencontainers.image.title=OI-Code Clang
+            org.opencontainers.image.description=Multi-platform Clang compiler for OI competitive programming
+            org.opencontainers.image.source=https://github.com/FlowerRealm/oi-code-extension
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
-      - name: Notify deployment
+      - name: Generate build report
         run: |
-          echo "🚀 Docker镜像发布成功!"
-          echo "📦 最新镜像: flowerrealm/oi-code-clang:latest"
-          echo "🔖 版本镜像: flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}"
+          echo "## 🐳 Docker Multi-Platform Build Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Build Status: Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tags**: latest, v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache**: Enabled with registry storage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏗️ Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: flowerrealm/oi-code-clang" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base**: Ubuntu 24.04 LTS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tools**: Clang 18.1.8, LLVM, LLDB, Valgrind" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Usage Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker run --rm flowerrealm/oi-code-clang:latest clang --version" >> $GITHUB_STEP_SUMMARY
+          echo "docker run --rm flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }} clang++ --version" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

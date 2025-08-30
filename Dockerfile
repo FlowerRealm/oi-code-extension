@@ -1,44 +1,66 @@
-# OI-Code Clang container based on Ubuntu 24.04
+# OI-Code multi-platform Clang container optimized for competitive programming
 FROM ubuntu:24.04
 
-# Install Clang++ toolchain with complete debugging tools
+# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Setup LLVM/Clang toolchain, system configuration and user environment
+# Install essential build tools and libraries
 RUN apt-get update --quiet && \
-    apt-get install -y \
-    clang-18 \
-    clang++-18 \
-    clangd-18 \
-    clang-format-18 \
-    clang-tidy-18 \
-    lldb-18 \
-    llvm-18 \
-    lld-18 \
-    libclang-18-dev \
-    libclang-cpp18-dev \
-    libc++-18-dev \
-    libc++abi-18-dev \
-    valgrind \
-    cppcheck \
-    && \
-    # Create symlinks for convenience
+    apt-get install -y --no-install-recommends \
+        # Core C/C++ development tools
+        clang-18 \
+        clang++-18 \
+        gcc \
+        g++ \
+        libc6-dev \
+        libc++-18-dev \
+        libc++abi-18-dev \
+        libstdc++-13-dev \
+        # Development utilities
+        make \
+        cmake \
+        gdb \
+        lldb-18 \
+        valgrind \
+        cppcheck \
+        # Code formatting and analysis
+        clang-format-18 \
+        clang-tidy-18 \
+        # Essential libraries for competitive coding
+        libboost-dev \
+        libgmp-dev \
+        libmpfr-dev \
+        # System tools
+        procps \
+        lsof \
+        && \
+    # Create symlinks for convenience and compatibility
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
     ln -sf /usr/bin/lld-18 /usr/bin/lld && \
     ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
-    # Create runner user with proper permissions and verify Clang installation
+    ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format && \
+    # Create runner user with proper permissions
     useradd -m -s /bin/bash runner && \
-    mkdir /sandbox && \
-    chown runner:runner /sandbox && \
-    clang --version && \
-    clang++ --version && \
+    mkdir -p /sandbox && \
+    chown -R runner:runner /sandbox && \
+    # Clean up package cache to reduce image size
+    apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    # Verify installations
+    clang --version && \
+    clang++ --version
 
+# Switch to non-privileged user for security
 USER runner
 WORKDIR /sandbox
 
+# Health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD clang --version > /dev/null || exit 1
+
+# Default entrypoint that can run both interactive and non-interactive
 ENTRYPOINT ["/bin/bash", "-lc"]
 
 # Build command:

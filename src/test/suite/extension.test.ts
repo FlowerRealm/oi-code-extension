@@ -46,17 +46,30 @@ async function cleanupDir(dir: string, maxRetries = 3) {
 
 // Helper to check if Docker is available and working
 async function isDockerAvailable(): Promise<boolean> {
+    // Check if tests should skip Docker entirely
+    if (process.env.SKIP_DOCKER_TESTS === 'true') {
+        console.log('[Docker Check] Skipping Docker tests as requested by environment');
+        return false;
+    }
+
     return new Promise<boolean>((resolve) => {
         const { exec } = require('child_process');
         // First check if docker command exists
         exec('docker --version', (error: any, stdout: any, stderr: any) => {
             if (error) {
+                console.log('[Docker Check] Docker command not found:', error.message);
                 resolve(false);
                 return;
             }
             // Then check if docker daemon is running
             exec('docker info', (error: any, stdout: any, stderr: any) => {
-                resolve(!error);
+                if (error) {
+                    console.log('[Docker Check] Docker daemon not running:', error.message);
+                    resolve(false);
+                } else {
+                    console.log('[Docker Check] Docker is available and running');
+                    resolve(true);
+                }
             });
         });
     });

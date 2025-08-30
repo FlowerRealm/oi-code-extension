@@ -539,18 +539,7 @@ export class DockerManager {
         if (compilers[languageId]) {
             return compilers[languageId];
         }
-
-        // Platform-specific image selection for Clang toolchain
-        const platform = os.platform();
-
-        if (platform === 'win32') {
-            // Windows: Use official Docker Hub image with Clang toolchain
-            const winImage = 'flowerrealm/oi-code-clang:latest';
-            return winImage;
-        } else {
-            // Linux/macOS: Use official Docker Hub image with Clang toolchain
-            return 'flowerrealm/oi-code-clang:latest';
-        }
+        return 'flowerrealm/oi-code-clang:latest';
     }
 
     /**
@@ -621,46 +610,40 @@ export class DockerManager {
     private static imageBuildPromises: Map<string, Promise<void>> = new Map();
 
     /**
-     * Pull image from Docker Hub
+     * Pull image from Docker Hub with reduced verbose logging
      */
     private static async pullImageFromDockerHub(imageName: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Image Pull');
-            outputChannel.show();
+            console.log(`[DockerManager] Pulling ${imageName} from Docker Hub...`);
 
-            outputChannel.appendLine(`[ OI-Code ] Pulling ${imageName} from Docker Hub...`);
-
-            const pullProcess = spawn('docker', ['pull', imageName]);
-
-            pullProcess.stdout.on('data', (data) => {
-                const output = data.toString().trim();
-                outputChannel.appendLine(`[pull] ${output}`);
-                console.log(`[Docker Image Pull] ${output}`);
+            const pullProcess = spawn('docker', ['pull', imageName], {
+                stdio: ['ignore', 'pipe', 'pipe']
             });
 
+            // Reduce logging for minor progress updates, only log errors and completion
+            let pullError: string = '';
+
             pullProcess.stderr.on('data', (data) => {
-                const error = data.toString().trim();
-                outputChannel.appendLine(`[pull] ${error}`);
-                console.log(`[Docker Image Pull] ${error}`);
+                const errorMsg = data.toString();
+                if (errorMsg.includes('manifest') || errorMsg.includes('error') || errorMsg.includes('failed')) {
+                    pullError = errorMsg.trim();
+                    console.warn(`[DockerManager] Pull error for ${imageName}: ${pullError}`);
+                }
             });
 
             pullProcess.on('close', (code) => {
-                outputChannel.appendLine(`Docker pull process exited with code: ${code}`);
-
                 if (code === 0) {
-                    outputChannel.appendLine(`✅ Successfully pulled ${imageName} from Docker Hub`);
                     console.log(`[DockerManager] Successfully pulled ${imageName}`);
                     resolve();
                 } else {
-                    outputChannel.appendLine(`❌ Failed to pull ${imageName} from Docker Hub (code: ${code})`);
-                    console.error(`[DockerManager] Failed to pull ${imageName} with code: ${code}`);
-                    reject(new Error(`Pull failed with code ${code}`));
+                    const errorMessage = pullError || `Pull command exited with code ${code}`;
+                    console.error(`[DockerManager] Failed to pull ${imageName}: ${errorMessage}`);
+                    reject(new Error(errorMessage));
                 }
             });
 
             pullProcess.on('error', (err) => {
-                outputChannel.appendLine(`❌ Pull error: ${err.message}`);
-                console.error(`[DockerManager] Pull process error: ${err.message}`);
+                console.error(`[DockerManager] Pull process error for ${imageName}: ${err.message}`);
                 reject(err);
             });
         });
