@@ -134,17 +134,6 @@
             "type": "string"
           },
           "description": "Arguments for the C++ compiler (e.g., -Wall -O2 -std=c++17)."
-        },
-        "oi-code.language.python.Command": {
-          "type": "string",
-          "description": "Path to the Python interpreter (e.g., /usr/bin/python3)."
-        },
-        "oi-code.language.python.Args": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Arguments for the Python interpreter (e.g., -u)."
         }
       }
     }

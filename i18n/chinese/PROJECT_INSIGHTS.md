@@ -16,7 +16,7 @@
   - 命令注册：`oicode.runCode`、`oicode.runPairCheck`、`oicode.createProblem` 等
 
 - **dockerManager.ts**：
-  - 动态选择官方镜像（gcc:13、python:3.11）
+  - 动态选择官方镜像（gcc:13）
   - run：拼装 docker run 限制参数（CPU/内存/PIDs/网络），并处理 stdout/stderr 与超限标志
   - 临时写挂载位于 `~/.oi-code-tests/tmp`，避免桌面版共享路径问题
   - **容器池优化**：复用 Docker 容器以提高性能，减少容器启动开销
@@ -29,7 +29,7 @@
 ## 运行细节
 
 - **C/C++**：容器内执行 gcc/g++，应用 opt/std 设置后编译；可执行文件放置临时可写目录运行
-- **Python**：容器内 python3 直接运行
+
 - **资源限制**：
   - timedOut：超时标志
   - memoryExceeded：137 等退出码判定

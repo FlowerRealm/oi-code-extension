@@ -15,7 +15,7 @@ This extension aims to provide OI competitors with a consistent and reliable loc
   - Command registration: `oicode.runCode`, `oicode.runPairCheck`, `oicode.createProblem`, etc.
 
 - **dockerManager.ts**:
-  - Dynamically selects official images (gcc:13, python:3.11)
+  - Dynamically selects official images (gcc:13)
   - Run: assembles docker run restriction parameters (CPU/memory/PIDs/network), and handles stdout/stderr and timeout flags
   - Temporary write mounts located at `~/.oi-code-tests/tmp`, avoiding Desktop shared path issues
   - **Container Pool Optimization**: Reuse Docker containers for improved performance, reducing container startup overhead
@@ -28,7 +28,7 @@ This extension aims to provide OI competitors with a consistent and reliable loc
 ## Runtime Details
 
 - **C/C++**: Execute gcc/g++ within container, compile after applying opt/std settings; executable files placed in temporary writable directory for execution
-- **Python**: Directly run python3 within container
+
 - **Resource Restrictions**:
   - timedOut: timeout flag
   - memoryExceeded: judged by exit codes like 137

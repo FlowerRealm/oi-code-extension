@@ -76,7 +76,7 @@ interface ContainerPool {
 const CONTAINER_POOL_CONFIG = {
     maxIdleTime: 30 * 60 * 1000, // Auto cleanup after 30 minutes of inactivity
     healthCheckInterval: 5 * 60 * 1000, // Health check every 5 minutes
-    supportedLanguages: ['c', 'cpp', 'python'] as const,
+    supportedLanguages: ['c', 'cpp'] as const,
 };
 
 /**
@@ -234,7 +234,10 @@ export class DockerManager {
 
             // Build pipe command - use safe parameter passing to avoid shell injection
             // Pass commands as array instead of string concatenation
-            const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
+            // Detect Windows containers and use appropriate shell
+            const isWindowsContainer = container.image.includes('windows') || container.image.includes('nanoserver');
+            const shellCmd = isWindowsContainer ? ['cmd', '/S', '/C'] : ['bash', '-c'];
+            const dockerExecArgs = ['exec', '-i', container.containerId, ...shellCmd, `cd /tmp/source && ${command}`];
             const dockerProcess = spawn('docker', dockerExecArgs);
 
             let stdout = '';
@@ -515,19 +518,143 @@ export class DockerManager {
             return compilers[languageId];
         }
 
-        // For Windows environment, use Linux images (assuming Docker Desktop supports Linux containers)
-        // If user's Docker doesn't support Linux containers, they need to manually configure custom images
-        switch (languageId.toLowerCase()) {
-            case 'python':
-                return 'python:3.11';
-            case 'cpp':
-            case 'c++':
-                return 'gcc:13';
-            case 'c':
-                return 'gcc:13';
-            default:
-                return 'ubuntu:24.04';
+        // Platform-specific image selection for Clang toolchain
+        const platform = os.platform();
+
+        if (platform === 'win32') {
+            // Windows: Use official Docker Hub image with Clang toolchain
+            const winImage = 'flowerrealm/oi-code-clang-windows:latest';
+            return winImage;
+        } else {
+            // Linux/macOS: Use official Docker Hub image with Clang toolchain
+            return 'flowerrealm/oi-code-clang:latest';
         }
+    }
+
+    /**
+     * Ensure Clang image exists, build it automatically if not available
+     */
+    private static async ensureClangImageExists(imageName: string, platform: NodeJS.Platform): Promise<void> {
+        // Use a static flag to prevent concurrent builds of the same image
+        if (this.imageBuildPromises.has(imageName)) {
+            console.log(`[DockerManager] Build already in progress for ${imageName}, waiting...`);
+            return this.imageBuildPromises.get(imageName)!;
+        }
+
+        return new Promise((resolve) => {
+            const checkImage = spawn('docker', ['images', '-q', imageName]);
+            let imageId = '';
+
+            checkImage.stdout.on('data', (data) => {
+                imageId += data.toString().trim();
+            });
+
+            const handleResolve = () => {
+                this.imageBuildPromises.delete(imageName);
+                resolve();
+            };
+
+            const handleResolveError = () => {
+                this.imageBuildPromises.delete(imageName);
+                resolve(); // Continue with fallback - don't stop execution
+            };
+
+            checkImage.on('close', (code) => {
+                if (code === 0 && imageId) {
+                    // Image exists
+                    console.log(`[DockerManager] Clang image ${imageName} found and ready`);
+                    handleResolve();
+                } else {
+                    // Image doesn't exist, build it automatically
+                    console.log(`[DockerManager] Clang image ${imageName} not found, building automatically...`);
+
+                    const buildPromise = this.buildClangImage(imageName, platform);
+                    this.imageBuildPromises.set(imageName, buildPromise);
+
+                    buildPromise.then(() => {
+                        console.log(`[DockerManager] Clang image ${imageName} built successfully`);
+                        handleResolve();
+                    }).catch((error) => {
+                        console.warn(`[DockerManager] Failed to build Clang image ${imageName}: ${error}`);
+                        handleResolveError();
+                    });
+                }
+            });
+
+            checkImage.on('error', (err) => {
+                console.warn(`[DockerManager] Error checking image ${imageName}: ${err.message}`);
+                handleResolveError();
+            });
+        });
+    }
+
+    // Static map to track ongoing image builds
+    private static imageBuildPromises: Map<string, Promise<void>> = new Map();
+
+    /**
+     * Build Clang image automatically
+     */
+    private static async buildClangImage(imageName: string, platform: NodeJS.Platform): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Image Build');
+            outputChannel.show();
+
+            outputChannel.appendLine(`[ OI-Code ] Building ${imageName} (this may take several minutes)...`);
+            outputChannel.appendLine(`Platform: ${platform}`);
+
+            // Determine Dockerfile path - use current working directory which should be extension root
+            const extensionPath = process.cwd();
+            outputChannel.appendLine(`Building in directory: ${extensionPath}`);
+
+            const dockerfileName = platform === 'win32' ? 'Dockerfile.windows' : 'Dockerfile';
+            const buildArgs = [
+                'build',
+                '-t', imageName,
+                '-f', dockerfileName,
+                '.', // Dockerfile location relative to extension root
+                '--no-cache' // Force fresh build
+            ];
+
+            outputChannel.appendLine(`docker ${buildArgs.join(' ')}`);
+            console.log(`[DockerManager] Building image with args:`, buildArgs);
+            console.log(`[DockerManager] Working directory: ${extensionPath}`);
+
+            const buildProcess = spawn('docker', buildArgs, { cwd: extensionPath });
+
+            buildProcess.stdout.on('data', (data) => {
+                const output = data.toString().trim();
+                outputChannel.appendLine(`[build] ${output}`);
+                console.log(`[Docker Image Build] ${output}`);
+            });
+
+            buildProcess.stderr.on('data', (data) => {
+                const error = data.toString().trim();
+                outputChannel.appendLine(`[build] ${error}`);
+                console.log(`[Docker Image Build] ${error}`);
+            });
+
+            buildProcess.on('close', (code) => {
+                outputChannel.appendLine(`Docker build process exited with code: ${code}`);
+                console.log(`[DockerManager] Build process finished with code: ${code}`);
+
+                if (code === 0) {
+                    outputChannel.appendLine(`✅ Successfully built ${imageName}`);
+                    outputChannel.appendLine(`🎉 Clang toolchain ready!`);
+                    console.log(`[DockerManager] Successfully built ${imageName}`);
+                    resolve();
+                } else {
+                    outputChannel.appendLine(`❌ Failed to build ${imageName} (code: ${code})`);
+                    console.error(`[DockerManager] Failed to build ${imageName} with code: ${code}`);
+                    reject(new Error(`Build failed with code ${code}`));
+                }
+            });
+
+            buildProcess.on('error', (err) => {
+                outputChannel.appendLine(`❌ Build error: ${err.message}`);
+                console.error(`[DockerManager] Build process error: ${err.message}`);
+                reject(err);
+            });
+        });
     }
 
     /**
@@ -789,7 +916,7 @@ export class DockerManager {
             await this.forceRemoveOiContainers();
 
             // Only remove images created by oi-code, preserve base images
-            // Note: No longer removing gcc:13 and python:3.11 base images
+            // Note: No longer removing gcc:13 base images
             console.log('[DockerManager] Skipping base image removal to preserve Docker Hub images...');
 
             // Skip Docker system prune to avoid user data loss

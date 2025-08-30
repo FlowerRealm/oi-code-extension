@@ -95,7 +95,7 @@ function getPairCheckWebviewContent(webview: vscode.Webview): string {
 async function runSingleInDocker(
     projectRootPath: string,
     sourceDir: string,
-    languageId: 'c' | 'cpp' | 'python',
+    languageId: 'c' | 'cpp',
     sourceFileName: string,
     input: string,
     options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
@@ -108,53 +108,38 @@ async function runSingleInDocker(
     // Build complete source file path
     const sourceFilePath = `/tmp/source/${sourceFileName}`;
 
-    // Build compile command - use safe parameter passing to prevent shell injection
+    // Get compiler options
+    const config = vscode.workspace.getConfiguration();
+    const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
+    const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
+
+    const effOpt = (options?.opt || defaultOpt).replace(/^O/, '');
+    // Ensure optimization level is valid
+    const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
+    const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
+    const effStd = options?.std || defaultStd;
+
+    // Validate path security - prevent path traversal attacks
+    if (sourceFilePath.includes('..') || executableName.includes('..')) {
+        throw new Error('Invalid file path: path traversal detected');
+    }
+
+    // Build compile command using Clang toolchain
     let compileCommand: string;
-    if (languageId === 'python') {
-        // Python doesn't need compilation, run directly
-        compileCommand = '';
+    if (languageId === 'cpp') {
+        compileCommand = `clang++ "${sourceFilePath}" -o "${executableName}" -O${finalOpt} -std=${effStd}`;
     } else {
-        // Get compiler options
-        const config = vscode.workspace.getConfiguration();
-        const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
-        const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
-
-        const effOpt = (options?.opt || defaultOpt).replace(/^O/, '');
-        // Ensure optimization level is valid
-        const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
-        const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
-        const effStd = options?.std || defaultStd;
-
-        // Validate path security - prevent path traversal attacks
-        if (sourceFilePath.includes('..') || executableName.includes('..')) {
-            throw new Error('Invalid file path: path traversal detected');
-        }
-
-        if (languageId === 'cpp') {
-            compileCommand = `g++ "${sourceFilePath}" -o "${executableName}" -O${finalOpt} -std=${effStd}`;
-        } else {
-            compileCommand = `gcc "${sourceFilePath}" -o "${executableName}" -O${finalOpt}`;
-        }
+        compileCommand = `clang "${sourceFilePath}" -o "${executableName}" -O${finalOpt}`;
     }
 
-    // Build run command - use safe parameter passing
-    let runCommand: string;
-    if (languageId === 'python') {
-        runCommand = `python3 "${sourceFilePath}"`;
-    } else {
-        runCommand = `"${executableName}"`;
-    }
+    // Build run command
+    const runCommand = `"${executableName}"`;
 
     // Combine complete command: compile + run
-    let fullCommand: string;
-    if (languageId === 'python') {
-        fullCommand = runCommand;
-    } else {
-        // Use trap command to ensure temporary compilation products are reliably cleaned up
-        // even when the process is unexpectedly terminated
-        // Use double quotes around paths to prevent shell injection
-        fullCommand = `trap "rm -f \\"${executableName}\\"" EXIT; ${compileCommand} && ${runCommand}`;
-    }
+    // Use trap command to ensure temporary compilation products are reliably cleaned up
+    // even when the process is unexpectedly terminated
+    // Use double quotes around paths to prevent shell injection
+    const fullCommand = `trap "rm -f \\"${executableName}\\"" EXIT; ${compileCommand} && ${runCommand}`;
 
     // Add debug information
     console.log(`[RunSingleInDocker] Language: ${languageId}, Source file: ${sourceFileName}`);
@@ -187,7 +172,7 @@ async function runSingleInDocker(
 async function runPairInSeparateContainers(
     projectRootPath: string,
     sourceDir: string,
-    languageId: 'c' | 'cpp' | 'python',
+    languageId: 'c' | 'cpp',
     sourceFileName1: string,
     sourceFileName2: string,
     input: string,
@@ -239,9 +224,9 @@ function createDiffHtml(output1: string, output2: string): { html1: string; html
     return { html1, html2 };
 }
 
-function getLanguageIdFromEditor(editor: vscode.TextEditor): 'c' | 'cpp' | 'python' {
+function getLanguageIdFromEditor(editor: vscode.TextEditor): 'c' | 'cpp' {
     const langId = editor.document.languageId;
-    if (langId === 'c' || langId === 'cpp' || langId === 'python') {
+    if (langId === 'c' || langId === 'cpp') {
         return langId;
     }
     throw new Error(`Unsupported language: ${langId}`);
@@ -261,17 +246,13 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp' || e.document.languageId === 'python'));
+                    const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp'));
                     if (editors.length < 2) {
-                        vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check.');
+                        vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
                     const langId = getLanguageIdFromEditor(editor1);
-                    if (langId !== 'c' && langId !== 'cpp' && langId !== 'python') {
-                        vscode.window.showErrorMessage(`Pair check does not support language: ${langId}`);
-                        return;
-                    }
                     if (editor2.document.languageId !== langId) {
                         vscode.window.showErrorMessage('Both code files must have the same language type.');
                         return;
@@ -282,9 +263,8 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
 
                     // Define file extensions to ensure consistency with Docker file names
-                    const ext = langId === 'python' ? 'py' : langId;
-                    const file1Path = path.join(tempDir, `code1.${ext}`);
-                    const file2Path = path.join(tempDir, `code2.${ext}`);
+                    const file1Path = path.join(tempDir, `code1.${langId}`);
+                    const file2Path = path.join(tempDir, `code2.${langId}`);
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
                     await fs.promises.writeFile(file2Path, editor2.document.getText());
 
@@ -293,8 +273,8 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                         this._context.extensionPath,
                         tempDir,
                         langId,
-                        `code1.${ext}`,
-                        `code2.${ext}`,
+                        `code1.${langId}`,
+                        `code2.${langId}`,
                         message.input,
                         { timeLimit: 20, memoryLimit: 512 }
                     );
@@ -338,7 +318,7 @@ function setupEditorEventListeners(context: vscode.ExtensionContext): void {
     console.log('[EditorEventListeners] Setting up editor event listeners for container management');
 
     // Supported languages for container management
-    const supportedLanguages = ['c', 'cpp', 'python'];
+    const supportedLanguages = ['c', 'cpp'];
 
     // Helper function to check if document language is supported
     const isSupportedLanguage = (languageId: string) => supportedLanguages.includes(languageId);
@@ -422,7 +402,6 @@ export function activate(context: vscode.ExtensionContext) {
                     const active = vscode.window.activeTextEditor;
                     if (!active) { throw new Error('Please open a source file in the editor first.'); }
                     const langId = getLanguageIdFromEditor(active);
-                    const ext = langId === 'python' ? 'py' : langId;
                     const problemName = toSafeName(m.name);
 
                     const baseDir = await pickProblemsBaseDir();
@@ -433,7 +412,7 @@ export function activate(context: vscode.ExtensionContext) {
                     await fs.promises.mkdir(configDir, { recursive: true });
 
                     // Write source file
-                    const sourcePath = path.join(problemDir, `main.${ext}`);
+                    const sourcePath = path.join(problemDir, `main.${langId}`);
                     await fs.promises.writeFile(sourcePath, active.document.getText(), 'utf8');
 
                     // Write config files
@@ -477,7 +456,7 @@ export function activate(context: vscode.ExtensionContext) {
         }));
 
         // Command: create a new problem skeleton by name
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.createProblem', async (payload?: { name?: string; language?: 'c' | 'cpp' | 'python'; baseDir?: string }) => {
+        context.subscriptions.push(vscode.commands.registerCommand('oicode.createProblem', async (payload?: { name?: string; language?: 'c' | 'cpp'; baseDir?: string }) => {
             try {
                 let name = payload?.name;
                 if (!name) {
@@ -501,18 +480,17 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
 
-                let langId = payload?.language as ('c' | 'cpp' | 'python') | undefined;
+                let langId = payload?.language as ('c' | 'cpp') | undefined;
                 if (!langId) {
                     const langPick = await vscode.window.showQuickPick([
                         { label: 'C', detail: 'main.c', value: 'c' },
-                        { label: 'C++', detail: 'main.cpp', value: 'cpp' },
-                        { label: 'Python', detail: 'main.py', value: 'python' }
+                        { label: 'C++', detail: 'main.cpp', value: 'cpp' }
                     ], { placeHolder: 'Select language' });
                     if (!langPick) { return; }
-                    langId = langPick.value as 'c' | 'cpp' | 'python';
+                    langId = langPick.value as 'c' | 'cpp';
                 }
                 if (langId) {
-                    const ext = langId === 'python' ? 'py' : langId;
+                    const ext = langId;
                     const problemDir = path.join(baseDir, safe);
                     const configDir = path.join(problemDir, 'config');
                     await fs.promises.mkdir(problemDir, { recursive: true });
@@ -613,9 +591,9 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Programmatic pair-check command for tests and headless execution
         context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
-            const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'python' || e.document.languageId === 'c'));
+            const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c'));
             if (editors.length < 2) {
-                vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check.');
+                vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
                 return { error: 'NEED_TWO_EDITORS' };
             }
             const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
@@ -652,9 +630,8 @@ export function activate(context: vscode.ExtensionContext) {
             await fs.promises.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
             const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-code-'));
             try {
-                const ext = langId === 'python' ? 'py' : langId;
-                const file1Path = path.join(tempDir, `code1.${ext}`);
-                const file2Path = path.join(tempDir, `code2.${ext}`);
+                const file1Path = path.join(tempDir, `code1.${langId}`);
+                const file2Path = path.join(tempDir, `code2.${langId}`);
                 await fs.promises.writeFile(file1Path, finalEditor1Content);
                 await fs.promises.writeFile(file2Path, finalEditor2Content);
 
@@ -667,8 +644,8 @@ export function activate(context: vscode.ExtensionContext) {
                     context.extensionPath,
                     tempDir,
                     langId,
-                    `code1.${ext}`,
-                    `code2.${ext}`,
+                    `code1.${langId}`,
+                    `code2.${langId}`,
                     input,
                     { timeLimit, memoryLimit: 512 }
                 );
@@ -702,7 +679,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return vscode.window.showErrorMessage('Please open a file to run.');
             }
             const document = editor.document;
-            const languageId = document.languageId as 'c' | 'cpp' | 'python';
+            const languageId = document.languageId as 'c' | 'cpp';
             const sourceFile = path.basename(document.fileName);
             let input: string | undefined;
             if (testInput !== undefined) {

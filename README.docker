@@ -1,0 +1,161 @@
+## OI-Code Docker Image Documentation
+
+This document explains how to build and use custom Docker images for OI-Code extension with Clang toolchain support.
+
+### Overview
+
+OI-Code uses Docker containers to provide a consistent development environment. We've created custom Docker images that:
+
+1. **Replace gcc with Clang**: Use LLVM/Clang toolchain instead of GCC
+2. **Platform-specific images**:
+   - Linux/macOS: Ubuntu 24.04-based image (`oi-code-clang:latest`)
+   - Windows: Windows Nano Server-based image (`oi-code-clang-windows:latest`)
+
+### Prerequisites
+
+- Docker installed and running
+- For Linux/macOS development: Standard Docker setup
+- For Windows development: Windows containers support enabled in Docker Desktop
+
+### Quick Start
+
+1. **Build Docker Images**:
+   ```bash
+   # Make build script executable (if not already)
+   chmod +x build-images.sh
+
+   # Build images for your platform
+   ./build-images.sh
+   ```
+
+2. **Configure OI-Code** (optional - automatic if images exist):
+   ```json
+   // Add to VS Code settings.json
+   "oicode.docker.compilers": {
+     "cpp": "oi-code-clang:latest",
+     "c": "oi-code-clang:latest"
+   }
+   ```
+
+3. **Start Coding**:
+   - Open C/C++ files in VS Code
+   - Use OI-Code commands (run, pair check, etc.)
+   - Extension will use Clang toolchain automatically
+
+### Building Images (Advanced)
+
+Use the provided build script to create images for your platform:
+
+```bash
+# Build image for current platform only (recommended)
+./build-images.sh
+
+# Build Linux image only
+./build-images.sh linux
+
+# Build Windows image only
+./build-images.sh windows
+
+# Build both images
+./build-images.sh all
+```
+
+### Usage
+
+Once built, the OI-Code extension will automatically use the custom images:
+
+- **Linux/macOS**: `oi-code-clang:latest`
+- **Windows**: `oi-code-clang-windows:latest`
+
+### Custom Image Details
+
+#### Linux Image (`oi-code-clang:latest`)
+- **Base**: Ubuntu 24.04
+- **Tools Installed**:
+  - Clang/Clang++
+  - libc++ (C++ standard library)
+  - LLVM toolchain
+  - lldb debugger
+  - lld linker
+  - Development tools (make, gdb, valgrind)
+
+#### Windows Image (`oi-code-clang-windows:latest`)
+- **Base**: Windows Nano Server LTSC 2022
+- **Notes**: Requires manual Clang binary installation (see Dockerfile.windows comments)
+
+### Troubleshooting
+
+#### Image Build Fails
+If custom image building fails, you can configure OI-Code to fall back to official images:
+
+In VS Code settings, add:
+```json
+"oicode.docker.compilers": {
+  "cpp": "ubuntu:24.04",
+  "c": "ubuntu:24.04"
+}
+```
+
+#### Linux: Clang Not Found
+Install Clang in the container:
+```bash
+apt-get update && apt-get install -y clang clang++
+```
+
+#### Windows: Setup Challenges
+For Windows containers with Clang:
+1. Download LLVM/Clang distribution from https://releases.llvm.org/
+2. Extract binaries to `C:\llvm\bin\`
+3. Add to PATH: `ENV PATH="C:\llvm\bin;%PATH%"`
+4. Update Dockerfile.windows with actual paths
+
+### Advanced Usage
+
+#### Manual Image Building
+
+```bash
+# Build Linux image manually
+docker build -t oi-code-clang:latest -f Dockerfile .
+
+# Build Windows image manually (after setting up Clang binaries)
+docker build -t oi-code-clang-windows:latest -f Dockerfile.windows .
+```
+
+#### Custom Compiler Configuration
+You can override the default images in VS Code settings:
+
+```json
+{
+  "oicode.docker.compilers": {
+    "cpp": "my-custom-gcc:latest",
+    "c": "my-custom-gcc:latest"
+  }
+}
+```
+
+#### Image Registry
+Push your custom images to a registry for team sharing:
+
+```bash
+# Tag and push to registry
+docker tag oi-code-clang:latest my-registry.com/oi-code-clang:latest
+docker push my-registry.com/oi-code-clang:latest
+```
+
+### Performance Considerations
+
+- **Container Pool**: Custom images work with the container pool optimization
+- **Cache Mounting**: Enabled for better file synchronization performance
+- **Image Size**: Ubuntu-based image is ~1GB, Nano Server image is ~300MB
+
+### Known Limitations
+
+1. **Windows Support**: Windows Nano Server doesn't support direct package installation
+2. **Large Binaries**: Clang toolchain significantly increases image size
+3. **Cross-platform**: Windows containers cannot run on Linux hosts directly
+
+### Migration from GCC
+
+The extension automatically detects and uses the new Clang images. No manual configuration is required after building the images.
+
+Previous GCC-based configurations will still work if you don't build the new images.

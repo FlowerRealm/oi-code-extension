@@ -17,7 +17,7 @@ import * as os from 'os';
 const TEST_BASE_DIR = path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
 
 // Helper: create a problem via command, inject code, and open it
-async function createProblemAndOpen(name: string, language: 'c' | 'cpp' | 'python', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
+async function createProblemAndOpen(name: string, language: 'c' | 'cpp', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
     await fs.mkdir(TEST_BASE_DIR, { recursive: true });
     const res: any = await vscode.commands.executeCommand('oicode.createProblem', { name, language, baseDir: TEST_BASE_DIR });
     if (!res || res.error) { throw new Error(`failed to create problem: ${res?.error || 'unknown'}`); }
@@ -154,14 +154,6 @@ suite('Extension Test Suite', () => {
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdCpp.sourcePath));
 
-        // Test Python code execution
-        const pythonCode = `print(\"Hello, Python!\")`;
-        const createdPy = await createProblemAndOpen('UT-PY-Hello', 'python', pythonCode);
-        const resPy: any = await vscode.commands.executeCommand('oicode.runCode', '');
-        console.log('[Docker Init Test] Python execution result:', resPy);
-        assert.ok(resPy && typeof resPy.output === 'string', 'Python execution should return string output');
-        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-        await cleanupDir(path.dirname(createdPy.sourcePath));
     });
 });
 
@@ -248,7 +240,7 @@ suite('OI-Code Commands Test Suite', () => {
         async function openBesideDocs(codeLeft: string, codeRight: string, ext: string) {
             // Close all editors to avoid picking unrelated editors in runPairCheck
             await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-            const lang = (ext === 'py' ? 'python' : ext) as 'c' | 'cpp' | 'python';
+            const lang = ext as 'c' | 'cpp';
             const left = await createProblemAndOpen(`UT-${ext}-REC`, lang, codeLeft);
             const right = await createProblemAndOpen(`UT-${ext}-DP`, lang, codeRight);
             const leftDoc = await vscode.workspace.openTextDocument(left.uri);
@@ -302,34 +294,9 @@ int main() {
     return 0;
 }`;
 
-        const pyRec = `import sys
-from functools import lru_cache
-@lru_cache(None)
-def C(n):
-    if n<=1: return 1
-    return sum(C(i)*C(n-1-i) for i in range(n))
-def main():
-    n = int(sys.stdin.readline().strip() or '0')
-    print(C(n))
-main()`;
-
-        const pyDp = `import sys
-def main():
-    n = int(sys.stdin.readline().strip() or '0')
-    if n == 0:
-        print(1)
-    else:
-        C = [0] * (n + 1)
-        C[0] = 1
-        for i in range(1, n + 1):
-            C[i] = 0
-            for j in range(i):
-                C[i] += C[j] * C[i - 1 - j]
-        print(C[n])
-main()`;
 
 
-        for (const lang of ['c', 'cpp', 'python'] as const) {
+        for (const lang of ['c', 'cpp'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
                 this.timeout(60000);
 
@@ -350,8 +317,8 @@ main()`;
                     return;
                 }
 
-                const codes = lang === 'c' ? [cRec, cDp] : lang === 'cpp' ? [cppRec, cppDp] : [pyRec, pyDp];
-                const ext = lang === 'python' ? 'py' : lang;
+                const codes = lang === 'c' ? [cRec, cDp] : [cppRec, cppDp];
+                const ext = lang;
                 const { leftDir, rightDir } = await openBesideDocs(codes[0], codes[1], ext);
                 try {
                     for (const input of inputs) {
