@@ -420,7 +420,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 async function ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
                     const active = vscode.window.activeTextEditor;
-                    if (!active) { throw new Error('Please open a source file in the editor first。'); }
+                    if (!active) { throw new Error('Please open a source file in the editor first.'); }
                     const langId = getLanguageIdFromEditor(active);
                     const ext = langId === 'python' ? 'py' : langId;
                     const problemName = toSafeName(m.name);
@@ -615,13 +615,13 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
             const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'python' || e.document.languageId === 'c'));
             if (editors.length < 2) {
-                vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check。');
+                vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check.');
                 return { error: 'NEED_TWO_EDITORS' };
             }
             const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
             const langId = getLanguageIdFromEditor(editor1);
             if (editor2.document.languageId !== langId) {
-                vscode.window.showErrorMessage('Both code files must have the same language type。');
+                vscode.window.showErrorMessage('Both code files must have the same language type.');
                 return { error: 'LANG_MISMATCH' };
             }
 
@@ -644,7 +644,7 @@ export function activate(context: vscode.ExtensionContext) {
             const finalEditor1Content = editor1.document.getText();
             const finalEditor2Content = editor2.document.getText();
             if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
-                vscode.window.showErrorMessage('Editor content load timeout, please try again later。');
+                vscode.window.showErrorMessage('Editor content load timeout, please try again later.');
                 return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
             }
 

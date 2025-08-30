@@ -1,5 +1,6 @@
 # OI-Code 项目洞察
 
+[![中文文档](https://img.shields.io/badge/项目洞察-中文-red.svg)](i18n/chinese/PROJECT_INSIGHTS.md)
 [![English Documentation](https://img.shields.io/badge/Project-Insights-blue.svg)](../../docs/PROJECT_INSIGHTS.md)
 
 ## 项目认识与技术要点
