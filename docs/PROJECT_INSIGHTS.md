@@ -1,89 +1,99 @@
-# OI-Code 项目洞察
+# OI-Code Project Insights
 
-## 项目认识与技术要点
+[![中文文档](https://img.shields.io/badge/项目洞察-中文-red.svg)](i18n/chinese/PROJECT_INSIGHTS.md)
 
-本扩展旨在为 OI 选手提供一致、可靠的本地开发体验：通过容器将编译与运行彻底与宿主机隔离，避免"装编译器/环境不一致/路径权限"等问题，侧边栏聚焦题目信息管理与操作流，测试体系保障核心功能的稳定性。
+## Project Overview and Technical Highlights
 
-## 架构概览
+This extension aims to provide OI competitors with a consistent and reliable local development experience: by completely isolating compilation and execution from the host system through containers, avoiding issues like "compiler installation/environment inconsistency/path permissions," with the sidebar focusing on problem information management and operational workflow, and the testing system ensuring core functionality stability.
 
-- **extension.ts**：
-  - 激活扩展、注册命令与视图
-  - 统一调用 runSingleInDocker，将运行入口（单测/对拍）都指向容器
-  - 侧边栏 OI-Code 的 WebviewViewProvider：题目信息、限制与操作（运行/对拍）
-  - 命令注册：`oicode.runCode`、`oicode.runPairCheck`、`oicode.createProblem` 等
+## Architecture Overview
 
-- **dockerManager.ts**：
-  - 动态选择官方镜像（gcc:13、python:3.11）
-  - run：拼装 docker run 限制参数（CPU/内存/PIDs/网络），并处理 stdout/stderr 与超限标志
-  - 临时写挂载位于 `~/.oi-code-tests/tmp`，避免桌面版共享路径问题
-  - **容器池优化**：复用 Docker 容器以提高性能，减少容器启动开销
+- **extension.ts**:
+  - Activates the extension, registers commands and views
+  - Unified call to runSingleInDocker, directing all execution entries (unit tests/pair checking) to containers
+  - Sidebar OI-Code WebviewViewProvider: problem information, restrictions, and operations (run/pair check)
+  - Command registration: `oicode.runCode`, `oicode.runPairCheck`, `oicode.createProblem`, etc.
 
-- **docker/install.ts**：
-  - 统一静默安装/启动 Docker 的策略（Win/Mac/Linux），并轮询 docker info 直至就绪
-  - 支持包管理器（winget/choco/brew/apt/pacman）和手动安装
-  - 统一的错误日志记录机制
+- **dockerManager.ts**:
+  - Dynamically selects official images (gcc:13, python:3.11)
+  - Run: assembles docker run restriction parameters (CPU/memory/PIDs/network), and handles stdout/stderr and timeout flags
+  - Temporary write mounts located at `~/.oi-code-tests/tmp`, avoiding Desktop shared path issues
+  - **Container Pool Optimization**: Reuse Docker containers for improved performance, reducing container startup overhead
 
-## 运行细节
+- **docker/install.ts**:
+  - Unified silent installation/startup strategy for Docker (Win/Mac/Linux), with polling docker info until ready
+  - Support for package managers (winget/choco/brew/apt/pacman) and manual installation
+  - Unified error logging mechanism
 
-- **C/C++**：容器内执行 gcc/g++，应用 opt/std 设置后编译；可执行文件放置临时可写目录运行
-- **Python**：容器内 python3 直接运行
-- **资源限制**：
-  - timedOut：超时标志
-  - memoryExceeded：137 等退出码判定
-  - spaceExceeded：stderr 关键字
-- **错误处理**：统一的错误日志记录和用户友好的错误消息
+## Runtime Details
 
-## 题目工程与 UI
+- **C/C++**: Execute gcc/g++ within container, compile after applying opt/std settings; executable files placed in temporary writable directory for execution
+- **Python**: Directly run python3 within container
+- **Resource Restrictions**:
+  - timedOut: timeout flag
+  - memoryExceeded: judged by exit codes like 137
+  - spaceExceeded: stderr keywords
+- **Error Handling**: Unified error logging and user-friendly error messages
 
-- **结构**：`ProblemFolder/main.ext`、`config/problem.json`、`statement.md`、`samples.txt`
-- **新建题目**：`oicode.createProblem` 生成骨架与语言模板，并支持"复用上次根目录/手动选择"
-- **侧边栏**：输入题目名称、URL、题面（Markdown 可编辑）、时间/内存限制、样例；下方选择 O2、语言标准；底部按钮运行/对拍/从文件导入样例
+## Problem Engineering and UI
 
-## 测试策略
+- **Structure**: `ProblemFolder/main.ext`, `config/problem.json`, `statement.md`, `samples.txt`
+- **Create New Problem**: `oicode.createProblem` generates framework and language templates, supports "reuse last root directory/manual selection"
+- **Sidebar**: Enter problem name, URL, problem statement (Markdown editable), time/memory limits, samples; select O2, language standard below; run/compare/import samples from file buttons at bottom
 
-- 使用 @vscode/test-electron 启动 VS Code 测试宿主
-- 用例先通过 `oicode.createProblem` 创建题目，再执行 `oicode.runCode`/`oicode.runPairCheck`
-- **跨平台兼容**：
-  - Docker 可用性检测：自动跳过需要 Docker 的测试
-  - 文件清理重试机制：解决 Windows 文件锁定问题
-  - Catalan 数算法测试：验证递归和动态规划实现
-- 测试日志输出到 `test-output.log`，便于 CI 与本地排查
+## Testing Strategy
 
-## 关键决策
+- Use @vscode/test-electron to launch VS Code test host
+- Test cases first create problems through `oicode.createProblem`, then execute `oicode.runCode`/`oicode.runPairCheck`
+- **Cross-platform Compatibility**:
+  - Docker availability detection: automatically skip Docker-dependent tests
+  - File cleanup retry mechanism: solving Windows file lock issues
+  - Catalan number algorithm testing: validating recursive and dynamic programming implementations
+- Test logs output to `test-output.log`, for easy CI and local debugging
 
-- **全量容器化**：对拍及单测全部走容器，消除本地差异
-- **放弃自建镜像**：直接使用官方语言镜像，降低构建与维护成本
-- **路径策略**：临时写挂载使用用户目录，避免 Desktop 的共享路径限制
-- **返回模型**：`runCode` 返回执行结果对象，由外层判断对错/展示
-- **错误处理**：统一的错误日志记录和用户友好的错误消息
-- **测试体系**：全面的测试覆盖，确保跨平台兼容性
+## Key Decisions
 
-## 最新改进
+- **Full Containerization**: All pair checking and unit testing run in containers, eliminating local differences
+- **No Custom Images**: Directly use official language images, reducing build and maintenance costs
+- **Path Strategy**: Temporary write mounts use user directory, avoiding Desktop shared path restrictions
+- **Return Model**: `runCode` returns execution result object, handled by outer layer for correctness display
+- **Error Handling**: Unified error logging and user-friendly error messages
+- **Testing System**: Comprehensive test coverage, ensuring cross-platform compatibility
 
-### 容器池优化
-1. **性能提升**：通过容器池复用 Docker 容器，显著减少容器启动时间
-2. **资源管理**：实现容器健康检查、超时清理和自动重启机制
-3. **回退机制**：当容器池出现问题时自动回退到传统模式
-4. **缓存挂载**：支持 Docker Volumes 挂载以提高文件复制效率
+## Latest Improvements
 
-### 安全性改进
-1. **Shell注入防护**：重构代码以避免 shell 注入风险
-2. **输入处理**：使用安全的 stdin 方式传递输入
-3. **资源限制**：严格执行 CPU、内存和进程数限制
+### Container Pool Optimization
+1. **Performance Improvement**: Significantly reduce container startup time through container pool reuse of Docker containers
+2. **Resource Management**: Implement container health checks, timeout cleanup, and automatic restart mechanisms
+3. **Fallback Mechanism**: Automatically fallback to traditional mode when container pool encounters issues
+4. **Cache Mounting**: Support Docker Volumes mounting for improved file copy efficiency
 
-### 代码质量提升
-1. **错误处理**：完善错误处理机制，避免未处理的 Promise 拒绝
-2. **代码重构**：消除重复代码，提高可维护性
-3. **类型安全**：改进 TypeScript 类型定义
+### Security Improvements
+1. **Shell Injection Protection**: Refactor code to avoid shell injection risks
+2. **Input Processing**: Use secure stdin method for input passing
+3. **Resource Restrictions**: Strictly enforce CPU, memory, and process number limits
 
-### 用户体验优化
-1. **编辑器内容加载**：使用轮询机制确保编辑器内容完全加载
-2. **输出处理**：直接使用 stdout 而不是临时文件
-3. **清理优化**：改进 Docker 资源清理逻辑，避免删除用户数据
+### Code Quality Improvement
+1. **Error Handling**: Improve error handling mechanisms, avoid unhandled Promise rejections
+2. **Code Refactoring**: Eliminate duplicate code, improve maintainability
+3. **Type Safety**: Improve TypeScript type definitions
+4. **Internationalization**: Translate all Chinese comments to English, improve code readability
+5. **Documentation Enhancement**: Unify English comment format, improve code documentation quality
+6. **Editor Event Optimization**: Integrate duplicate editor listener logic
 
-## 技术实现细节
+### User Experience Optimization
+1. **Editor Content Loading**: Use polling mechanism to ensure editor content fully loads
+2. **Output Processing**: Use stdout directly instead of temporary files
+3. **Cleanup Optimization**: Improve Docker resource cleanup logic, avoid deleting user data
 
-### 容器池架构
+### Project Structure Optimization
+1. **Build Product Management**: Clean up incorrect build artifacts and fix .gitignore configuration
+2. **Directory Structure Normalization**: Ensure build files in correct location (out/ directory)
+3. **Code Organization**: Optimize file structure and constant definitions
+
+## Technical Implementation Details
+
+### Container Pool Architecture
 ```typescript
 interface DockerContainer {
     containerId: string;
@@ -99,35 +109,33 @@ interface ContainerPool {
 }
 ```
 
-容器池通过以下方式工作：
-1. 在扩展激活时预启动容器
-2. 为每种语言维护一个活动容器
-3. 实现健康检查和超时清理
-4. 支持自动回退到非池模式
+The container pool works as follows:
+1. Pre-start containers when extension activates
+2. Maintain one active container per language
+3. Implement health checks and timeout cleanup
+4. Support automatic fallback to non-pool mode
 
-### 安全输入处理
+### Secure Input Processing
 ```typescript
-// 使用安全的 stdin 方式传递输入
+// Use secure stdin method for input passing
 if (input) {
     dockerProcess.stdin.write(input);
     dockerProcess.stdin.end();
 }
 ```
 
-### 资源清理优化
+### Resource Cleanup Optimization
 ```typescript
-// 批量停止和删除容器
+// Batch stop and remove containers
 private static async _stopContainers(containerIds: string[]): Promise<void>
 private static async _removeContainers(containerIds: string[]): Promise<void>
 ```
 
-## 后续可拓展点
+## Future Extensibility
 
-- 题库集成（如链接远端 OJ，抓取题目元数据）
-- 评测配置模板与多用例管理
-- 更细粒度的资源限制/沙箱策略（seccomp、AppArmor）
-- 评测报告可视化与历史记录
-- 多语言支持（Java、Go、Rust 等）
-- 在线评测集成
-
-
+- Problem database integration (connect to remote OJ, fetch problem metadata)
+- Evaluation configuration templates and multi-case management
+- More fine-grained resource restrictions/sandbox strategies (seccomp, AppArmor)
+- Evaluation report visualization and history records
+- Multi-language support (Java, Go, Rust, etc.)
+- Online evaluation integration

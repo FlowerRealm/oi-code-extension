@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     strategy:
-      fail-fast: false   # 🚀 确保一个失败不会取消其它矩阵任务
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13, windows-11-arm, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
@@ -26,12 +26,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # 在所有 Linux 系统上安装 xvfb，如果安装失败则忽略
-      - name: Install xvfb on Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-        continue-on-error: true
 
       - name: Run tests
         run: |

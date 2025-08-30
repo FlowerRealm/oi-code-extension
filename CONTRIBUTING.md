@@ -1,143 +1,149 @@
-# 贡献指南
+# Contributing Guide
 
-感谢您对 OI-Code 扩展的关注！我们欢迎各种形式的贡献。
+[![中文文档](https://img.shields.io/badge/贡献指南-中文-red.svg)](i18n/chinese/CONTRIBUTING.md)
+[![English Documentation](https://img.shields.io/badge/Contributing-Guide-blue.svg)](CONTRIBUTING.md)
 
-## 开发环境设置
+Thank you for your interest in the OI-Code extension! We welcome contributions of all kinds.
 
-### 先决条件
+## Development Environment Setup
+
+### Prerequisites
 - Node.js 16+
 - VS Code
-- Docker（用于测试）
+- Docker (for testing)
 - Git
 
-### 设置步骤
-1. 克隆仓库：
+### Setup Steps
+1. Clone the repository:
 ```bash
 git clone https://github.com/FlowerRealm/oi-code-extension.git
 cd oi-code-extension
 ```
 
-2. 安装依赖：
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. 编译项目：
+3. Compile the project:
 ```bash
 npm run compile
 ```
 
-4. 运行测试：
+4. Run tests:
 ```bash
 npm test
 ```
 
-## 代码规范
+## Code Standards
 
-### TypeScript 规范
-- 使用 TypeScript 严格模式
-- 遵循 ESLint 配置
-- 使用 Prettier 格式化代码
+### TypeScript Standards
+- Use TypeScript strict mode
+- Follow ESLint configuration
+- Use Prettier for code formatting
+- **English Comments**: All comments must be written in English to improve code readability
+- **Code Organization**: Avoid duplicate code, prioritize reusable functions and modules
+- **Error Handling**: Use appropriate try-catch blocks and Promise error handling
 
-### 测试规范
-- 使用 Mocha 测试框架
-- 测试文件放在 `src/test/` 目录
-- 测试用例应该具有描述性名称
-- 包含错误处理测试
+### Testing Standards
+- Use Mocha testing framework
+- Place test files in the `src/test/` directory
+- Test cases should have descriptive names
+- Include error handling tests
 
-### Git 提交规范
-- 使用清晰的提交信息
-- 遵循 Conventional Commits 格式
-- 提交前运行测试确保通过
+### Git Commit Standards
+- Use clear, descriptive commit messages
+- Follow Conventional Commits format
+- Run tests before committing to ensure passing
 
-## 测试指南
+## Testing Guide
 
-### 运行测试
+### Running Tests
 ```bash
-# 运行所有测试
+# Run all tests
 npm test
 
-# 运行测试并输出日志
+# Run tests with logging
 npm run test:log
 ```
 
-### 测试类型
-1. **单元测试**：测试单个函数或组件
-2. **集成测试**：测试多个组件的交互
-3. **端到端测试**：测试完整的用户流程
+### Test Types
+1. **Unit Tests**: Test individual functions or components
+2. **Integration Tests**: Test interactions between multiple components
+3. **End-to-End Tests**: Test complete user workflows
 
-### 跨平台测试
-- Windows：测试文件清理和 Docker 安装
-- Linux：测试核心功能
-- macOS：测试 Docker 安装和功能
+### Cross-Platform Testing
+- Windows: Test file cleanup and Docker installation
+- Linux: Test core functionality
+- macOS: Test Docker installation and functionality
 
-## 功能开发
+## Feature Development
 
-### 添加新语言支持
-1. 在 `package.json` 中添加语言配置
-2. 在 `dockerManager.ts` 中添加镜像配置
-3. 更新测试用例
-4. 更新文档
+### Adding New Language Support
+1. Add language configuration in `package.json`
+2. Add image configuration in `dockerManager.ts`
+3. Update test cases
+4. Update documentation
 
-### 添加新命令
-1. 在 `extension.ts` 中注册命令
-2. 在 `commands/` 目录中实现命令逻辑
-3. 添加测试用例
-4. 更新文档
+### Adding New Commands
+1. Register commands in `extension.ts`
+2. Implement command logic in `commands/` directory
+3. Add test cases
+4. Update documentation
 
-### 添加新配置项
-1. 在 `package.json` 中添加配置项
-2. 在 `config/` 目录中实现配置逻辑
-3. 更新测试用例
-4. 更新文档
+### Adding New Configuration Options
+1. Add configuration option in `package.json`
+2. Implement configuration logic in `config/` directory
+3. Update test cases
+4. Update documentation
 
-## 问题排查
+## Troubleshooting
 
-### 常见问题
-1. **测试失败**：检查 Docker 是否可用，查看 `test-output.log`
-2. **编译错误**：确保 TypeScript 编译通过
-3. **Docker 问题**：运行 `oicode.downloadDocker` 安装 Docker
+### Common Issues
+1. **Test Failures**: Check if Docker is available, review `test-output.log`
+2. **Compilation Errors**: Ensure TypeScript compilation passes
+3. **Docker Issues**: Run `oicode.downloadDocker` to install Docker
 
-### 调试技巧
-- 使用 VS Code 调试器
-- 查看 `test-output.log` 日志
-- 使用 `console.log` 输出调试信息
+### Debugging Tips
+- Use VS Code debugger
+- Review `test-output.log` logs
+- Use `console.log` for debug output
 
-## 提交 Pull Request
+## Submitting Pull Requests
 
-### 步骤
-1. Fork 仓库
-2. 创建功能分支：`git checkout -b feature/AmazingFeature`
-3. 提交更改：`git commit -m 'feat: Add some AmazingFeature'`
-4. 推送到分支：`git push origin feature/AmazingFeature`
-5. 创建 Pull Request
+### Steps
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/AmazingFeature`
+3. Make your changes: `git commit -m 'feat: Add some AmazingFeature'`
+4. Push to the branch: `git push origin feature/AmazingFeature`
+5. Create a Pull Request
 
-### Pull Request 模板
+### Pull Request Template
 ```markdown
-## 变更描述
-简要描述这个 PR 的目的和变更内容。
+## Change Description
+Brief description of what this PR aims to accomplish and the changes it contains.
 
-## 变更类型
-- [ ] Bug 修复
-- [ ] 新功能
-- [ ] 文档更新
-- [ ] 重构
-- [ ] 性能优化
+## Change Type
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation update
+- [ ] Code refactoring
+- [ ] Performance optimization
 
-## 测试清单
-- [ ] 功能测试通过
-- [ ] 跨平台测试通过
-- [ ] 文档更新
+## Testing Checklist
+- [ ] Functional tests pass
+- [ ] Cross-platform tests pass
+- [ ] Documentation updated
 
-## 相关问题
+## Related Issues
 Closes #123
 
-## 其他信息
+## Additional Information
 ```
 
-## 联系方式
-- GitHub Issues：[提交问题](https://github.com/FlowerRealm/oi-code-extension/issues)
-- 邮箱：admin@flowerrealm.top
+## Contact Information
+- GitHub Issues: [Report Issues](https://github.com/FlowerRealm/oi-code-extension/issues)
+- Email: admin@flowerrealm.top
 
-## 许可证
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

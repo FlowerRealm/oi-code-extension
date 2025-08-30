@@ -62,46 +62,6 @@ async function isDockerAvailable(): Promise<boolean> {
     });
 }
 
-// Helper to get oi-container IDs with timeout and error handling
-async function getOiContainerIds(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-        const { exec } = require('child_process');
-        const timer = setTimeout(() => {
-            reject(new Error('[Test Helper] Docker ps command timeout'));
-        }, 10000);
-
-        exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-            clearTimeout(timer);
-            if (error) {
-                reject(new Error(`[Test Helper] Failed to list docker containers: ${error.message}`));
-                return;
-            }
-            const ids = stdout.trim();
-            resolve(ids ? ids.split('\n').filter((id: string) => id) : []);
-        });
-    });
-}
-
-// Helper to get Docker images with timeout and error handling
-async function getDockerImages(): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-        const { exec } = require('child_process');
-        const timer = setTimeout(() => {
-            reject(new Error('[Test Helper] Docker images command timeout'));
-        }, 10000);
-
-        exec('docker images --format "{{.Repository}}:{{.Tag}}"', (error: any, stdout: any) => {
-            clearTimeout(timer);
-            if (error) {
-                reject(new Error(`[Test Helper] Failed to list docker images: ${error.message}`));
-                return;
-            }
-            const images = stdout.trim();
-            resolve(images ? images.split('\n').filter((img: string) => img) : []);
-        });
-    });
-}
-
 suite('Extension Test Suite', () => {
     // Wait for extension activation
     before(async function () {
@@ -149,7 +109,7 @@ suite('Extension Test Suite', () => {
         assert.ok(activeTab, "No active tab found after executing command");
         const isWebview = activeTab.input instanceof vscode.TabInputWebview;
         assert.ok(isWebview, "The active tab is not a webview panel");
-        assert.strictEqual(activeTab.label, 'OI-Code 设置', "Webview panel title is incorrect");
+        assert.strictEqual(activeTab.label, 'OI-Code Settings', "Webview panel title is incorrect");
     });
 
     test('Docker initialization and code execution', async function () {
@@ -245,7 +205,6 @@ suite('OI-Code Commands Test Suite', () => {
                 console.log('[Test Setup] Docker not available, skipping Docker-dependent tests');
                 vscode.window.showInformationMessage('Docker not available, skipping Docker-dependent tests.');
                 this.skip(); // Skip all tests in this describe block
-                return;
             }
 
             console.log('[Test Setup] Docker is available, initializing Docker environment for code execution tests...');
@@ -433,7 +392,7 @@ main()`;
 
     describe('Docker Installation Integration Tests', () => {
         test('should install and prepare Docker in CI environment (Ubuntu)', async function () {
-            this.timeout(900000); // 15分钟超时 - Docker安装需要时间
+            this.timeout(900000); // 15-minute timeout - Docker installation takes time
 
             const platform = os.platform();
             if (platform !== 'linux') {
@@ -452,7 +411,7 @@ main()`;
 
             console.log('[Docker Install CI Test] Running Docker CI installation test...');
 
-            // 记录初始状态
+            // Record initial state
             let initialDockerAvailable = false;
             try {
                 const { exec } = require('child_process');
