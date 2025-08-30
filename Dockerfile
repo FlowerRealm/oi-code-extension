@@ -32,6 +32,8 @@ RUN apt-get update --quiet && \
     # Create symlinks for convenience
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
+    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
+    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

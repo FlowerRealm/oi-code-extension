@@ -36,7 +36,6 @@ jobs:
           fi
         shell: bash
 
-  # 🔧 新增Docker发布任务 - 只在main分支合并时运行
   deploy-docker:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest

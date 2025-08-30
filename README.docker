@@ -94,14 +94,30 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # 安装 Clang 18 完整工具链
-RUN apt-get update && apt-get install -y \
-    clang-18 clang++-18 lldb-18 llvm-18 \
-    lld-18 make gdb valgrind \
-    && apt-get clean
-
-# 设置默认编译器
-RUN update-alternatives --set clang /usr/bin/clang-18
-RUN update-alternatives --set clang++ /usr/bin/clang++-18
+RUN apt-get update --quiet && \
+    apt-get install -y \
+        clang-18 \
+        clang++-18 \
+        clangd-18 \
+        clang-format-18 \
+        clang-tidy-18 \
+        lldb-18 \
+        llvm-18 \
+        lld-18 \
+        libclang-18-dev \
+        libclang-cpp18-dev \
+        libc++-18-dev \
+        libc++abi-18-dev \
+        valgrind \
+        cppcheck \
+        && \
+    # Create symlinks for convenience
+    ln -sf /usr/bin/clang-18 /usr/bin/clang && \
+    ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
+    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
+    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # 验证安装
 RUN clang --version && clang++ --version

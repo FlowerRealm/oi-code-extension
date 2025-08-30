@@ -612,7 +612,6 @@ export class DockerManager {
                 '-t', imageName,
                 '-f', dockerfileName,
                 '.', // Dockerfile location relative to extension root
-                '--no-cache' // Force fresh build
             ];
 
             outputChannel.appendLine(`docker ${buildArgs.join(' ')}`);
