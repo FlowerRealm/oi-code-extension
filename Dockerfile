@@ -4,15 +4,12 @@ FROM ubuntu:24.04 AS base
 # Install Clang++ toolchain with complete debugging tools
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Use official Ubuntu sources for maximum compatibility
-# Ubuntu 24.04 uses 'noble' codename
+# Install core LLVM/Clang toolchain - focused OI environment
 RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
     echo "deb http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse" > /etc/apt/sources.list && \
     echo "deb http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse" >> /etc/apt/sources.list
-
-# Install core LLVM/Clang toolchain - focused OI environment
-RUN apt-get update --quiet && \
+    echo "deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    apt-get update --quiet && \
     apt-get install -y \
         clang-18 \
         clang++-18 \

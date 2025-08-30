@@ -355,6 +355,9 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
 
+        // Initialize DockerManager with extension context
+        DockerManager.initialize(context);
+
         // Initialize container pool
         DockerManager.initializeContainerPool().catch(error => {
             console.error('Failed to initialize container pool:', error);

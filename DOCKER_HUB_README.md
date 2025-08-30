@@ -112,7 +112,16 @@ FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 
 # 安装 clang 工具链及调试工具
 USER ContainerAdministrator
-RUN ... (Clang 安装命令)
+
+# Nano Server 需要手动复制 Clang 二进制文件。
+# 例如，使用 PowerShell 解压并添加到 PATH：
+# RUN powershell -Command Expand-Archive C:\clang.zip -DestinationPath C:\; setx /M PATH "%PATH%;C:\clang\bin"
+
+# 具体安装步骤：
+# 1. 下载 Clang 二进制文件到 C:\clang.zip
+# 2. 解压并添加到系统 PATH
+# 3. 验证安装 (在 SET LOCAL 步骤中)
+
 USER ContainerUser
 ```
 

@@ -84,6 +84,25 @@ const CONTAINER_POOL_CONFIG = {
  * and resource management for the OI extension.
  */
 export class DockerManager {
+    // Extension context for getting path reliably
+    private static extensionContext: vscode.ExtensionContext | null = null;
+
+    // Static getter for extension path
+    private static get extensionPath(): string {
+        if (!this.extensionContext) {
+            throw new Error('DockerManager not initialized with extension context');
+        }
+        return this.extensionContext.extensionPath;
+    }
+
+    /**
+     * Initialize DockerManager with extension context
+     */
+    public static initialize(context: vscode.ExtensionContext): void {
+        this.extensionContext = context;
+        console.log('[DockerManager] Initialized with extension path:', this.extensionPath);
+    }
+
     // Container pool instance
     public static containerPool: ContainerPool = {
         containers: new Map(),
@@ -602,9 +621,8 @@ export class DockerManager {
             outputChannel.appendLine(`[ OI-Code ] Building ${imageName} (this may take several minutes)...`);
             outputChannel.appendLine(`Platform: ${platform}`);
 
-            // Determine Dockerfile path - use current working directory which should be extension root
-            const extensionPath = process.cwd();
-            outputChannel.appendLine(`Building in directory: ${extensionPath}`);
+            // Use the reliable extension path from context
+            outputChannel.appendLine(`Building in directory: ${this.extensionPath}`);
 
             const dockerfileName = platform === 'win32' ? 'Dockerfile.windows' : 'Dockerfile';
             const buildArgs = [
@@ -616,9 +634,9 @@ export class DockerManager {
 
             outputChannel.appendLine(`docker ${buildArgs.join(' ')}`);
             console.log(`[DockerManager] Building image with args:`, buildArgs);
-            console.log(`[DockerManager] Working directory: ${extensionPath}`);
+            console.log(`[DockerManager] Working directory: ${this.extensionPath}`);
 
-            const buildProcess = spawn('docker', buildArgs, { cwd: extensionPath });
+            const buildProcess = spawn('docker', buildArgs, { cwd: this.extensionPath });
 
             buildProcess.stdout.on('data', (data) => {
                 const output = data.toString().trim();
@@ -977,6 +995,11 @@ export class DockerManager {
      */
     private static async startContainerForLanguage(languageId: string): Promise<DockerContainer> {
         const image = this.selectImageForCommand(languageId);
+        const platform = os.platform();
+
+        // Ensure Clang image exists and is ready before starting container
+        await this.ensureClangImageExists(image, platform);
+
         const containerName = `oi-container-${languageId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
