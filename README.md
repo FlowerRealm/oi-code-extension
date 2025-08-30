@@ -1,93 +1,96 @@
 # OI-Code
 
-OI-Code 是一个为竞技编程者和学生设计的 Visual Studio Code 扩展，帮助练习编程题目。它提供了一个简化的工作流程，用于在受控的 Docker 环境中编写、编译、运行和测试代码。
+[![中文文档](https://img.shields.io/badge/文档-中文-red.svg)](i18n/chinese/README.md)
+[![English Documentation](https://img.shields.io/badge/English-Documentation-blue.svg)](README.md)
 
-## 功能特性
+OI-Code is a Visual Studio Code extension designed for competitive programmers and students, helping them practice coding problems. It provides a simplified workflow for writing, compiling, running, and testing code in a controlled Docker environment.
 
-- **基于 Docker 的执行**：所有代码都在隔离的 Docker 容器中运行，以确保安全性和一致性。
-- **多语言支持**：开箱即用地支持 C、C++ 和 Python。
-- **题目管理**：创建和组织编程题目及其元数据。
-- **对拍功能**：比较两种不同实现的输出（例如，暴力解法与优化解法）。
-- **资源限制**：强制执行时间和内存限制以进行公平评估。
-- **Webview 集成**：为题目描述和设置提供丰富的 UI。
-- **容器池优化**：复用 Docker 容器以提高性能，减少执行延迟。
+## Features
 
-## 环境要求
+- **Docker-based Execution**: All code runs in isolated Docker containers to ensure safety and consistency.
+- **Multi-language Support**: Ready-to-use support for C, C++, and Python.
+- **Problem Management**: Create and organize coding problems with their metadata.
+- **Pair Check Feature**: Compare outputs of two different implementations (e.g., brute force vs. optimized solutions).
+- **Resource Limits**: Enforce time and memory limits for fair evaluation.
+- **Webview Integration**: Rich UI for problem descriptions and settings.
+- **Container Pool Optimization**: Reuse Docker containers to improve performance and reduce execution delays.
 
-- 系统上必须安装并运行 Docker。
-- Visual Studio Code 1.60.0 或更高版本。
+## System Requirements
 
-## 安装
+- Docker must be installed and running on the system.
+- Visual Studio Code 1.60.0 or higher.
 
-1. 在您的系统上安装 Docker。
-2. 从 VS Code 市场安装此扩展。
-3. 扩展将在首次使用时自动初始化 Docker 环境。
+## Installation
 
-## 使用方法
+1. Install Docker on your system.
+2. Install this extension from the VS Code Marketplace.
+3. The extension will automatically initialize the Docker environment on first use.
 
-### 运行代码
+## Usage
 
-1. 在 VS Code 中打开一个 C、C++ 或 Python 文件。
-2. 使用命令面板（`Ctrl+Shift+P`）运行 `OI-Code: Run Code`。
-3. 在提示时输入程序的输入。
-4. 在新面板中查看输出。
+### Running Code
 
-### 对拍功能
+1. Open a C, C++, or Python file in VS Code.
+2. Use the command palette (`Ctrl+Shift+P`) and run `OI-Code: Run Code`.
+3. Enter input for the program when prompted.
+4. View the output in the new panel.
 
-1. 在 VS Code 中打开同一问题的两个实现。
-2. 使用命令面板（`Ctrl+Shift+P`）运行 `OI-Code: Run Pair Check`。
-3. 在提示时输入测试输入。
-4. 并排比较输出，差异部分会被高亮显示。
+### Pair Check Feature
 
-### 题目管理
+1. Open two implementations of the same problem in VS Code.
+2. Use the command palette (`Ctrl+Shift+P`) and run `OI-Code: Run Pair Check`.
+3. Enter test input when prompted.
+4. Compare outputs side by side with highlighted differences.
 
-1. 使用 `OI-Code: Create Problem` 创建新的题目结构。
-2. 在侧边栏视图中填写题目详细信息。
-3. 直接从题目视图保存并运行您的解决方案。
+### Problem Management
 
-## 扩展设置
+1. Use `OI-Code: Create Problem` to create a new problem structure.
+2. Fill in problem details in the sidebar view.
+3. Save and run your solution directly from the problem view.
 
-此扩展提供了以下设置：
+## Extension Settings
 
-- `oicode.docker.compilers`：为不同语言自定义 Docker 镜像。
-- `oicode.compile.opt`：C/C++ 编译的默认优化级别。
-- `oicode.compile.std`：C++ 编译的默认标准。
+This extension provides the following settings:
 
-## 性能优化
+- `oicode.docker.compilers`: Customize Docker images for different languages (e.g., `{"cpp": "my-custom-gcc:latest"}`).
+- `oicode.compile.opt`: Default optimization level for C/C++ compilation.
+- `oicode.compile.std`: Default C++ standard for compilation.
 
-### 容器池
-最新版本引入了容器池优化，通过复用 Docker 容器来显著提高代码执行性能：
-- 预启动容器以减少执行延迟
-- 智能容器管理，包括健康检查和超时清理
-- 自动回退机制，确保在容器池出现问题时仍能正常工作
+## Performance Optimizations
 
-### 安全改进
-- 防止 shell 注入攻击的安全输入处理
-- 严格的资源限制以防止系统资源耗尽
-- 改进的错误处理和日志记录
+### Container Pool
+The latest version introduces container pool optimization to significantly improve code execution performance:
+- Pre-start containers to reduce startup delays
+- Intelligent container management with health checks and timeout cleanup
+- Automatic fallback mechanism ensures continued functionality when container pool issues occur
 
-### 代码质量改进 (v0.0.2)
-- **国际化代码注释**：所有中文注释已翻译为英文，提升代码可读性
-- **代码结构优化**：清理冗余代码，整合重复逻辑，改善错误处理
-- **项目结构规范**：修复构建产物位置，确保正确的目录结构
-- **文档完善**：更新项目文档以反映最新改进
-- **构建系统改进**：清理编译产物并优化.gitignore配置
+### Security Improvements
+- Secure input handling to prevent shell injection attacks
+- Strict resource limits to prevent system resource exhaustion
+- Improved error handling and logging
 
-## 已知问题
+### Code Quality Improvements (v0.0.2)
+- **Internationalized Code Comments**: All Chinese comments have been translated to English for better code readability
+- **Code Structure Optimization**: Clean up redundant code, consolidate duplicate logic, improve error handling
+- **Project Structure Standardization**: Fix build artifact locations to ensure correct directory structure
+- **Documentation Enhancement**: Update project documentation to reflect recent improvements
+- **Build System Improvements**: Clean build artifacts and optimize .gitignore configuration
 
-- 首次运行时 Docker 初始化可能需要一些时间。
-- 大量输出可能导致输出面板中的性能问题。
+## Known Issues
 
-## 版本说明
+- Docker initialization may take some time on first run.
+- Large outputs may cause performance issues in the output panel.
+
+## Version Notes
 
 ### 0.0.1
 
-OI-Code 的初始版本，具有基本功能。
+Initial version of OI-Code with essential features.
 
-## 贡献
+## Contributing
 
-有关如何为此项目做出贡献的详细信息，请参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+For detailed information on how to contribute to this project, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 许可证
+## License
 
-本项目根据 MIT 许可证授权 - 有关详细信息，请参见 [LICENSE](LICENSE) 文件。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
