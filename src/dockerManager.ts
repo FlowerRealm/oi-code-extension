@@ -80,8 +80,8 @@ const CONTAINER_POOL_CONFIG = {
 };
 
 /**
- * Manages the Docker environment, including building the image, running containers,
- * and monitoring submissions for the OI extension.
+ * Docker Manager - handles Docker environment setup, container execution,
+ * and resource management for the OI extension.
  */
 export class DockerManager {
     // 容器池实例

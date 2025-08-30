@@ -27,12 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 在所有 Linux 系统上安装 xvfb，如果安装失败则忽略
-      - name: Install xvfb on Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-        continue-on-error: true
-
       - name: Run tests
         run: |
           if command -v xvfb-run &> /dev/null; then

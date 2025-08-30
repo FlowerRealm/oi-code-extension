@@ -44,7 +44,7 @@ function getPairCheckWebviewContent(webview: vscode.Webview): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>对拍</title>
+    <title>Pair Check</title>
     <style>
         body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); }
         .container { display: flex; flex-direction: column; height: 100%; }
@@ -63,13 +63,13 @@ function getPairCheckWebviewContent(webview: vscode.Webview): string {
 <body>
     <div class="container">
         <div class="input-section">
-            <label for="input-data">输入数据:</label>
+            <label for="input-data">Input data:</label>
             <textarea id="input-data" rows="5"></textarea>
-            <button id="run-button">运行对拍</button>
+            <button id="run-button">Run Pair Check</button>
         </div>
         <div class="output-section">
-            <div id="output1-container" class="output-box"><h4>左侧代码输出</h4><div id="output1-content"></div></div>
-            <div id="output2-container" class="output-box"><h4>右侧代码输出</h4><div id="output2-content"></div></div>
+            <div id="output1-container" class="output-box"><h4>Left Code Output</h4><div id="output1-content"></div></div>
+            <div id="output2-container" class="output-box"><h4>Right Code Output</h4><div id="output2-content"></div></div>
         </div>
     </div>
     <script>
@@ -100,32 +100,32 @@ async function runSingleInDocker(
     input: string,
     options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
 ): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
-    // 生成唯一的可执行文件名，避免冲突
+    // Generate unique executable filename to avoid conflicts
     const baseName = path.parse(sourceFileName).name;
     const uniqueId = Math.random().toString(36).slice(2, 7);
     const executableName = `/tmp/${baseName}_${uniqueId}.out`;
 
-    // 构建完整的源文件路径
+    // Build complete source file path
     const sourceFilePath = `/tmp/source/${sourceFileName}`;
 
-    // 构建编译命令 - 使用安全的参数传递方式避免shell注入
+    // Build compile command - use safe parameter passing to prevent shell injection
     let compileCommand: string;
     if (languageId === 'python') {
-        // Python不需要编译，直接运行
+        // Python doesn't need compilation, run directly
         compileCommand = '';
     } else {
-        // 获取编译器选项
+        // Get compiler options
         const config = vscode.workspace.getConfiguration();
         const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
         const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
 
         const effOpt = (options?.opt || defaultOpt).replace(/^O/, '');
-        // 确保优化级别是有效的
+        // Ensure optimization level is valid
         const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
         const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
         const effStd = options?.std || defaultStd;
 
-        // 验证路径安全性 - 防止路径遍历攻击
+        // Validate path security - prevent path traversal attacks
         if (sourceFilePath.includes('..') || executableName.includes('..')) {
             throw new Error('Invalid file path: path traversal detected');
         }
@@ -137,7 +137,7 @@ async function runSingleInDocker(
         }
     }
 
-    // 构建运行命令 - 使用安全的参数传递方式
+    // Build run command - use safe parameter passing
     let runCommand: string;
     if (languageId === 'python') {
         runCommand = `python3 "${sourceFilePath}"`;
@@ -145,17 +145,18 @@ async function runSingleInDocker(
         runCommand = `"${executableName}"`;
     }
 
-    // 组合完整的命令：编译 + 运行
+    // Combine complete command: compile + run
     let fullCommand: string;
     if (languageId === 'python') {
         fullCommand = runCommand;
     } else {
-        // 使用 trap 命令确保临时编译产物能被可靠清理，即使在进程被意外终止时也能执行
-        // 使用双引号包围路径以防止shell注入
+        // Use trap command to ensure temporary compilation products are reliably cleaned up
+        // even when the process is unexpectedly terminated
+        // Use double quotes around paths to prevent shell injection
         fullCommand = `trap "rm -f \\"${executableName}\\"" EXIT; ${compileCommand} && ${runCommand}`;
     }
 
-    // 添加调试信息
+    // Add debug information
     console.log(`[RunSingleInDocker] Language: ${languageId}, Source file: ${sourceFileName}`);
     console.log(`[RunSingleInDocker] Executable name: ${executableName}`);
     console.log(`[RunSingleInDocker] Source file path: ${sourceFilePath}`);
@@ -181,7 +182,7 @@ async function runSingleInDocker(
 }
 
 /**
- * 在两个独立的容器中分别运行两个代码文件，避免复杂的输出解析
+ * Run two code files in separate containers to avoid complex output parsing
  */
 async function runPairInSeparateContainers(
     projectRootPath: string,
@@ -195,7 +196,7 @@ async function runPairInSeparateContainers(
     result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
     result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
 }> {
-    // 并行运行两个程序，每个程序使用独立的容器
+    // Run two programs in parallel, each using a separate container
     const [result1, result2] = await Promise.all([
         runSingleInDocker(
             projectRootPath,
@@ -331,48 +332,40 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 }
 
 /**
- * 设置编辑器事件监听器，实现按需容器管理
+ * Set up editor event listeners for container management
  */
 function setupEditorEventListeners(context: vscode.ExtensionContext): void {
-    console.log('[EditorEventListeners] Setting up editor event listeners for on-demand container management');
+    console.log('[EditorEventListeners] Setting up editor event listeners for container management');
 
-    // 监听编辑器打开事件
+    // Supported languages for container management
+    const supportedLanguages = ['c', 'cpp', 'python'];
+
+    // Helper function to check if document language is supported
+    const isSupportedLanguage = (languageId: string) => supportedLanguages.includes(languageId);
+
+    // Listen for document open events
     const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument((document) => {
-        if (!document.isUntitled) {
-            const languageId = document.languageId;
-            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
-                console.log(`[EditorEventListeners] Document opened with language: ${languageId}`);
-                // 容器池管理由 DockerManager.initializeContainerPool() 处理，无需额外操作
-            }
+        if (!document.isUntitled && isSupportedLanguage(document.languageId)) {
+            console.log(`[EditorEventListeners] Document opened with language: ${document.languageId}`);
         }
     });
 
-    // 监听编辑器关闭事件
+    // Listen for document close events
     const onDidCloseTextDocument = vscode.workspace.onDidCloseTextDocument((document) => {
-        if (!document.isUntitled) {
-            const languageId = document.languageId;
-            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
-                console.log(`[EditorEventListeners] Document closed with language: ${languageId}`);
-                // 容器池管理由 DockerManager 的健康检查机制处理，无需额外操作
-            }
+        if (!document.isUntitled && isSupportedLanguage(document.languageId)) {
+            console.log(`[EditorEventListeners] Document closed with language: ${document.languageId}`);
         }
     });
 
-    // 监听活动编辑器变化
+    // Listen for active editor changes
     const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor && !editor.document.isUntitled) {
-            const languageId = editor.document.languageId;
-            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
-                console.log(`[EditorEventListeners] Active editor changed to language: ${languageId}`);
-                // 容器池管理由 DockerManager 的健康检查机制处理，无需额外操作
-            }
+        if (editor && !editor.document.isUntitled && isSupportedLanguage(editor.document.languageId)) {
+            console.log(`[EditorEventListeners] Active editor changed to language: ${editor.document.languageId}`);
         }
     });
 
-    // 将所有监听器添加到上下文订阅中，确保在扩展停用时正确清理
-    context.subscriptions.push(onDidOpenTextDocument);
-    context.subscriptions.push(onDidCloseTextDocument);
-    context.subscriptions.push(onDidChangeActiveTextEditor);
+    // Add all listeners to context subscriptions for proper cleanup
+    context.subscriptions.push(onDidOpenTextDocument, onDidCloseTextDocument, onDidChangeActiveTextEditor);
 
     console.log('[EditorEventListeners] Editor event listeners setup completed');
 }
