@@ -304,10 +304,6 @@ export HTTP_PROXY=http://proxy.company.com:8080
   - lld linker
   - Development tools (valgrind)
 
-#### Windows Image (`oi-code-clang-windows:latest`)
-- **Base**: Windows Nano Server LTSC 2022
-- **Notes**: Requires manual Clang binary installation (see Dockerfile.windows comments)
-
 ### Troubleshooting
 
 #### Image Build Fails
@@ -341,9 +337,6 @@ For Windows containers with Clang:
 ```bash
 # Build Linux image manually
 docker build -t oi-code-clang:latest -f Dockerfile .
-
-# Build Windows image manually (after setting up Clang binaries)
-docker build -t oi-code-clang-windows:latest -f Dockerfile.windows .
 ```
 
 #### Custom Compiler Configuration

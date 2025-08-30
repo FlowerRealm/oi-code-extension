@@ -5,11 +5,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Setup LLVM/Clang toolchain, system configuration and user environment
-RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
-    echo "deb http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse" > /etc/apt/sources.list && \
-    echo "deb http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
-    apt-get update --quiet && \
+RUN apt-get update --quiet && \
     apt-get install -y \
     clang-18 \
     clang++-18 \
@@ -23,9 +19,9 @@ RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
     libclang-cpp18-dev \
     libc++-18-dev \
     libc++abi-18-dev \
-        valgrind \
-        cppcheck \
-        && \
+    valgrind \
+    cppcheck \
+    && \
     # Create symlinks for convenience
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
