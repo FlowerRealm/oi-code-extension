@@ -166,10 +166,9 @@ export class DockerManager {
         // 确保 Docker 可用
         await this.ensureDockerIsReady(options.projectRootPath);
 
-        // 如果容器池已激活，并且内存限制与容器池匹配，则使用容器池
-        // 容器池中的容器默认配置为512MB内存
-        const isPoolCompatibleMemory = options.memoryLimit === '512';
-        if (this.containerPool.isActive && isPoolCompatibleMemory) {
+        // 如果容器池已激活，则优先使用容器池
+        // 容器池中的容器可以动态调整内存限制
+        if (this.containerPool.isActive) {
             try {
                 return await this.runWithContainerPool(options);
             } catch (err) {
@@ -202,9 +201,16 @@ export class DockerManager {
     }> {
         const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 
-        // 注意：在容器池模式下，内存限制在容器创建时已预设为512MB
-        // 这里解构出的memoryLimit仅用于保持接口一致性，实际不使用
-        console.log(`[DockerManager] Using container pool with pre-configured 512MB memory limit (requested: ${memoryLimit}MB)`);
+        // 容器池中的容器预设为512MB内存
+        // 如果请求的内存超过512MB，使用临时容器
+        if (parseInt(memoryLimit) > 512) {
+            console.log(`[DockerManager] Requested memory ${memoryLimit}MB exceeds pool limit (512MB), using temporary container`);
+            return this.runWithoutContainerPool(options);
+        }
+
+        // 对于512MB及以下的请求，使用容器池
+        // 容器内部会通过cgroup等方式限制实际程序的内存使用
+        console.log(`[DockerManager] Using container pool with 512MB container limit (program limit: ${memoryLimit}MB)`);
 
         // 获取容器
         const container = await this.getContainerForLanguage(languageId);
@@ -509,9 +515,6 @@ export class DockerManager {
             return compilers[languageId];
         }
 
-        // 检测操作系统以选择合适的镜像
-        const isWindows = os.platform() === 'win32';
-
         // 对于Windows环境，我们使用Linux镜像（假设Docker Desktop支持Linux容器）
         // 如果用户的Docker不支持Linux容器，他们需要手动配置自定义镜像
         switch (languageId.toLowerCase()) {
@@ -780,29 +783,16 @@ export class DockerManager {
         console.log('[DockerManager] Starting comprehensive Docker cleanup...');
 
         try {
-            // 1. 并行停止和删除容器池中的容器
-            console.log('[DockerManager] Stopping and removing container pool containers...');
-            const containerIds: string[] = [];
-            for (const container of this.containerPool.containers.values()) {
-                if (container.isReady) {
-                    containerIds.push(container.containerId);
-                }
-            }
-
-            if (containerIds.length > 0) {
-                // 直接删除容器，docker rm -f 会自动停止容器
-                await this._removeContainers(containerIds);
-            }
-
-            // 2. 强制删除所有oi-container容器（直接扫描并强杀）
+            // 强制删除所有oi-container容器（直接扫描并强杀）
+            // 这个操作已经包含了对容器池中容器的清理
             console.log('[DockerManager] Force removing all oi-container containers...');
             await this.forceRemoveOiContainers();
 
-            // 3. 只删除oi-code创建的镜像，保留基础镜像
+            // 只删除oi-code创建的镜像，保留基础镜像
             // 注意：这里不再删除gcc:13和python:3.11等基础镜像
             console.log('[DockerManager] Skipping base image removal to preserve Docker Hub images...');
 
-            // 4. 跳过Docker系统清理，避免删除用户数据
+            // 跳过Docker系统清理，避免删除用户数据
             console.log('[DockerManager] Skipping system prune to avoid user data loss...');
 
             console.log('[DockerManager] Docker cleanup completed successfully');
@@ -1003,23 +993,6 @@ export class DockerManager {
                 // 即使出错也继续清理
                 console.warn(`[DockerManager] Error stopping container ${container.containerId}, continuing cleanup`);
                 resolve();
-            });
-        });
-    }
-
-    /**
-     * 批量停止容器的辅助函数
-     */
-    private static async _stopContainers(containerIds: string[]): Promise<void> {
-        if (containerIds.length === 0) {
-            return;
-        }
-        await new Promise<void>((resolve) => {
-            const stopProcess = spawn('docker', ['stop', ...containerIds]);
-            stopProcess.on('close', () => resolve());
-            stopProcess.on('error', (err) => {
-                console.warn(`[DockerManager] Error stopping containers: ${err.message}`);
-                resolve(); // 出错也继续，保证后续清理流程
             });
         });
     }
@@ -1229,21 +1202,22 @@ export class DockerManager {
 
     /**
      * 获取平台特定的容器创建参数
+     * @param memoryLimit 内存限制（MB），默认为512MB以兼容容器池
      * @returns Docker参数数组
      */
-    private static _getPlatformSpecificCreateArgs(): string[] {
+    private static _getPlatformSpecificCreateArgs(memoryLimit: string = '512'): string[] {
         const isWindows = os.platform() === 'win32';
         const args: string[] = [];
 
         if (!isWindows) {
             // Linux/macOS支持的选项
-            args.push('--memory=512m');
-            args.push('--memory-swap=512m');
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--memory-swap=' + memoryLimit + 'm');
             args.push('--cpus=1.0');
             args.push('--pids-limit=64');
         } else {
             // Windows Docker的简化配置
-            args.push('--memory=512m');
+            args.push('--memory=' + memoryLimit + 'm');
         }
 
         return args;

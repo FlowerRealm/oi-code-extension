@@ -5,7 +5,7 @@
 
 
 import * as assert from 'assert';
-import { describe, it, before, after } from 'mocha';
+import { describe, before } from 'mocha';
 require('mocha');
 
 import * as vscode from 'vscode';
@@ -36,8 +36,7 @@ async function cleanupDir(dir: string, maxRetries = 3) {
             return;
         } catch (error: any) {
             if (attempt === maxRetries - 1) {
-                console.warn(`Failed to cleanup directory ${dir} after ${maxRetries} attempts:`, error.message);
-                // Don't throw - just continue with test
+                throw new Error(`Failed to cleanup directory ${dir} after ${maxRetries} attempts: ${error.message}`);
             } else {
                 await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
             }
@@ -45,45 +44,66 @@ async function cleanupDir(dir: string, maxRetries = 3) {
     }
 }
 
-// Helper to clean up all Docker resources
-async function cleanupAllDockerResources() {
-    try {
-        console.log('[Test Cleanup] Starting Docker resource cleanup...');
+// Helper to check if Docker is available and working
+async function isDockerAvailable(): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        const { exec } = require('child_process');
+        // First check if docker command exists
+        exec('docker --version', (error: any, stdout: any, stderr: any) => {
+            if (error) {
+                resolve(false);
+                return;
+            }
+            // Then check if docker daemon is running
+            exec('docker info', (error: any, stdout: any, stderr: any) => {
+                resolve(!error);
+            });
+        });
+    });
+}
 
-        // Import DockerManager dynamically to avoid circular dependencies
-        const { DockerManager } = await import('../../dockerManager');
+// Helper to get oi-container IDs with timeout and error handling
+async function getOiContainerIds(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+        const { exec } = require('child_process');
+        const timer = setTimeout(() => {
+            reject(new Error('[Test Helper] Docker ps command timeout'));
+        }, 10000);
 
-        // Get stats before cleanup
-        const beforeStats = await DockerManager.getDockerStats();
-        console.log(`[Test Cleanup] Before cleanup - Containers: ${beforeStats.containers}, Images: ${beforeStats.images}`);
+        exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
+            clearTimeout(timer);
+            if (error) {
+                reject(new Error(`[Test Helper] Failed to list docker containers: ${error.message}`));
+                return;
+            }
+            const ids = stdout.trim();
+            resolve(ids ? ids.split('\n').filter((id: string) => id) : []);
+        });
+    });
+}
 
-        // Perform comprehensive cleanup
-        await DockerManager.cleanupAllDockerResources();
+// Helper to get Docker images with timeout and error handling
+async function getDockerImages(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+        const { exec } = require('child_process');
+        const timer = setTimeout(() => {
+            reject(new Error('[Test Helper] Docker images command timeout'));
+        }, 10000);
 
-        // Get stats after cleanup
-        const afterStats = await DockerManager.getDockerStats();
-        console.log(`[Test Cleanup] After cleanup - Containers: ${afterStats.containers}, Images: ${afterStats.images}`);
-
-        if (afterStats.containers === 0) {
-            console.log('[Test Cleanup] ✓ All Docker containers cleaned up successfully');
-        } else {
-            console.warn(`[Test Cleanup] ⚠ ${afterStats.containers} containers still exist after cleanup`);
-        }
-
-        if (afterStats.images <= 2) { // Allow base images (gcc:13, python:3.11)
-            console.log('[Test Cleanup] ✓ Docker images cleaned up successfully');
-        } else {
-            console.warn(`[Test Cleanup] ⚠ ${afterStats.images} images still exist after cleanup`);
-        }
-
-    } catch (error) {
-        console.warn('[Test Cleanup] Error during Docker cleanup:', error);
-        // Don't fail the test if cleanup fails
-    }
+        exec('docker images --format "{{.Repository}}:{{.Tag}}"', (error: any, stdout: any) => {
+            clearTimeout(timer);
+            if (error) {
+                reject(new Error(`[Test Helper] Failed to list docker images: ${error.message}`));
+                return;
+            }
+            const images = stdout.trim();
+            resolve(images ? images.split('\n').filter((img: string) => img) : []);
+        });
+    });
 }
 
 suite('Extension Test Suite', () => {
-    // 等待扩展激活
+    // Wait for extension activation
     before(async function () {
         this.timeout(35000);
         const extId = 'FlowerRealm.oi-code';
@@ -136,20 +156,9 @@ suite('Extension Test Suite', () => {
         this.timeout(90000);
 
         // Check if Docker is available before running the test
-        const isDockerAvailable = await new Promise<boolean>(resolve => {
-            const { exec } = require('child_process');
-            exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                if (error) {
-                    resolve(false);
-                    return;
-                }
-                exec('docker info', (error: any, stdout: any, stderr: any) => {
-                    resolve(!error);
-                });
-            });
-        });
+        const dockerAvailable = await isDockerAvailable();
 
-        if (!isDockerAvailable) {
+        if (!dockerAvailable) {
             console.log('[Docker Init Test] Docker not available, testing Docker installation instead');
             // Test Docker installation when Docker is not available
             try {
@@ -203,14 +212,9 @@ suite('OI-Code Commands Test Suite', () => {
     test('should execute oi-code.installDocker command', async function () {
         this.timeout(120000); // Increase timeout for Docker installation
         // Check if Docker is already available
-        const isDockerAvailable = await new Promise<boolean>(resolve => {
-            const { exec } = require('child_process');
-            exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                resolve(!error);
-            });
-        });
+        const dockerAvailable = await isDockerAvailable();
 
-        if (isDockerAvailable) {
+        if (dockerAvailable) {
             vscode.window.showInformationMessage('Docker is already installed. Skipping installation test.');
             assert.ok(true, 'Docker already available, test passed.');
         } else {
@@ -220,8 +224,8 @@ suite('OI-Code Commands Test Suite', () => {
                 await vscode.commands.executeCommand('oicode.downloadDocker');
                 assert.ok(true, 'oi-code.downloadDocker command executed without crashing');
             } catch (error: any) {
-                // 在没有Docker的CI环境中，此命令预计会失败。
-                // 记录错误以供调试，但测试应继续。
+                // Expected to fail in CI environments without Docker
+                // Log error for debugging but continue with test
                 console.warn(`[Test] 'oicode.downloadDocker' command failed as expected: ${error.message}`);
                 assert.ok(true, `oi-code.downloadDocker command failed as expected: ${error.message}`);
             }
@@ -235,22 +239,9 @@ suite('OI-Code Commands Test Suite', () => {
             this.timeout(120000); // Increase timeout for Docker initialization
 
             // Check if Docker is available and working before running tests
-            const isDockerAvailable = await new Promise<boolean>(resolve => {
-                const { exec } = require('child_process');
-                // First check if docker command exists
-                exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                    if (error) {
-                        resolve(false);
-                        return;
-                    }
-                    // Then check if docker daemon is running
-                    exec('docker info', (error: any, stdout: any, stderr: any) => {
-                        resolve(!error);
-                    });
-                });
-            });
+            const dockerAvailable = await isDockerAvailable();
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Test Setup] Docker not available, skipping Docker-dependent tests');
                 vscode.window.showInformationMessage('Docker not available, skipping Docker-dependent tests.');
                 this.skip(); // Skip all tests in this describe block
@@ -326,14 +317,9 @@ suite('OI-Code Commands Test Suite', () => {
         this.timeout(120000);
 
         // Check if Docker is available
-        const isDockerAvailable = await new Promise<boolean>(resolve => {
-            const { exec } = require('child_process');
-            exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                resolve(!error);
-            });
-        });
+        const dockerAvailable = await isDockerAvailable();
 
-        if (isDockerAvailable) {
+        if (dockerAvailable) {
             console.log('[Docker Installation Test] Docker is already available, skipping installation test');
             assert.ok(true, 'Docker already available, test passed.');
             return;
@@ -352,7 +338,7 @@ suite('OI-Code Commands Test Suite', () => {
     });
 
     describe('Pair Check Tests (Catalan numbers)', () => {
-        const inputs = ['2\n', '3\n', '4\n', '5\n'];
+        const inputs = ['1', '2', '3', '4', '5'];
 
         async function openBesideDocs(codeLeft: string, codeRight: string, ext: string) {
             // Close all editors to avoid picking unrelated editors in runPairCheck
@@ -412,7 +398,6 @@ int main() {
 }`;
 
         const pyRec = `import sys
-sys.setrecursionlimit(10000)
 from functools import lru_cache
 @lru_cache(None)
 def C(n):
@@ -438,25 +423,15 @@ def main():
         print(C[n])
 main()`;
 
+
         for (const lang of ['c', 'cpp', 'python'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
                 this.timeout(60000);
 
                 // Check if Docker is available for this test
-                const isDockerAvailableForTest = await new Promise<boolean>(resolve => {
-                    const { exec } = require('child_process');
-                    exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                        if (error) {
-                            resolve(false);
-                            return;
-                        }
-                        exec('docker info', (error: any, stdout: any, stderr: any) => {
-                            resolve(!error);
-                        });
-                    });
-                });
+                const dockerAvailableForTest = await isDockerAvailable();
 
-                if (!isDockerAvailableForTest) {
+                if (!dockerAvailableForTest) {
                     console.log(`[PairCheck Test] Docker not available for ${lang}, testing Docker installation instead`);
                     // Test Docker installation when Docker is not available
                     try {
@@ -511,27 +486,14 @@ main()`;
     });
 
     describe('Container Pool Tests', () => {
-        let isDockerAvailable = false;
+        let dockerAvailable = false;
 
         before(async function () {
             this.timeout(120000); // Increase timeout for Docker initialization
             // Check if Docker is available and working before running tests
-            isDockerAvailable = await new Promise<boolean>(resolve => {
-                const { exec } = require('child_process');
-                // First check if docker command exists
-                exec('docker --version', (error: any, stdout: any, stderr: any) => {
-                    if (error) {
-                        resolve(false);
-                        return;
-                    }
-                    // Then check if docker daemon is running
-                    exec('docker info', (error: any, stdout: any, stderr: any) => {
-                        resolve(!error);
-                    });
-                });
-            });
+            dockerAvailable = await isDockerAvailable();
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Test Setup] Docker not available or not working, will test Docker installation instead');
                 vscode.window.showInformationMessage('Docker not available, will test Docker installation functionality.');
                 return;
@@ -545,7 +507,7 @@ main()`;
         test('should initialize container pool', async function () {
             this.timeout(60000);
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Container Pool Init Test] Docker not available, testing Docker installation instead');
                 // Test Docker installation when Docker is not available
                 try {
@@ -559,16 +521,16 @@ main()`;
                 return;
             }
 
-            // 确保容器池已初始化
-            // 注意：由于模块加载限制，我们通过检查扩展日志来验证容器池初始化
-            // 实际的容器池状态检查在扩展激活时已经完成
+            // Ensure container pool is initialized
+            // Note: Due to module loading limitations, we verify container pool initialization through extension logs
+            // Actual container pool state check is completed during extension activation
             assert.ok(true, 'Container pool should be initialized during extension activation');
         });
 
         test('should reuse containers for code execution', async function () {
-            this.timeout(120000); // 增加超时时间到2分钟
+            this.timeout(120000); // Increase timeout to 2 minutes
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Container Reuse Test] Docker not available, testing Docker installation instead');
                 // Test Docker installation when Docker is not available
                 try {
@@ -582,36 +544,21 @@ main()`;
                 return;
             }
 
-            // 等待容器池完全初始化
+            // Wait for container pool to fully initialize
             console.log('[Container Reuse Test] Waiting for container pool initialization...');
-            await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒确保容器池初始化完成
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds to ensure container pool initialization is complete
 
-            // 获取执行前的容器数量
-            const { exec } = require('child_process');
-            const beforeContainers = await new Promise<string>((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    console.warn('[Container Reuse Test] Docker command timeout');
-                    resolve('');
-                }, 10000); // 10秒超时
-
-                exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                    clearTimeout(timer);
-                    if (error) {
-                        console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
-                        return resolve('');
-                    }
-                    resolve(stdout.trim());
-                });
-            });
-            const beforeCount = beforeContainers ? beforeContainers.split('\n').filter(id => id).length : 0;
+            // Get container count before execution
+            const beforeIds = await getOiContainerIds();
+            const beforeCount = beforeIds.length;
             console.log(`[Container Pool Test] Before execution - oi-containers: ${beforeCount}`);
 
-            // 创建一个简单的 C 程序
+            // Create a simple C program
             const cCode = `#include <stdio.h>\nint main() { printf("Container reuse test\\n"); return 0; }`;
             const created = await createProblemAndOpen('UT-Container-Reuse', 'c', cCode);
 
             try {
-                // 第一次执行代码 - 增加超时和重试机制
+                // First execution - with timeout and retry mechanism
                 console.log('[Container Pool Test] Starting first execution...');
                 let res1: any = null;
                 let retryCount = 0;
@@ -638,37 +585,23 @@ main()`;
                 console.log('[Container Pool Test] First execution result:', res1);
                 assert.ok(res1, 'Should return execution result for first run');
 
-                // 验证第一次执行成功
+                // Verify first execution success
                 if (res1.error) {
                     assert.fail(`First run should not have stderr, but got: ${res1.error}`);
                 }
                 assert.ok(res1.output, 'Should have output from first run');
                 assert.ok(res1.output.includes('Container reuse test'), 'First run should execute successfully');
 
-                // 获取第一次执行后的容器数量
-                const afterFirstContainers = await new Promise<string>((resolve, reject) => {
-                    const timer = setTimeout(() => {
-                        console.warn('[Container Reuse Test] Docker command timeout after first execution');
-                        resolve('');
-                    }, 10000);
-
-                    exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                        clearTimeout(timer);
-                        if (error) {
-                            console.warn(`[Test Helper] Failed to list docker containers after first execution: ${error.message}`);
-                            return resolve('');
-                        }
-                        resolve(stdout.trim());
-                    });
-                });
-                const afterFirstCount = afterFirstContainers ? afterFirstContainers.split('\n').filter(id => id).length : 0;
+                // Get container count after first execution
+                const afterFirstIds = await getOiContainerIds();
+                const afterFirstCount = afterFirstIds.length;
                 console.log(`[Container Pool Test] After first execution - oi-containers: ${afterFirstCount}`);
 
-                // 等待一段时间确保容器池稳定
+                // Wait for container pool to stabilize
                 console.log('[Container Pool Test] Waiting for container pool to stabilize...');
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
-                // 第二次执行代码 - 增加超时和重试机制
+                // Second execution - with timeout and retry mechanism
                 console.log('[Container Pool Test] Starting second execution...');
                 let res2: any = null;
                 retryCount = 0;
@@ -694,33 +627,19 @@ main()`;
                 console.log('[Container Pool Test] Second execution result:', res2);
                 assert.ok(res2, 'Should return execution result for second run');
 
-                // 验证第二次执行成功
+                // Verify second execution success
                 if (res2.error) {
                     assert.fail(`Second run should not have stderr, but got: ${res2.error}`);
                 }
                 assert.ok(res2.output, 'Should have output from second run');
                 assert.ok(res2.output.includes('Container reuse test'), 'Second run should execute successfully');
 
-                // 获取第二次执行后的容器数量
-                const afterSecondContainers = await new Promise<string>((resolve, reject) => {
-                    const timer = setTimeout(() => {
-                        console.warn('[Container Reuse Test] Docker command timeout after second execution');
-                        resolve('');
-                    }, 10000);
-
-                    exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                        clearTimeout(timer);
-                        if (error) {
-                            console.warn(`[Test Helper] Failed to list docker containers after second execution: ${error.message}`);
-                            return resolve('');
-                        }
-                        resolve(stdout.trim());
-                    });
-                });
-                const afterSecondCount = afterSecondContainers ? afterSecondContainers.split('\n').filter(id => id).length : 0;
+                // Get container count after second execution
+                const afterSecondIds = await getOiContainerIds();
+                const afterSecondCount = afterSecondIds.length;
                 console.log(`[Container Pool Test] After second execution - oi-containers: ${afterSecondCount}`);
 
-                // 验证容器被复用（第二次执行后容器数量应该没有增加）
+                // Verify container reuse (container count should not increase after second execution)
                 console.log(`[Container Pool Test] Container count: before=${beforeCount}, after_first=${afterFirstCount}, after_second=${afterSecondCount}`);
                 assert.ok(afterSecondCount <= afterFirstCount, `Container count should not increase after second execution (before: ${beforeCount}, after_first: ${afterFirstCount}, after_second: ${afterSecondCount})`);
 
@@ -734,7 +653,7 @@ main()`;
         test('should cleanup container pool on deactivate', async function () {
             this.timeout(60000);
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Container Cleanup Test] Docker not available, testing Docker installation instead');
                 // Test Docker installation when Docker is not available
                 try {
@@ -748,68 +667,43 @@ main()`;
                 return;
             }
 
-            // 首先检查当前是否有oi-container容器
-            const { exec } = require('child_process');
-            const beforeContainers = await new Promise<string>((resolve) => {
-                exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                    resolve(stdout.trim());
-                });
-            });
+            // First check if there are any oi-container containers currently
+            const beforeIds = await getOiContainerIds();
+            console.log(`[Deactivate Test] Before deactivate - oi-containers: ${beforeIds.length}`);
 
-            console.log(`[Deactivate Test] Before deactivate - oi-containers: ${beforeContainers ? beforeContainers.split('\n').length : 0}`);
-
-            // 手动调用deactivate函数来测试清理功能
+            // Manually call deactivate function to test cleanup functionality
             try {
-                // 由于deactivate函数在扩展上下文中运行，我们需要模拟扩展上下文
-                // 这里我们直接调用DockerManager的清理方法
+                // Since deactivate function runs in extension context, we need to simulate extension context
+                // Here we directly call DockerManager's cleanup method
                 const { DockerManager } = await import('../../dockerManager');
 
-                // 获取清理前的状态
+                // Get stats before cleanup
                 const beforeStats = await DockerManager.getDockerStats();
                 console.log(`[Deactivate Test] Before cleanup - Containers: ${beforeStats.containers}, Images: ${beforeStats.images}`);
 
-                // 执行清理
+                // Execute cleanup
                 await DockerManager.cleanupAllDockerResources();
 
-                // 获取清理后的状态
+                // Get stats after cleanup
                 const afterStats = await DockerManager.getDockerStats();
                 console.log(`[Deactivate Test] After cleanup - Containers: ${afterStats.containers}, Images: ${afterStats.images}`);
 
-                // 验证容器被清理
-                const afterContainers = await new Promise<string>((resolve) => {
-                    exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                        if (error) {
-                            console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
-                            return resolve('');
-                        }
-                        resolve(stdout.trim());
-                    });
-                });
+                // Verify containers are cleaned up
+                const afterIds = await getOiContainerIds();
+                console.log(`[Deactivate Test] After deactivate - oi-containers: ${afterIds.length}`);
 
-                console.log(`[Deactivate Test] After deactivate - oi-containers: ${afterContainers ? afterContainers.split('\n').length : 0}`);
-
-                // 验证oi-container容器被清理
-                const beforeCount = beforeContainers ? beforeContainers.split('\n').filter(id => id).length : 0;
-                const afterCount = afterContainers ? afterContainers.split('\n').filter(id => id).length : 0;
+                // Verify oi-container containers are cleaned up
+                const beforeCount = beforeIds.length;
+                const afterCount = afterIds.length;
 
                 console.log(`[Deactivate Test] Container count before: ${beforeCount}, after: ${afterCount}`);
 
-                // 验证所有oi-container容器都已被清理
-                assert.strictEqual(afterCount, 0, `All oi-container containers should be removed after deactivate, but ${afterCount} remain. Remaining containers: ${afterContainers}`);
+                // Verify all oi-container containers are removed
+                assert.strictEqual(afterCount, 0, `All oi-container containers should be removed after deactivate, but ${afterCount} remain. Remaining containers: ${afterIds.join(', ')}`);
 
-                // 验证基础镜像仍然存在
-                const imagesOutput = await new Promise<string>((resolve) => {
-                    exec('docker images --format "{{.Repository}}:{{.Tag}}"', (error: any, stdout: any) => {
-                        if (error) {
-                            console.warn(`[Test Helper] Failed to list docker images: ${error.message}`);
-                            return resolve('');
-                        }
-                        resolve(stdout.trim());
-                    });
-                });
-
-                const allImages = imagesOutput ? imagesOutput.split('\n').filter(img => img) : [];
-                const baseImages = allImages.filter(img => img === 'gcc:13' || img === 'python:3.11');
+                // Verify base images are still present
+                const allImages = await getDockerImages();
+                const baseImages = allImages.filter((img: string) => img === 'gcc:13' || img === 'python:3.11');
                 console.log(`[Deactivate Test] Base images (gcc:13, python:3.11): ${baseImages.join(', ')}`);
                 assert.ok(baseImages.length >= 2, 'Base images (gcc:13, python:3.11) should be preserved');
 
@@ -817,13 +711,14 @@ main()`;
 
             } catch (error: any) {
                 console.error('[Deactivate Test] Error during deactivate test:', error);
+                throw error; // Re-throw the error to fail the test
             }
         });
 
         test('should handle deactivate errors gracefully', async function () {
             this.timeout(60000);
 
-            if (!isDockerAvailable) {
+            if (!dockerAvailable) {
                 console.log('[Deactivate Error Test] Docker not available, testing Docker installation instead');
                 // Test Docker installation when Docker is not available
                 try {
@@ -837,37 +732,26 @@ main()`;
                 return;
             }
 
-            // 导入扩展模块来测试deactivate函数
+            // Import extension module to test deactivate function
             const extensionModule = await import('../../extension');
-
-            // 创建一个模拟的扩展上下文
-            const mockContext = {
-                subscriptions: [],
-                extensionPath: '/mock/path',
-                globalState: {
-                    get: () => undefined,
-                    update: () => Promise.resolve(),
-                    setKeysForSync: () => {}
-                }
-            };
 
             console.log('[Deactivate Error Test] Testing deactivate error handling...');
 
-            // 模拟一个会失败的清理场景
+            // Simulate a cleanup scenario that might fail
             const { DockerManager } = await import('../../dockerManager');
 
-            // 首先确保容器池被初始化
+            // First ensure container pool is initialized
             await DockerManager.initializeContainerPool();
 
-            // 现在测试deactivate函数的错误处理
-            // 注意：deactivate函数会调用DockerManager.cleanupAllDockerResources().catch()
-            // 这意味着即使清理失败，deactivate也不会抛出错误
+            // Now test deactivate function error handling
+            // Note: deactivate function calls DockerManager.cleanupAllDockerResources().catch()
+            // This means deactivate won't throw errors even if cleanup fails
 
             let deactivateCompleted = false;
             let deactivateError: any = null;
 
             try {
-                // 调用deactivate函数
+                // Call deactivate function
                 await extensionModule.deactivate();
                 deactivateCompleted = true;
                 console.log('[Deactivate Error Test] Deactivate completed without throwing');
@@ -876,28 +760,19 @@ main()`;
                 console.log('[Deactivate Error Test] Deactivate threw error:', error.message);
             }
 
-            // 验证deactivate函数没有抛出错误（即使清理失败）
+            // Verify deactivate function doesn't throw errors (even if cleanup fails)
             assert.ok(deactivateCompleted, 'Deactivate function should complete without throwing errors');
             assert.ok(!deactivateError, `Deactivate should not throw errors, but got: ${deactivateError?.message || deactivateError}`);
 
-            // 验证即使deactivate没有抛出错误，清理也应该被尝试过
-            // 我们可以通过检查日志或者容器状态来验证
-            const { exec } = require('child_process');
-            const remainingContainers = await new Promise<string>((resolve) => {
-                exec('docker ps -a --filter "name=oi-container" -q', (error: any, stdout: any) => {
-                    if (error) {
-                        console.warn(`[Test Helper] Failed to list docker containers: ${error.message}`);
-                        return resolve('');
-                    }
-                    resolve(stdout.trim());
-                });
-            });
+            // Verify that cleanup was attempted even if deactivate didn't throw errors
+            // We can verify this by checking logs or container status
+            const remainingIds = await getOiContainerIds();
 
-            const remainingCount = remainingContainers ? remainingContainers.split('\n').filter(id => id).length : 0;
+            const remainingCount = remainingIds.length;
             console.log(`[Deactivate Error Test] Remaining containers after deactivate: ${remainingCount}`);
 
-            // 无论清理是否成功，deactivate都不应该抛出错误
-            // 这证明了错误处理逻辑是正确的
+            // Regardless of cleanup success, deactivate should not throw errors
+            // This proves the error handling logic is correct
             console.log('[Deactivate Error Test] ✓ Deactivate error handling test passed');
         });
     });

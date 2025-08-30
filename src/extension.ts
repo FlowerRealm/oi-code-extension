@@ -5,16 +5,11 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as cp from 'child_process';
-import * as util from 'util';
 import * as fs from 'fs';
-import * as os from 'os';
 import { DockerManager } from './dockerManager';
 import * as Diff from 'diff';
 import { Installer } from './docker/install';
 import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
-
-const exec = util.promisify(cp.exec);
 
 function htmlEscape(str: string): string {
     return str.replace(/[&<>"'\/]/g, (match) => {
@@ -37,18 +32,6 @@ function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: a
     } catch (e) {
         console.error(`Failed to post message '${command}' to webview:`, e);
     }
-}
-
-interface OiCodeSettings {
-    c?: { path: string };
-    cpp?: { path: string };
-    python?: { path: string };
-    workspace?: { path: string };
-}
-
-interface InitializationTask {
-    name: string;
-    execute: (panel: vscode.WebviewPanel, settings: OiCodeSettings) => Promise<boolean>;
 }
 
 function getTheme(kind: vscode.ColorThemeKind): string {
@@ -197,6 +180,44 @@ async function runSingleInDocker(
     };
 }
 
+/**
+ * 在两个独立的容器中分别运行两个代码文件，避免复杂的输出解析
+ */
+async function runPairInSeparateContainers(
+    projectRootPath: string,
+    sourceDir: string,
+    languageId: 'c' | 'cpp' | 'python',
+    sourceFileName1: string,
+    sourceFileName2: string,
+    input: string,
+    options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
+): Promise<{
+    result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
+    result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
+}> {
+    // 并行运行两个程序，每个程序使用独立的容器
+    const [result1, result2] = await Promise.all([
+        runSingleInDocker(
+            projectRootPath,
+            sourceDir,
+            languageId,
+            sourceFileName1,
+            input,
+            options
+        ),
+        runSingleInDocker(
+            projectRootPath,
+            sourceDir,
+            languageId,
+            sourceFileName2,
+            input,
+            options
+        )
+    ]);
+
+    return { result1, result2 };
+}
+
 function createDiffHtml(output1: string, output2: string): { html1: string; html2: string } {
     const diff = Diff.diffLines(output1, output2);
     let html1 = '';
@@ -266,10 +287,18 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
                     await fs.promises.writeFile(file2Path, editor2.document.getText());
 
-                    const [result1, result2] = await Promise.all([
-                        runSingleInDocker(this._context.extensionPath, tempDir, langId, `code1.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false })),
-                        runSingleInDocker(this._context.extensionPath, tempDir, langId, `code2.${ext}`, message.input, { timeLimit: 20 }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false }))
-                    ]);
+                    // 优化对拍：使用独立的容器运行，避免复杂的输出解析
+                    const pairResult = await runPairInSeparateContainers(
+                        this._context.extensionPath,
+                        tempDir,
+                        langId,
+                        `code1.${ext}`,
+                        `code2.${ext}`,
+                        message.input,
+                        { timeLimit: 20, memoryLimit: 512 }
+                    );
+                    const result1 = pairResult.result1;
+                    const result2 = pairResult.result2;
 
                     const output1 = result1.stderr ? `<b>错误:</b>\n${htmlEscape(result1.stderr)}` : result1.stdout;
                     const output2 = result2.stderr ? `<b>错误:</b>\n${htmlEscape(result2.stderr)}` : result2.stdout;
@@ -301,6 +330,53 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     }
 }
 
+/**
+ * 设置编辑器事件监听器，实现按需容器管理
+ */
+function setupEditorEventListeners(context: vscode.ExtensionContext): void {
+    console.log('[EditorEventListeners] Setting up editor event listeners for on-demand container management');
+
+    // 监听编辑器打开事件
+    const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument((document) => {
+        if (!document.isUntitled) {
+            const languageId = document.languageId;
+            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
+                console.log(`[EditorEventListeners] Document opened with language: ${languageId}`);
+                // 容器池管理由 DockerManager.initializeContainerPool() 处理，无需额外操作
+            }
+        }
+    });
+
+    // 监听编辑器关闭事件
+    const onDidCloseTextDocument = vscode.workspace.onDidCloseTextDocument((document) => {
+        if (!document.isUntitled) {
+            const languageId = document.languageId;
+            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
+                console.log(`[EditorEventListeners] Document closed with language: ${languageId}`);
+                // 容器池管理由 DockerManager 的健康检查机制处理，无需额外操作
+            }
+        }
+    });
+
+    // 监听活动编辑器变化
+    const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor && !editor.document.isUntitled) {
+            const languageId = editor.document.languageId;
+            if (languageId === 'c' || languageId === 'cpp' || languageId === 'python') {
+                console.log(`[EditorEventListeners] Active editor changed to language: ${languageId}`);
+                // 容器池管理由 DockerManager 的健康检查机制处理，无需额外操作
+            }
+        }
+    });
+
+    // 将所有监听器添加到上下文订阅中，确保在扩展停用时正确清理
+    context.subscriptions.push(onDidOpenTextDocument);
+    context.subscriptions.push(onDidCloseTextDocument);
+    context.subscriptions.push(onDidChangeActiveTextEditor);
+
+    console.log('[EditorEventListeners] Editor event listeners setup completed');
+}
+
 export function activate(context: vscode.ExtensionContext) {
     try {
         console.log('OI-Code extension is now active!');
@@ -310,6 +386,9 @@ export function activate(context: vscode.ExtensionContext) {
         DockerManager.initializeContainerPool().catch(error => {
             console.error('Failed to initialize container pool:', error);
         });
+
+        // 设置编辑器事件监听器，实现按需容器管理
+        setupEditorEventListeners(context);
 
         // Register WebviewView providers
         console.log('PairCheckViewProvider will be registered later');
@@ -589,11 +668,19 @@ export function activate(context: vscode.ExtensionContext) {
                 const input = testInput ?? '';
                 // Use provided options or fallback to defaults
                 const timeLimit = options?.timeLimit ?? 20; // seconds
-                const memoryLimit = options?.memoryLimit ?? 256; // MB
-                const [result1, result2] = await Promise.all([
-                    runSingleInDocker(context.extensionPath, tempDir, langId, `code1.${ext}`, input, { timeLimit, memoryLimit }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any)),
-                    runSingleInDocker(context.extensionPath, tempDir, langId, `code2.${ext}`, input, { timeLimit, memoryLimit }).catch((e: any) => ({ stdout: '', stderr: e.message, timedOut: false, memoryExceeded: false, spaceExceeded: false } as any))
-                ]);
+
+                // 优化对拍：使用独立的容器运行，避免复杂的输出解析
+                const pairResult = await runPairInSeparateContainers(
+                    context.extensionPath,
+                    tempDir,
+                    langId,
+                    `code1.${ext}`,
+                    `code2.${ext}`,
+                    input,
+                    { timeLimit, memoryLimit: 512 }
+                );
+                const result1 = pairResult.result1;
+                const result2 = pairResult.result2;
 
                 const toDisplay = (r: any) => {
                     if (r.timedOut) return 'TIMEOUT';
@@ -638,7 +725,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // Use provided options or fallback to defaults
             const timeLimit = options?.timeLimit ?? 5; // seconds
-            const memoryLimit = options?.memoryLimit ?? 256; // MB
+            const memoryLimit = options?.memoryLimit ?? 512; // MB (use 512MB to enable container pool)
             return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `正在运行 ${sourceFile}...`,
