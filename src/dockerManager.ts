@@ -10,16 +10,88 @@ import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
 
-
-
-import { Installer, InstallCommand } from './docker/install';
+import { Installer } from './docker/install';
 import { OI_CODE_TEST_TMP_PATH } from './constants';
+
+// Docker inspect 输出接口定义
+interface DockerMount {
+    Type: string;
+    Source: string;
+    Destination: string;
+    Mode?: string;
+    RW?: boolean;
+    Propagation?: string;
+}
+
+interface DockerContainerState {
+    Status: string;
+    Running: boolean;
+    Paused: boolean;
+    Restarting: boolean;
+    OOMKilled: boolean;
+    Dead: boolean;
+    Pid?: number;
+    ExitCode?: number;
+    Error?: string;
+    StartedAt: string;
+    FinishedAt: string;
+}
+
+interface DockerContainerConfig {
+    Image: string;
+    Labels: Record<string, string>;
+    Env?: string[];
+    Cmd?: string[];
+    WorkingDir?: string;
+}
+
+interface DockerContainerInfo {
+    Id: string;
+    Name: string;
+    Image: string;
+    State: DockerContainerState;
+    Config: DockerContainerConfig;
+    Mounts: DockerMount[];
+    NetworkSettings?: {
+        Networks?: Record<string, any>;
+    };
+}
+
+// 容器池管理接口
+interface DockerContainer {
+    containerId: string;
+    languageId: string;
+    image: string;
+    isReady: boolean;
+    lastUsed: number;
+    hasCacheMount?: boolean;
+}
+
+interface ContainerPool {
+    containers: Map<string, DockerContainer>;
+    isActive: boolean;
+}
+
+// 容器池配置
+const CONTAINER_POOL_CONFIG = {
+    maxIdleTime: 30 * 60 * 1000, // 30分钟无使用自动清理
+    healthCheckInterval: 5 * 60 * 1000, // 5分钟健康检查
+    supportedLanguages: ['c', 'cpp', 'python'] as const,
+};
 
 /**
  * Manages the Docker environment, including building the image, running containers,
  * and monitoring submissions for the OI extension.
  */
 export class DockerManager {
+    // 容器池实例
+    public static containerPool: ContainerPool = {
+        containers: new Map(),
+        isActive: false
+    };
+
+    // 健康检查定时器
+    private static healthCheckTimer: NodeJS.Timeout | null = null;
 
     /**
      * Ensures Docker is available and ready for use.
@@ -91,38 +163,79 @@ export class DockerManager {
         memoryExceeded: boolean;
         spaceExceeded: boolean;
     }> {
-        // Ensure Docker is available
+        // 确保 Docker 可用
         await this.ensureDockerIsReady(options.projectRootPath);
 
+        // 如果容器池已激活，则优先使用容器池
+        // 容器池中的容器可以动态调整内存限制
+        if (this.containerPool.isActive) {
+            try {
+                return await this.runWithContainerPool(options);
+            } catch (err) {
+                console.warn(`[DockerManager] Running with container pool failed, falling back to non-pool mode: ${err}`);
+                return this.runWithoutContainerPool(options);
+            }
+        }
+
+        // 否则使用原来的实现（包括自定义内存限制的情况）
+        return this.runWithoutContainerPool(options);
+    }
+
+    /**
+     * 使用容器池运行命令
+     */
+    private static async runWithContainerPool(options: {
+        sourceDir: string;
+        command: string;
+        input: string;
+        memoryLimit: string;
+        projectRootPath: string;
+        languageId: string;
+        timeLimit: number;
+    }): Promise<{
+        stdout: string;
+        stderr: string;
+        timedOut: boolean;
+        memoryExceeded: boolean;
+        spaceExceeded: boolean;
+    }> {
         const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 
-        // Create a temporary directory on the host for writable output (e.g., compiled binary)
-        await fs.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
-        const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
-        const image = this.selectImageForCommand(languageId);
+        // 容器池中的容器预设为512MB内存
+        // 如果请求的内存超过512MB，使用临时容器
+        if (parseInt(memoryLimit) > 512) {
+            console.log(`[DockerManager] Requested memory ${memoryLimit}MB exceeds pool limit (512MB), using temporary container`);
+            return this.runWithoutContainerPool(options);
+        }
 
-        const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        // 对于512MB及以下的请求，使用容器池
+        // 容器内部会通过cgroup等方式限制实际程序的内存使用
+        console.log(`[DockerManager] Using container pool with 512MB container limit (program limit: ${memoryLimit}MB)`);
 
-        const args = [
-            'run', '--rm', '-i',
-            '--name', containerName,
-            '--network=none',
-            '--read-only',
-            `--memory=${memoryLimit}m`,
-            `--memory-swap=${memoryLimit}m`,
-            '--cpus=1.0',
-            '--pids-limit=64',
-            '-v', `${sourceDir}:/sandbox:ro`,
-            '-v', `${tempDir}:/tmp:rw`, // Mount a writable temp dir for output
-            image,
-            'bash', '-c', command
-        ];
+        // 获取容器
+        const container = await this.getContainerForLanguage(languageId);
 
-        const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
-        outputChannel.show(true);
-        return new Promise((resolve) => {
-            outputChannel.appendLine(`[DockerManager] docker ${args.join(' ')}`);
-            const dockerProcess = spawn('docker', args);
+        try {
+            // 使用缓存挂载进行高效的文件同步
+            const hasCacheMount = container.hasCacheMount ?? false;
+            if (hasCacheMount) {
+                // 高效的文件同步：直接在宿主机上操作缓存目录
+                await this.syncFilesToCacheMount(sourceDir, languageId);
+                console.log(`[DockerManager] Using cache mount for container ${container.containerId}`);
+            } else {
+                // 回退到原来的文件同步逻辑
+                await this.copyFilesToContainer(sourceDir, container.containerId, false);
+                console.log(`[DockerManager] Using direct copy for container ${container.containerId}`);
+            }
+
+            // 使用管道格式执行命令
+            const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
+            outputChannel.show(true);
+
+            // 构建管道命令 - 使用安全的参数传递方式避免shell注入
+            // 将命令通过数组形式传递，而不是字符串拼接
+            const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
+            const dockerProcess = spawn('docker', dockerExecArgs);
 
             let stdout = '';
             let stderr = '';
@@ -131,15 +244,226 @@ export class DockerManager {
             dockerProcess.stdout.on('data', (data) => {
                 const text = data.toString();
                 stdout += text;
-                outputChannel.appendLine(`[docker stdout] ${text.trimEnd()}`);
+                outputChannel.appendLine(`[pipe stdout] ${text.trimEnd()}`);
+            });
+
+            dockerProcess.stderr.on('data', (data) => {
+                const text = data.toString();
+                stderr += text;
+                outputChannel.appendLine(`[pipe stderr] ${text.trimEnd()}`);
+            });
+
+            // 通过stdin传递输入（如果有）
+            if (input) {
+                dockerProcess.stdin.write(input);
+            }
+            dockerProcess.stdin.end();
+
+            // 硬超时：如果超过时间限制则杀死进程
+            const killTimer = setTimeout(() => {
+                console.warn(`[DockerManager] Timeout exceeded, killing process`);
+                dockerProcess.kill('SIGTERM');
+                timedOut = true;
+            }, (timeLimit + 1) * 1000);
+
+            return new Promise((resolve) => {
+                dockerProcess.on('close', async (pipeCode) => {
+                    clearTimeout(killTimer);
+
+                    // 直接使用管道的输出，不需要额外获取
+                    const memoryExceeded = !timedOut && (pipeCode === 137 || /Out of memory|Killed process/m.test(stderr));
+                    const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
+                    resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
+                    outputChannel.appendLine(`[DockerManager] pipe exit code=${pipeCode}`);
+                });
+
+                dockerProcess.on('error', async (err) => {
+                    clearTimeout(killTimer);
+                    resolve({ stdout: '', stderr: `Failed to execute pipe command: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
+                    outputChannel.appendLine(`[DockerManager] pipe error: ${err.message}`);
+                });
+            });
+        } catch (err) {
+            throw err;
+        }
+    }
+
+
+
+    /**
+     * 高效的文件同步：直接在宿主机上操作缓存目录
+     */
+    private static async syncFilesToCacheMount(sourceDir: string, languageId: string): Promise<void> {
+        console.log(`[DockerManager] Syncing files from ${sourceDir} to cache mount for ${languageId}`);
+
+        // 获取缓存目录路径，为每种语言创建独立的子目录
+        const homedir = os.homedir();
+        const cacheDir = path.join(homedir, '.cache', 'oi-code', languageId);
+
+        try {
+            // 检查源目录是否存在
+            await fs.access(sourceDir);
+
+            // 确保缓存目录存在
+            await fs.mkdir(cacheDir, { recursive: true });
+
+            // 清空缓存目录
+            try {
+                const entries = await fs.readdir(cacheDir);
+                for (const entry of entries) {
+                    await fs.rm(path.join(cacheDir, entry), { recursive: true, force: true });
+                }
+            } catch (error: any) {
+                console.warn(`[DockerManager] Failed to clean cache directory: ${error}`);
+                throw new Error(`Failed to clean cache directory: ${error}`);
+            }
+
+            // 复制源目录的文件到缓存目录
+            await this.copyDirectoryRecursive(sourceDir, cacheDir);
+            console.log(`[DockerManager] Files synced to cache mount successfully for ${languageId}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Failed to sync files to cache mount: ${error}`);
+            throw new Error(`Failed to sync files to cache mount: ${error}`);
+        }
+    }
+
+    /**
+     * 递归复制目录
+     */
+    private static async copyDirectoryRecursive(source: string, destination: string): Promise<void> {
+        const entries = await fs.readdir(source, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const sourcePath = path.join(source, entry.name);
+            const destPath = path.join(destination, entry.name);
+
+            if (entry.isDirectory()) {
+                await fs.mkdir(destPath, { recursive: true });
+                await this.copyDirectoryRecursive(sourcePath, destPath);
+            } else if (entry.isFile()) {
+                await fs.copyFile(sourcePath, destPath);
+            }
+        }
+    }
+
+    /**
+     * 复制文件到容器
+     */
+    private static async copyFilesToContainer(sourceDir: string, containerId: string, useCache: boolean = false): Promise<void> {
+        const targetDescription = useCache ? '/tmp/source in container' : 'container';
+        const logMessage = `[DockerManager] Copying files from ${sourceDir} to ${targetDescription} ${containerId}`;
+        console.log(logMessage);
+
+        return new Promise((resolve, reject) => {
+            // 首先清空目标目录
+            const cleanProcess = spawn('docker', ['exec', containerId, 'bash', '-c', 'rm -rf /tmp/source/*']);
+            cleanProcess.on('close', (cleanCode) => {
+                if (cleanCode === 0) {
+                    // 然后复制源目录的内容到目标目录
+                    const cpProcess = spawn('docker', ['cp', `${sourceDir}/.`, `${containerId}:/tmp/source/`]);
+                    cpProcess.on('close', (code) => {
+                        if (code === 0) {
+                            console.log(`[DockerManager] Files copied to ${targetDescription} successfully`);
+                            resolve();
+                        } else {
+                            reject(new Error(`Failed to copy files to ${targetDescription}: ${code}`));
+                        }
+                    });
+                    cpProcess.on('error', (err) => {
+                        reject(new Error(`Failed to copy files to ${targetDescription}: ${err.message}`));
+                    });
+                } else {
+                    reject(new Error(`Failed to clean ${targetDescription}: ${cleanCode}`));
+                }
+            });
+            cleanProcess.on('error', (err) => {
+                reject(new Error(`Failed to clean ${targetDescription}: ${err.message}`));
+            });
+        });
+    }
+
+    /**
+     * 不使用容器池运行命令（原始实现）
+     */
+    private static async runWithoutContainerPool(options: {
+        sourceDir: string;
+        command: string;
+        input: string;
+        memoryLimit: string;
+        projectRootPath: string;
+        languageId: string;
+        timeLimit: number;
+    }): Promise<{
+        stdout: string;
+        stderr: string;
+        timedOut: boolean;
+        memoryExceeded: boolean;
+        spaceExceeded: boolean;
+    }> {
+        const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
+
+        // 创建临时目录用于输出
+        await fs.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
+        const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
+        const image = this.selectImageForCommand(languageId);
+
+        const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        // 构建docker run参数，使用安全的stdin方式传递输入
+        const dockerArgs = [
+            'run',
+            '--rm',
+            '-i',
+            '--name', containerName,
+            '--network=none'
+        ];
+
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificRunArgs(memoryLimit);
+        dockerArgs.push(...platformArgs);
+
+        // Windows不支持只读挂载，条件性添加
+        const isWindows = os.platform() === 'win32';
+        if (!isWindows) {
+            dockerArgs.push('--read-only');
+        }
+
+        // 挂载源目录为只读（Windows也支持）
+        dockerArgs.push('-v', `${sourceDir}:/tmp/source:ro`);
+        // 挂载临时目录为可写，用于编译产物
+        dockerArgs.push('-v', `${tempDir}:/tmp:rw`);
+
+        // 添加镜像和命令
+        dockerArgs.push(image, 'bash', '-c', `cd /tmp/source && ${command}`);
+
+        const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
+        outputChannel.show(true);
+        return new Promise((resolve) => {
+            outputChannel.appendLine(`[DockerManager] docker ${dockerArgs.join(' ')}`);
+            const dockerProcess = spawn('docker', dockerArgs);
+
+            let stdout = '';
+            let stderr = '';
+            let timedOut = false;
+
+            dockerProcess.stdout.on('data', (data) => {
+                const text = data.toString();
+                stdout += text;
+                outputChannel.appendLine(`[stdout] ${text.trimEnd()}`);
             });
             dockerProcess.stderr.on('data', (data) => {
                 const text = data.toString();
                 stderr += text;
-                outputChannel.appendLine(`[docker stderr] ${text.trimEnd()}`);
+                outputChannel.appendLine(`[stderr] ${text.trimEnd()}`);
             });
 
-            // Hard timeout: kill container if timeLimit exceeded
+            // 通过stdin传递输入（如果有）
+            if (input) {
+                dockerProcess.stdin.write(input);
+            }
+            dockerProcess.stdin.end();
+
+            // 硬超时：如果超过时间限制则杀死进程
             const killTimer = setTimeout(() => {
                 console.warn(`[DockerManager] Timeout exceeded, killing container ${containerName}`);
                 spawn('docker', ['kill', containerName]).on('close', () => { /* noop */ });
@@ -148,8 +472,17 @@ export class DockerManager {
 
             dockerProcess.on('close', async (code) => {
                 clearTimeout(killTimer);
-                await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
-                const memoryExceeded = code === 137 || /Out of memory|Killed process/m.test(stderr);
+
+                await fs.rm(tempDir, { recursive: true, force: true }); // 清理临时目录
+
+                // 自动清理Docker资源 - 只清理测试相关的容器
+                try {
+                    await this.cleanupTestContainers();
+                } catch (cleanupError) {
+                    console.warn(`[DockerManager] Failed to cleanup test containers: ${cleanupError}`);
+                }
+
+                const memoryExceeded = !timedOut && (code === 137 || /Out of memory|Killed process/m.test(stderr));
                 const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
                 resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
                 outputChannel.appendLine(`[DockerManager] exit code=${code}`);
@@ -157,20 +490,33 @@ export class DockerManager {
 
             dockerProcess.on('error', async (err) => {
                 clearTimeout(killTimer);
-                await fs.rm(tempDir, { recursive: true, force: true }); // Cleanup
-                resolve({ stdout: '', stderr: `Failed to start Docker: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
+                await fs.rm(tempDir, { recursive: true, force: true }); // 清理临时目录
+
+                // 自动清理Docker资源
+                try {
+                    await this.cleanupTestContainers();
+                } catch (cleanupError) {
+                    console.warn(`[DockerManager] Failed to cleanup test containers: ${cleanupError}`);
+                }
+
+                resolve({ stdout: '', stderr: `Failed to execute docker command: ${err.message}`, timedOut: false, memoryExceeded: false, spaceExceeded: false });
                 outputChannel.appendLine(`[DockerManager] error: ${err.message}`);
             });
-
-            // Provide input to the process
-            if (input) {
-                dockerProcess.stdin.write(input);
-            }
-            dockerProcess.stdin.end();
         });
     }
 
     private static selectImageForCommand(languageId: string): string {
+        // 读取用户配置的编译器设置
+        const config = vscode.workspace.getConfiguration();
+        const compilers = config.get<any>('oicode.docker.compilers') || {};
+
+        // 优先使用用户配置的镜像
+        if (compilers[languageId]) {
+            return compilers[languageId];
+        }
+
+        // 对于Windows环境，我们使用Linux镜像（假设Docker Desktop支持Linux容器）
+        // 如果用户的Docker不支持Linux容器，他们需要手动配置自定义镜像
         switch (languageId.toLowerCase()) {
             case 'python':
                 return 'python:3.11';
@@ -181,6 +527,748 @@ export class DockerManager {
                 return 'gcc:13';
             default:
                 return 'ubuntu:24.04';
+        }
+    }
+
+    /**
+     * 接管现有的健康容器，避免资源泄漏
+     */
+    private static async adoptExistingContainers(): Promise<void> {
+        console.log('[DockerManager] Scanning for existing oi-container containers...');
+
+        try {
+            // 扫描所有oi-container-*容器
+            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container*', '--format', '{{.Names}}']);
+            let containerNames = '';
+
+            psProcess.stdout.on('data', (data) => {
+                containerNames += data.toString();
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                psProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to list containers: ${code}`));
+                    }
+                });
+                psProcess.on('error', (err) => {
+                    reject(new Error(`Error listing containers: ${err.message}`));
+                });
+            });
+
+            const names = containerNames.trim().split('\n').filter(name => name);
+            if (names.length === 0) {
+                console.log('[DockerManager] No existing oi-container containers found');
+                return;
+            }
+
+            console.log(`[DockerManager] Found ${names.length} existing containers: ${names.join(', ')}`);
+
+            // 检查每个容器的健康状态并尝试接管
+            for (const containerName of names) {
+                try {
+                    const container = await this.inspectAndAdoptContainer(containerName);
+                    if (container) {
+                        console.log(`[DockerManager] Successfully adopted container ${containerName} for ${container.languageId}`);
+                    } else {
+                        console.log(`[DockerManager] Container ${containerName} is not healthy, will be cleaned up`);
+                        // 清理不健康的容器
+                        await this.cleanupUnhealthyContainer(containerName);
+                    }
+                } catch (error) {
+                    console.warn(`[DockerManager] Failed to adopt container ${containerName}:`, error);
+                    // 清理无法接管的容器
+                    await this.cleanupUnhealthyContainer(containerName);
+                }
+            }
+        } catch (error) {
+            console.warn('[DockerManager] Error during container adoption:', error);
+            // 即使接管失败也继续初始化，不要影响正常功能
+        }
+    }
+
+    /**
+     * 检查并接管单个容器
+     */
+    private static async inspectAndAdoptContainer(containerName: string): Promise<DockerContainer | null> {
+        return new Promise((resolve) => {
+            const inspectProcess = spawn('docker', ['inspect', containerName]);
+            let stdout = '';
+            let stderr = '';
+
+            inspectProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            inspectProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            inspectProcess.on('close', (code) => {
+                if (code !== 0) {
+                    console.warn(`[DockerManager] Failed to inspect container ${containerName}: ${stderr}`);
+                    resolve(null);
+                    return;
+                }
+
+                try {
+                    const info: DockerContainerInfo[] = JSON.parse(stdout);
+                    if (!info || info.length === 0) {
+                        resolve(null);
+                        return;
+                    }
+
+                    const containerInfo = info[0];
+                    const state = containerInfo.State;
+
+                    // 检查容器是否正在运行
+                    if (state.Status !== 'running') {
+                        console.log(`[DockerManager] Container ${containerName} is not running (status: ${state.Status})`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 从容器标签中获取语言ID
+                    const languageId = containerInfo.Config.Labels?.['oi-code.language'];
+                    if (!languageId) {
+                        console.log(`[DockerManager] Cannot determine language from container labels: ${containerName}`);
+                        resolve(null);
+                        return;
+                    }
+                    if (!CONTAINER_POOL_CONFIG.supportedLanguages.includes(languageId as any)) {
+                        console.log(`[DockerManager] Unsupported language: ${languageId}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 检查是否已经有该语言的容器
+                    if (this.containerPool.containers.has(languageId)) {
+                        console.log(`[DockerManager] Already have a container for ${languageId}, skipping ${containerName}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    // 检查容器是否有缓存挂载
+                    const hasCacheMount = containerInfo.Mounts?.some((mount: DockerMount) =>
+                        mount.Destination === '/tmp/source' && mount.Type === 'bind'
+                    ) || false;
+
+                    // 创建容器对象并添加到池中
+                    const container: DockerContainer = {
+                        containerId: containerName,
+                        languageId,
+                        image: containerInfo.Config.Image,
+                        isReady: true,
+                        lastUsed: Date.now(),
+                        hasCacheMount
+                    };
+
+                    this.containerPool.containers.set(languageId, container);
+                    resolve(container);
+
+                } catch (error) {
+                    console.warn(`[DockerManager] Failed to parse container info for ${containerName}:`, error);
+                    resolve(null);
+                }
+            });
+
+            inspectProcess.on('error', (err) => {
+                console.warn(`[DockerManager] Error inspecting container ${containerName}:`, err);
+                resolve(null);
+            });
+        });
+    }
+
+    /**
+     * 清理不健康的容器
+     */
+    private static async cleanupUnhealthyContainer(containerName: string): Promise<void> {
+        try {
+            console.log(`[DockerManager] Cleaning up unhealthy container: ${containerName}`);
+            await new Promise<void>((resolve) => {
+                const rmProcess = spawn('docker', ['rm', '-f', containerName]);
+                rmProcess.on('close', (code) => {
+                    if (code === 0) {
+                        console.log(`[DockerManager] Successfully removed unhealthy container: ${containerName}`);
+                    } else {
+                        console.warn(`[DockerManager] Failed to remove unhealthy container ${containerName}: ${code}`);
+                    }
+                    resolve();
+                });
+                rmProcess.on('error', (err) => {
+                    console.warn(`[DockerManager] Error removing unhealthy container ${containerName}:`, err);
+                    resolve();
+                });
+            });
+        } catch (error) {
+            console.warn(`[DockerManager] Error during cleanup of ${containerName}:`, error);
+        }
+    }
+
+    /**
+     * 初始化容器池，在扩展激活时调用
+     */
+    public static async initializeContainerPool(): Promise<void> {
+        if (this.containerPool.isActive) {
+            console.log('[DockerManager] Container pool already initialized');
+            return;
+        }
+
+        console.log('[DockerManager] Initializing container pool...');
+        this.containerPool.isActive = true;
+
+        // 首先尝试接管现有的健康容器
+        await this.adoptExistingContainers();
+
+        // 为支持的语言预启动容器，确保每种语言只有一个容器
+        for (const language of CONTAINER_POOL_CONFIG.supportedLanguages) {
+            try {
+                // 检查是否已经存在该语言的容器
+                const existingContainer = this.containerPool.containers.get(language);
+                if (!existingContainer || !existingContainer.isReady) {
+                    console.log(`[DockerManager] Starting container for ${language} (no existing ready container)`);
+                    await this.startContainerForLanguage(language);
+                } else {
+                    console.log(`[DockerManager] Container for ${language} already exists and is ready`);
+                }
+            } catch (error) {
+                console.error(`[DockerManager] Failed to start container for ${language}:`, error);
+            }
+        }
+
+        // 启动健康检查定时器
+        this.startHealthCheck();
+
+        console.log('[DockerManager] Container pool initialized');
+        console.log(`[DockerManager] Active containers: ${this.containerPool.containers.size}`);
+    }
+
+    /**
+     * 清理容器池，在扩展停用时调用
+     */
+    public static async cleanupContainerPool(): Promise<void> {
+        if (!this.containerPool.isActive) {
+            return;
+        }
+
+        console.log('[DockerManager] Cleaning up container pool...');
+
+        // 停止健康检查
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
+        }
+
+        // 停止所有容器池中的容器
+        const stopPromises: Promise<void>[] = [];
+        for (const [languageId, container] of this.containerPool.containers) {
+            if (container.isReady) {
+                stopPromises.push(this.stopContainer(container));
+            }
+        }
+
+        await Promise.all(stopPromises);
+        this.containerPool.containers.clear();
+        this.containerPool.isActive = false;
+
+        console.log('[DockerManager] Container pool cleaned up');
+    }
+
+    /**
+     * 彻底清理所有Docker资源（容器、镜像、网络等）- 优化版本
+     */
+    public static async cleanupAllDockerResources(): Promise<void> {
+        console.log('[DockerManager] Starting comprehensive Docker cleanup...');
+
+        try {
+            // 强制删除所有oi-container容器（直接扫描并强杀）
+            // 这个操作已经包含了对容器池中容器的清理
+            console.log('[DockerManager] Force removing all oi-container containers...');
+            await this.forceRemoveOiContainers();
+
+            // 只删除oi-code创建的镜像，保留基础镜像
+            // 注意：这里不再删除gcc:13和python:3.11等基础镜像
+            console.log('[DockerManager] Skipping base image removal to preserve Docker Hub images...');
+
+            // 跳过Docker系统清理，避免删除用户数据
+            console.log('[DockerManager] Skipping system prune to avoid user data loss...');
+
+            console.log('[DockerManager] Docker cleanup completed successfully');
+        } catch (error) {
+            console.warn('[DockerManager] Error during Docker cleanup:', error);
+            // 即使清理失败也继续执行，不要影响其他操作
+        }
+    }
+
+    /**
+     * 获取Docker资源统计信息
+     */
+    public static async getDockerStats(): Promise<{ containers: number; images: number; containerNames: string[] }> {
+        return new Promise((resolve) => {
+            // 获取容器数量
+            const psProcess = spawn('docker', ['ps', '-a', '-q']);
+            let containerIds = '';
+            psProcess.stdout.on('data', (data) => {
+                containerIds += data.toString();
+            });
+
+            // 获取镜像数量
+            const imagesProcess = spawn('docker', ['images', '-q']);
+            let imageIds = '';
+            imagesProcess.stdout.on('data', (data) => {
+                imageIds += data.toString();
+            });
+
+            // 获取容器名称
+            const namesProcess = spawn('docker', ['ps', '-a', '--format', '{{.Names}}']);
+            let containerNames = '';
+            namesProcess.stdout.on('data', (data) => {
+                containerNames += data.toString();
+            });
+
+            const allProcesses = [psProcess, imagesProcess, namesProcess];
+            let completed = 0;
+
+            allProcesses.forEach(process => {
+                process.on('close', () => {
+                    completed++;
+                    if (completed === allProcesses.length) {
+                        resolve({
+                            containers: containerIds.trim().split('\n').filter(id => id).length,
+                            images: imageIds.trim().split('\n').filter(id => id).length,
+                            containerNames: containerNames.trim().split('\n').filter(name => name)
+                        });
+                    }
+                });
+            });
+        });
+    }
+
+    /**
+     * 为指定语言启动容器 - 优化版本，支持Docker Volumes挂载
+     */
+    private static async startContainerForLanguage(languageId: string): Promise<DockerContainer> {
+        const image = this.selectImageForCommand(languageId);
+        const containerName = `oi-container-${languageId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
+
+        // 获取用户主目录路径，多平台兼容，为每种语言创建独立的子目录
+        const homedir = os.homedir();
+        const cacheDir = path.join(homedir, '.cache', 'oi-code', languageId);
+
+        // 确保缓存目录存在
+        try {
+            await fs.mkdir(cacheDir, { recursive: true });
+            console.log(`[DockerManager] Using cache directory: ${cacheDir}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Failed to create cache directory: ${error}, using temporary directory`);
+            return this.startContainerWithoutMount(languageId, image, containerName);
+        }
+
+        // 创建容器并启动它，预设置必要的目录和权限，并挂载缓存目录
+        const createArgs = [
+            'run',
+            '-d', // 后台运行
+            '--name', containerName,
+            '--label', `oi-code.language=${languageId}`, // 添加语言标签
+            '--network=none'
+        ];
+
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificCreateArgs();
+        createArgs.push(...platformArgs);
+
+        // 添加交互模式和挂载选项
+        createArgs.push('-i');
+        createArgs.push('-v', `${cacheDir}:/tmp/source:rw`); // 直接挂载到/tmp/source
+        createArgs.push(image);
+        createArgs.push('bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done'); // 保持容器运行并创建必要目录，设置权限
+
+        return new Promise((resolve, reject) => {
+            const dockerProcess = spawn('docker', createArgs);
+            let stderr = '';
+
+            dockerProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            dockerProcess.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`[DockerManager] Container ${containerName} started for ${languageId}`);
+                    const container: DockerContainer = {
+                        containerId: containerName,
+                        languageId,
+                        image,
+                        isReady: true,
+                        lastUsed: Date.now(),
+                        hasCacheMount: true // 记录使用了缓存挂载
+                    };
+
+                    this.containerPool.containers.set(languageId, container);
+                    resolve(container);
+                } else {
+                    reject(new Error(`Failed to start container for ${languageId}: ${stderr}`));
+                }
+            });
+
+            dockerProcess.on('error', (err) => {
+                reject(new Error(`Failed to start container for ${languageId}: ${err.message}`));
+            });
+        });
+    }
+
+    /**
+     * 不使用挂载启动容器（备用方案）
+     */
+    private static async startContainerWithoutMount(languageId: string, image: string, containerName: string): Promise<DockerContainer> {
+        console.log(`[DockerManager] Starting container for ${languageId} without mount using ${image}`);
+
+        const createArgs = [
+            'run',
+            '-d', // 后台运行
+            '--name', containerName,
+            '--label', `oi-code.language=${languageId}`, // 添加语言标签
+            '--network=none'
+        ];
+
+        // 添加平台特定的参数
+        const platformArgs = this._getPlatformSpecificCreateArgs();
+        createArgs.push(...platformArgs);
+
+        // 添加交互模式和命令
+        createArgs.push('-i');
+        createArgs.push(image);
+        createArgs.push('bash', '-c', 'mkdir -p /tmp/source && chmod 755 /tmp/source && while true; do sleep 3600; done'); // 保持容器运行并创建必要目录，设置权限
+
+        return new Promise((resolve, reject) => {
+            const dockerProcess = spawn('docker', createArgs);
+            let stderr = '';
+
+            dockerProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            dockerProcess.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`[DockerManager] Container ${containerName} started for ${languageId} (without mount)`);
+                    const container: DockerContainer = {
+                        containerId: containerName,
+                        languageId,
+                        image,
+                        isReady: true,
+                        lastUsed: Date.now(),
+                        hasCacheMount: false // 记录未使用缓存挂载
+                    };
+
+                    this.containerPool.containers.set(languageId, container);
+                    resolve(container);
+                } else {
+                    reject(new Error(`Failed to start container for ${languageId}: ${stderr}`));
+                }
+            });
+
+            dockerProcess.on('error', (err) => {
+                reject(new Error(`Failed to start container for ${languageId}: ${err.message}`));
+            });
+        });
+    }
+
+    /**
+     * 停止容器
+     */
+    private static async stopContainer(container: DockerContainer): Promise<void> {
+        return new Promise((resolve) => {
+            console.log(`[DockerManager] Stopping container ${container.containerId}`);
+            const stopProcess = spawn('docker', ['stop', container.containerId]);
+
+            stopProcess.on('close', () => {
+                console.log(`[DockerManager] Container ${container.containerId} stopped`);
+                resolve();
+            });
+
+            stopProcess.on('error', () => {
+                // 即使出错也继续清理
+                console.warn(`[DockerManager] Error stopping container ${container.containerId}, continuing cleanup`);
+                resolve();
+            });
+        });
+    }
+
+    /**
+     * 批量删除容器的辅助函数
+     */
+    private static async _removeContainers(containerIds: string[]): Promise<void> {
+        if (containerIds.length === 0) {
+            return;
+        }
+        await new Promise<void>((resolve) => {
+            const rmProcess = spawn('docker', ['rm', '-f', ...containerIds]);
+            rmProcess.on('close', () => resolve());
+            rmProcess.on('error', (err) => {
+                console.warn(`[DockerManager] Error removing containers: ${err.message}`);
+                resolve(); // 出错也继续，保证清理流程完整
+            });
+        });
+    }
+
+    /**
+     * 启动健康检查定时器
+     */
+    private static startHealthCheck(): void {
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+        }
+
+        this.healthCheckTimer = setInterval(() => {
+            this.performHealthCheck();
+        }, CONTAINER_POOL_CONFIG.healthCheckInterval);
+    }
+
+    /**
+     * 执行健康检查
+     */
+    private static async performHealthCheck(): Promise<void> {
+        if (!this.containerPool.isActive) {
+            return;
+        }
+
+        console.log('[DockerManager] Performing health check');
+
+        const now = Date.now();
+        const cleanupPromises: Promise<void>[] = [];
+
+        // 检查容器是否仍然健康
+        for (const [languageId, container] of this.containerPool.containers) {
+            // 检查容器是否超时未使用
+            if (now - container.lastUsed > CONTAINER_POOL_CONFIG.maxIdleTime) {
+                console.log(`[DockerManager] Container for ${languageId} timed out, restarting`);
+                cleanupPromises.push(this.restartContainer(container));
+                continue;
+            }
+
+            // 检查容器是否仍然运行
+            try {
+                const inspectProcess = spawn('docker', ['inspect', container.containerId]);
+                let stdout = '';
+                let stderr = '';
+
+                inspectProcess.stdout.on('data', (data) => {
+                    stdout += data.toString();
+                });
+
+                inspectProcess.stderr.on('data', (data) => {
+                    stderr += data.toString();
+                });
+
+                await new Promise((resolve) => {
+                    inspectProcess.on('close', resolve);
+                });
+
+                const info: DockerContainerInfo[] = JSON.parse(stdout);
+                if (!info[0] || info[0].State?.Running !== true) {
+                    console.log(`[DockerManager] Container ${container.containerId} not running, restarting`);
+                    cleanupPromises.push(this.restartContainer(container));
+                }
+            } catch (error) {
+                console.warn(`[DockerManager] Failed to inspect container ${container.containerId}:`, error);
+                cleanupPromises.push(this.restartContainer(container));
+            }
+        }
+
+        await Promise.all(cleanupPromises);
+    }
+
+    /**
+     * 重启容器
+     */
+    private static async restartContainer(container: DockerContainer): Promise<void> {
+        try {
+            await this.stopContainer(container);
+            this.containerPool.containers.delete(container.languageId);
+        } catch (error) {
+            console.warn(`[DockerManager] Failed to stop container ${container.containerId}:`, error);
+        }
+
+        try {
+            await this.startContainerForLanguage(container.languageId);
+        } catch (error) {
+            console.error(`[DockerManager] Failed to restart container for ${container.languageId}:`, error);
+        }
+    }
+
+    /**
+     * 获取指定语言的可用容器
+     */
+    private static async getContainerForLanguage(languageId: string): Promise<DockerContainer> {
+        if (!this.containerPool.isActive) {
+            throw new Error('Container pool is not active');
+        }
+
+        let container = this.containerPool.containers.get(languageId);
+
+        // 如果没有容器或容器不可用，则创建新容器
+        if (!container || !container.isReady) {
+            console.log(`[DockerManager] No ready container for ${languageId}, creating new one`);
+            // 先清理可能存在的旧容器
+            if (container) {
+                try {
+                    await this.stopContainer(container);
+                } catch (error) {
+                    console.warn(`[DockerManager] Failed to stop old container ${container.containerId}:`, error);
+                }
+            }
+            try {
+                container = await this.startContainerForLanguage(languageId);
+            } catch (error: any) {
+                console.error(`[DockerManager] Failed to start container for ${languageId}:`, error);
+                // 如果容器启动失败，回退到不使用容器池的模式
+                console.log(`[DockerManager] Falling back to non-pool mode for ${languageId}`);
+                throw new Error(`Failed to start container for ${languageId}: ${error.message}`);
+            }
+        }
+
+        return container;
+    }
+
+    /**
+     * 强制删除所有oi-container容器
+     */
+    private static async forceRemoveOiContainers(): Promise<void> {
+        try {
+            // 查找所有oi-container容器
+            const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
+            let containerIds = '';
+
+            findProcess.stdout.on('data', (data) => {
+                containerIds += data.toString();
+            });
+
+            const findCode = await new Promise<number>((resolve) => {
+                findProcess.on('close', resolve);
+                findProcess.on('error', () => resolve(-1));
+            });
+
+            if (findCode !== 0) {
+                console.warn(`[DockerManager] Failed to find oi-containers: ${findCode}`);
+                return;
+            }
+
+            const ids = containerIds.trim().split('\n').filter(id => id);
+            if (ids.length === 0) {
+                console.log('[DockerManager] No oi-containers found to remove');
+                return;
+            }
+
+            console.log(`[DockerManager] Found ${ids.length} oi-container(s) to force remove`);
+
+            // 强制删除所有oi-container容器
+            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
+            const rmCode = await new Promise<number>((resolve) => {
+                rmProcess.on('close', resolve);
+                rmProcess.on('error', () => resolve(-1));
+            });
+
+            console.log(`[DockerManager] Force removed oi-containers with code: ${rmCode}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Error force removing oi-containers: ${error}`);
+        }
+    }
+
+    /**
+     * 获取平台特定的Docker运行参数
+     * @param memoryLimit 内存限制（MB）
+     * @returns Docker参数数组
+     */
+    private static _getPlatformSpecificRunArgs(memoryLimit: string): string[] {
+        const isWindows = os.platform() === 'win32';
+        const args: string[] = [];
+
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--memory-swap=' + memoryLimit + 'm');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            args.push('--memory=' + memoryLimit + 'm');
+        }
+
+        return args;
+    }
+
+    /**
+     * 获取平台特定的容器创建参数
+     * @param memoryLimit 内存限制（MB），默认为512MB以兼容容器池
+     * @returns Docker参数数组
+     */
+    private static _getPlatformSpecificCreateArgs(memoryLimit: string = '512'): string[] {
+        const isWindows = os.platform() === 'win32';
+        const args: string[] = [];
+
+        if (!isWindows) {
+            // Linux/macOS支持的选项
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--memory-swap=' + memoryLimit + 'm');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Windows Docker的简化配置
+            args.push('--memory=' + memoryLimit + 'm');
+        }
+
+        return args;
+    }
+
+    /**
+     * 清理测试相关的容器（非容器池容器）
+     */
+    private static async cleanupTestContainers(): Promise<void> {
+        try {
+            console.log('[DockerManager] Cleaning up test containers...');
+
+            // 获取所有容器
+            const psProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-task-']);
+            let containerIds = '';
+            psProcess.stdout.on('data', (data) => {
+                containerIds += data.toString();
+            });
+
+            await new Promise<void>((resolve, reject) => {
+                psProcess.on('close', (code) => {
+                    if (code === 0) {
+                        const ids = containerIds.trim().split('\n').filter(id => id);
+                        if (ids.length > 0) {
+                            console.log(`[DockerManager] Found ${ids.length} test containers to cleanup`);
+                            // 批量删除容器
+                            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
+                            rmProcess.on('close', (rmCode) => {
+                                console.log(`[DockerManager] Test containers cleanup completed with code: ${rmCode}`);
+                                resolve();
+                            });
+                            rmProcess.on('error', (err) => {
+                                console.warn(`[DockerManager] Error cleaning up test containers: ${err.message}`);
+                                resolve();
+                            });
+                        } else {
+                            console.log('[DockerManager] No test containers found to cleanup');
+                            resolve();
+                        }
+                    } else {
+                        console.warn(`[DockerManager] Failed to list test containers: ${code}`);
+                        resolve();
+                    }
+                });
+                psProcess.on('error', (err) => {
+                    console.warn(`[DockerManager] Error listing test containers: ${err.message}`);
+                    resolve();
+                });
+            });
+        } catch (error) {
+            console.warn('[DockerManager] Error during test container cleanup:', error);
         }
     }
 }

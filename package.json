@@ -110,85 +110,8 @@
         },
         "oicode.docker.compilers": {
           "type": "object",
-          "description": "Configure Docker compiler commands and arguments for different languages.",
-          "properties": {
-            "cpp": {
-              "type": "object",
-              "description": "C++ compiler settings for Docker.",
-              "properties": {
-                "command": {
-                  "type": "string",
-                  "description": "The C++ compiler command (e.g., 'g++')."
-                },
-                "args": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "Arguments for the C++ compiler. Use /sandbox/${sourceFile} for source, /tmp/a.out for output."
-                }
-              },
-              "default": {
-                "command": "g++",
-                "args": [
-                  "/sandbox/${sourceFile}",
-                  "-o",
-                  "/tmp/a.out",
-                  "-O2",
-                  "-std=c++17"
-                ]
-              }
-            },
-            "c": {
-              "type": "object",
-              "description": "C compiler settings for Docker.",
-              "properties": {
-                "command": {
-                  "type": "string",
-                  "description": "The C compiler command (e.g., 'gcc')."
-                },
-                "args": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "Arguments for the C compiler. Use /sandbox/${sourceFile} for source, /tmp/a.out for output."
-                }
-              },
-              "default": {
-                "command": "gcc",
-                "args": [
-                  "/sandbox/${sourceFile}",
-                  "-o",
-                  "/tmp/a.out",
-                  "-O2"
-                ]
-              }
-            },
-            "python": {
-              "type": "object",
-              "description": "Python interpreter settings for Docker.",
-              "properties": {
-                "command": {
-                  "type": "string",
-                  "description": "The Python interpreter command (e.g., 'python3')."
-                },
-                "args": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "Arguments for the Python interpreter. Use /sandbox/${sourceFile} for source."
-                }
-              },
-              "default": {
-                "command": "python3",
-                "args": [
-                  "/sandbox/${sourceFile}"
-                ]
-              }
-            }
-          }
+          "description": "为不同语言自定义 Docker 镜像 (例如: { \"cpp\": \"my-custom-gcc:latest\" })。",
+          "default": {}
         },
         "oi-code.language.c.Command": {
           "type": "string",

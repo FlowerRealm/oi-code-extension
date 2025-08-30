@@ -112,17 +112,42 @@ export class Installer {
         }
     }
 
-    private static async waitForDockerReady(timeoutMs = 180000): Promise<void> {
+    private static async waitForDockerReady(timeoutMs = 300000): Promise<void> { // 增加到5分钟
         const start = Date.now();
+        let attempts = 0;
+        let lastError = '';
+
+        dockerInstallOutput.appendLine(`Waiting for Docker to be ready (timeout: ${timeoutMs}ms)...`);
+
         while (Date.now() - start < timeoutMs) {
+            attempts++;
             try {
-                cp.execSync('docker info', { stdio: 'ignore' });
+                dockerInstallOutput.appendLine(`Docker readiness check #${attempts}...`);
+
+                // 首先检查Docker守护进程是否运行
+                cp.execSync('docker ps', { stdio: 'ignore', timeout: 5000 });
+                dockerInstallOutput.appendLine(`Docker is ready after ${attempts} attempts (${((Date.now() - start) / 1000).toFixed(1)}s)`);
                 return;
-            } catch {
-                await new Promise(r => setTimeout(r, 3000));
+            } catch (error: any) {
+                lastError = error.message;
+                dockerInstallOutput.appendLine(`Attempt ${attempts} failed: ${error.message}`);
+
+                // 如果是权限错误，尝试为当前用户添加docker组（会话后生效）
+                if (lastError.includes('permission denied') || lastError.includes('connection refused')) {
+                    dockerInstallOutput.appendLine('Attempting to add current user to docker group...');
+                    try {
+                        const currentUser = cp.execSync('whoami', { encoding: 'utf8' }).trim();
+                        cp.execSync(`sudo usermod -aG docker ${currentUser}`, { stdio: 'ignore' });
+                        dockerInstallOutput.appendLine(`Added user ${currentUser} to docker group`);
+                    } catch (groupError: any) {
+                        dockerInstallOutput.appendLine(`Failed to add user to docker group: ${groupError.message}`);
+                    }
+                }
+
+                await new Promise(r => setTimeout(r, 5000)); // 每5秒检查一次，更频繁一些
             }
         }
-        throw new Error('Waiting for Docker to be ready timeout');
+        throw new Error(`Docker failed to start after ${attempts} attempts (${((Date.now() - start) / 1000).toFixed(1)}s). Last error: ${lastError}`);
     }
 
     /**
@@ -202,14 +227,53 @@ export class Installer {
                     if (this.isCommandAvailable('brew')) {
                         progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
                         try {
-                            cp.execSync('brew install --cask docker', { stdio: 'ignore' });
+                            // 尝试非交互式安装，如果失败则记录错误但不抛出
+                            const result = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
+                                stdio: ['ignore', 'pipe', 'pipe'],
+                                timeout: 300000 // 5分钟超时
+                            });
+
+                            if (result.status === 0) {
+                                dockerInstallOutput.appendLine('Docker Desktop installed successfully via Homebrew');
+                            } else {
+                                const errorMsg = result.stderr?.toString() || 'Unknown error';
+                                dockerInstallOutput.appendLine(`Homebrew installation failed: ${errorMsg}`);
+                                console.warn('Homebrew Docker installation failed:', errorMsg);
+                            }
                         } catch (error: any) {
                             console.error('Failed to install Docker via Homebrew:', error);
                             dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error?.message || String(error)}`);
                         }
+                    } else {
+                        dockerInstallOutput.appendLine('Homebrew not available for Docker installation');
                     }
+
+                    // 尝试启动Docker Desktop
+                    progress.report({ message: 'Attempting to start Docker Desktop...' });
                     try {
-                        cp.spawn('open', ['/Applications/Docker.app'], { detached: true, stdio: 'ignore' });
+                        // 首先检查Docker.app是否存在于标准位置
+                        const standardPath = '/Applications/Docker.app';
+                        const altPath = `${os.homedir()}/Applications/Docker.app`;
+
+                        let dockerPath = standardPath;
+                        if (!fs.existsSync(standardPath) && fs.existsSync(altPath)) {
+                            dockerPath = altPath;
+                        }
+
+                        if (fs.existsSync(dockerPath)) {
+                            cp.spawn('open', [dockerPath], { detached: true, stdio: 'ignore' });
+                            dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
+                        } else {
+                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations. Trying to open via Launch Services...');
+                            try {
+                                // 使用 'open -a' 让系统通过名称查找并打开应用
+                                cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
+                                dockerInstallOutput.appendLine('Attempted to start Docker via Launch Services.');
+                            } catch (error: any) {
+                                console.error('Failed to start Docker via Launch Services:', error);
+                                dockerInstallOutput.appendLine(`Failed to start Docker via Launch Services: ${error?.message || String(error)}`);
+                            }
+                        }
                     } catch (error: any) {
                         console.error('Failed to start Docker Desktop on macOS:', error);
                         dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error?.message || String(error)}`);
@@ -217,23 +281,48 @@ export class Installer {
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
                     const distro = this.getLinuxDistro();
-                    progress.report({ message: `Installing Docker via ${distro} package manager (silently)...` });
+                    progress.report({ message: `Installing Docker via ${distro} package manager...` });
                     try {
                         if (distro === 'ubuntu' || distro === 'debian') {
-                            await run('bash', ['-lc', 'sudo apt-get update && sudo apt-get install -y docker.io']);
+                            dockerInstallOutput.appendLine('Updating package lists...');
+                            await run('sudo', ['apt-get', 'update', '-q']);
+                            dockerInstallOutput.appendLine('Installing Docker.io package...');
+                            await run('sudo', ['apt-get', 'install', '-y', 'docker.io']);
                         } else if (distro === 'arch') {
                             await run('bash', ['-lc', 'sudo pacman -Syu --noconfirm docker']);
                         } else if (distro === 'fedora') {
                             await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
                         }
+
+                        // 验证安装
+                        const dockerVersion = cp.execSync('docker --version', { encoding: 'utf8', stdio: 'ignore' }).trim();
+                        dockerInstallOutput.appendLine(`Docker installed successfully: ${dockerVersion}`);
+
                     } catch (error) {
-                        dockerInstallOutput.appendLine(`Failed to install Docker via apt-get: ${(error as any)?.message || String(error)}`);
+                        dockerInstallOutput.appendLine(`Failed to install Docker via package manager: ${(error as any)?.message || String(error)}`);
+                        throw error;
                     }
-                    // Try starting docker service (if applicable)
+
+                    // 启动和启用Docker服务
+                    progress.report({ message: 'Starting Docker service...' });
                     try {
+                        dockerInstallOutput.appendLine('Enabling Docker service...');
+                        cp.execSync('sudo systemctl enable docker', { stdio: 'ignore' });
+
+                        dockerInstallOutput.appendLine('Starting Docker service...');
                         cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
+
+                        // 检查服务状态
+                        const serviceStatus = cp.execSync('sudo systemctl is-active docker', { encoding: 'utf8' }).trim();
+                        dockerInstallOutput.appendLine(`Docker service status: ${serviceStatus}`);
+
+                        if (serviceStatus !== 'active') {
+                            throw new Error(`Docker service not active, status: ${serviceStatus}`);
+                        }
+
                     } catch (error: any) {
-                        dockerInstallOutput.appendLine(`Failed to start Docker service on Linux: ${error?.message || String(error)}`);
+                        dockerInstallOutput.appendLine(`Failed to start Docker service: ${error?.message || String(error)}`);
+                        throw error;
                     }
                 }
 
