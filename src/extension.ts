@@ -263,32 +263,32 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                 try {
                     const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp' || e.document.languageId === 'python'));
                     if (editors.length < 2) {
-                        vscode.window.showErrorMessage('需要打开至少两个C/C++/Python代码文件才能进行对拍。');
+                        vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check.');
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
                     const langId = getLanguageIdFromEditor(editor1);
                     if (langId !== 'c' && langId !== 'cpp' && langId !== 'python') {
-                        vscode.window.showErrorMessage(`对拍不支持语言: ${langId}`);
+                        vscode.window.showErrorMessage(`Pair check does not support language: ${langId}`);
                         return;
                     }
                     if (editor2.document.languageId !== langId) {
-                        vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
+                        vscode.window.showErrorMessage('Both code files must have the same language type.');
                         return;
                     }
 
-                    this.setOutputs('<i>正在运行...</i>', '<i>正在运行...</i>');
+                    this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
                     await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
                     const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
 
-                    // 定义文件扩展名，确保与 Docker 传递的文件名一致
+                    // Define file extensions to ensure consistency with Docker file names
                     const ext = langId === 'python' ? 'py' : langId;
                     const file1Path = path.join(tempDir, `code1.${ext}`);
                     const file2Path = path.join(tempDir, `code2.${ext}`);
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
                     await fs.promises.writeFile(file2Path, editor2.document.getText());
 
-                    // 优化对拍：使用独立的容器运行，避免复杂的输出解析
+                    // Optimize pair check: use separate containers to avoid complex output parsing
                     const pairResult = await runPairInSeparateContainers(
                         this._context.extensionPath,
                         tempDir,
@@ -301,13 +301,13 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     const result1 = pairResult.result1;
                     const result2 = pairResult.result2;
 
-                    const output1 = result1.stderr ? `<b>错误:</b>\n${htmlEscape(result1.stderr)}` : result1.stdout;
-                    const output2 = result2.stderr ? `<b>错误:</b>\n${htmlEscape(result2.stderr)}` : result2.stdout;
+                    const output1 = result1.stderr ? `<b>Error:</b>\n${htmlEscape(result1.stderr)}` : result1.stdout;
+                    const output2 = result2.stderr ? `<b>Error:</b>\n${htmlEscape(result2.stderr)}` : result2.stdout;
 
                     if (result1.stderr || result2.stderr) {
                         this.setOutputs(output1, output2);
                     } else if (output1 === output2) {
-                        this.setOutputs('<span style="color:var(--vscode-terminal-ansiGreen);">输出一致 (Accepted)</span>', '<span style="color:var(--vscode-terminal-ansiGreen);">输出一致 (Accepted)</span>');
+                        this.setOutputs('<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>', '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>');
                     } else {
                         const { html1, html2 } = createDiffHtml(output1, output2);
                         this.setOutputs(html1, html2);
@@ -316,8 +316,8 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     await fs.promises.rm(tempDir, { recursive: true, force: true });
 
                 } catch (e: any) {
-                    vscode.window.showErrorMessage(`对拍时发生错误: ${e.message}`);
-                    this.setOutputs(`<b>错误:</b>\n${htmlEscape(e.message)}`, `<b>错误:</b>\n${htmlEscape(e.message)}`);
+                    vscode.window.showErrorMessage(`Pair check error: ${e.message}`);
+                    this.setOutputs(`<b>Error:</b>\n${htmlEscape(e.message)}`, `<b>Error:</b>\n${htmlEscape(e.message)}`);
                 }
             }
         });
@@ -375,12 +375,12 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
 
-        // 初始化容器池
+        // Initialize container pool
         DockerManager.initializeContainerPool().catch(error => {
             console.error('Failed to initialize container pool:', error);
         });
 
-        // 设置编辑器事件监听器，实现按需容器管理
+        // Setup editor event listeners for on-demand container management
         setupEditorEventListeners(context);
 
         // Register WebviewView providers
@@ -404,15 +404,15 @@ export function activate(context: vscode.ExtensionContext) {
                         try {
                             await fs.promises.access(saved);
                             const choice = await vscode.window.showQuickPick([
-                                { label: `使用上次：${saved}`, value: 'saved' },
-                                { label: '重新选择...', value: 'pick' }
-                            ], { placeHolder: '选择题目根目录' });
-                            if (!choice) { throw new Error('未选择题目根目录'); }
+                                { label: `Use previous：${saved}`, value: 'saved' },
+                                { label: 'Choose again...', value: 'pick' }
+                            ], { placeHolder: 'Choose problem root directory' });
+                            if (!choice) { throw new Error('Problem root directory not selected'); }
                             if (choice.value === 'saved') { return saved; }
                         } catch { }
                     }
-                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: '选择题目根目录' });
-                    if (!pick || !pick[0]) { throw new Error('未选择题目根目录'); }
+                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Choose problem root directory' });
+                    if (!pick || !pick[0]) { throw new Error('Problem root directory not selected'); }
                     const baseDir = pick[0].fsPath;
                     context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
                     return baseDir;
@@ -420,7 +420,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 async function ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
                     const active = vscode.window.activeTextEditor;
-                    if (!active) { throw new Error('请先在编辑器中打开源文件。'); }
+                    if (!active) { throw new Error('Please open a source file in the editor first。'); }
                     const langId = getLanguageIdFromEditor(active);
                     const ext = langId === 'python' ? 'py' : langId;
                     const problemName = toSafeName(m.name);
@@ -454,7 +454,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 webviewView.webview.onDidReceiveMessage(async (m: any) => {
                     if (m.cmd === 'loadSamples') {
-                        const uris = await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: '选择样例文件' });
+                        const uris = await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: 'Select sample file' });
                         if (uris && uris[0]) {
                             const buf = await vscode.workspace.fs.readFile(uris[0]);
                             const text = buf.toString();
@@ -481,7 +481,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
                 let name = payload?.name;
                 if (!name) {
-                    name = await vscode.window.showInputBox({ prompt: '输入题目名称（将作为文件夹名）', placeHolder: '如：CF1234A' }) || '';
+                    name = await vscode.window.showInputBox({ prompt: 'Enter problem name (will be used as folder name)', placeHolder: 'e.g.: CF1234A' }) || '';
                 }
                 if (!name) { return; }
                 const safe = name.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
@@ -495,7 +495,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 }
                 if (!baseDir) {
-                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: '选择题目根目录' });
+                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Choose problem root directory' });
                     if (!pick || !pick[0]) { return; }
                     baseDir = pick[0].fsPath;
                 }
@@ -507,7 +507,7 @@ export function activate(context: vscode.ExtensionContext) {
                         { label: 'C', detail: 'main.c', value: 'c' },
                         { label: 'C++', detail: 'main.cpp', value: 'cpp' },
                         { label: 'Python', detail: 'main.py', value: 'python' }
-                    ], { placeHolder: '选择语言' });
+                    ], { placeHolder: 'Select language' });
                     if (!langPick) { return; }
                     langId = langPick.value as 'c' | 'cpp' | 'python';
                 }
@@ -517,12 +517,12 @@ export function activate(context: vscode.ExtensionContext) {
                     const configDir = path.join(problemDir, 'config');
                     await fs.promises.mkdir(problemDir, { recursive: true });
                     await fs.promises.mkdir(configDir, { recursive: true });
-                    // Template source - 使用空文件而不是模板代码
+                    // Template source - Use empty file instead of template code
                     const sourcePath = path.join(problemDir, `main.${ext}`);
                     try {
                         await fs.promises.access(sourcePath);
                     } catch {
-                        // 创建空文件，让用户自己编写代码
+                        // Create empty file and let user write code themselves
                         await fs.promises.writeFile(sourcePath, '', 'utf8');
                     }
                     // Default config
@@ -536,7 +536,7 @@ export function activate(context: vscode.ExtensionContext) {
                     try {
                         await fs.promises.access(statementPath);
                     } catch {
-                        await fs.promises.writeFile(statementPath, `# ${safe}\n\n在此编写题面...\n`, 'utf8');
+                        await fs.promises.writeFile(statementPath, `# ${safe}\n\nWrite problem statement here...\n`, 'utf8');
                     }
                     const samplesPath = path.join(configDir, 'samples.txt');
                     try {
@@ -547,11 +547,11 @@ export function activate(context: vscode.ExtensionContext) {
 
                     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
                     await vscode.window.showTextDocument(doc, { preview: false });
-                    vscode.window.showInformationMessage(`已创建题目：${safe}`);
+                    vscode.window.showInformationMessage(`Problem created：${safe}`);
                     return { problemDir, sourcePath };
                 }
             } catch (e: any) {
-                vscode.window.showErrorMessage(`新建题目失败：${e.message || e}`);
+                vscode.window.showErrorMessage(`Failed to create problem：${e.message || e}`);
                 return { error: e?.message || String(e) };
             }
         }));
@@ -564,7 +564,7 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oi-code.showSettingsPage', () => {
             const panel = vscode.window.createWebviewPanel(
                 'oiCodeSettings',
-                'OI-Code 设置',
+                'OI-Code Settings',
                 vscode.ViewColumn.One,
                 { enableScripts: true, retainContextWhenHidden: true }
             );
@@ -602,7 +602,7 @@ export function activate(context: vscode.ExtensionContext) {
             const originalDoc = activeEditor.document;
 
             const pairDoc = await vscode.workspace.openTextDocument({
-                content: `// 在这里粘贴或编写你的对拍代码\n// 例如，一个暴力解法\n`,
+                content: `// Place or write your pair check code here\n// For example, a brute force solution\n`,
                 language: originalDoc.languageId
             });
 
@@ -615,36 +615,36 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
             const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'python' || e.document.languageId === 'c'));
             if (editors.length < 2) {
-                vscode.window.showErrorMessage('需要打开至少两个C/C++/Python代码文件才能进行对拍。');
+                vscode.window.showErrorMessage('Need to open at least two C/C++/Python code files to perform pair check。');
                 return { error: 'NEED_TWO_EDITORS' };
             }
             const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
             const langId = getLanguageIdFromEditor(editor1);
             if (editor2.document.languageId !== langId) {
-                vscode.window.showErrorMessage('两个代码文件的语言类型必须相同。');
+                vscode.window.showErrorMessage('Both code files must have the same language type。');
                 return { error: 'LANG_MISMATCH' };
             }
 
-            // 等待编辑器内容完全加载（使用更可靠的机制）
+            // Wait for editor content to load completely (using more reliable mechanism)
             let attempts = 0;
             const maxAttempts = 10;
-            const checkInterval = 200; // 200ms检查一次
+            const checkInterval = 200; // Check every 200ms
 
             while (attempts < maxAttempts) {
                 const editor1Content = editor1.document.getText();
                 const editor2Content = editor2.document.getText();
                 if (editor1Content.length > 0 && editor2Content.length > 0) {
-                    break; // 内容已加载完成
+                    break; // Content loaded successfully
                 }
                 attempts++;
                 await new Promise(resolve => setTimeout(resolve, checkInterval));
             }
 
-            // 最终检查
+            // Final check
             const finalEditor1Content = editor1.document.getText();
             const finalEditor2Content = editor2.document.getText();
             if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
-                vscode.window.showErrorMessage('编辑器内容加载超时，请稍后再试。');
+                vscode.window.showErrorMessage('Editor content load timeout, please try again later。');
                 return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
             }
 
@@ -662,7 +662,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // Use provided options or fallback to defaults
                 const timeLimit = options?.timeLimit ?? 20; // seconds
 
-                // 优化对拍：使用独立的容器运行，避免复杂的输出解析
+                // Optimize pair check: use separate containers to avoid complex output parsing
                 const pairResult = await runPairInSeparateContainers(
                     context.extensionPath,
                     tempDir,
@@ -689,7 +689,7 @@ export function activate(context: vscode.ExtensionContext) {
                 pairCheckProvider.setOutputs(htmlEscape(output1), htmlEscape(output2));
                 return { output1, output2, equal };
             } catch (e: any) {
-                vscode.window.showErrorMessage(`对拍执行错误: ${e.message}`);
+                vscode.window.showErrorMessage(`Pair check execution error: ${e.message}`);
                 return { error: e.message };
             } finally {
                 await fs.promises.rm(tempDir, { recursive: true, force: true });
@@ -836,7 +836,7 @@ async function getWebviewContent(context: vscode.ExtensionContext, fileName: str
 }
 
 export function deactivate(): Promise<void> {
-    // 彻底清理所有Docker资源，包括删除容器
+    // Thoroughly cleanup all Docker resources, including container deletion
     return DockerManager.cleanupAllDockerResources().catch(error => {
         console.error('Failed to cleanup all Docker resources:', error);
     });

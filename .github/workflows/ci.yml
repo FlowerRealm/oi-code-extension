@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     strategy:
-      fail-fast: false   # 🚀 确保一个失败不会取消其它矩阵任务
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13, windows-11-arm, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
