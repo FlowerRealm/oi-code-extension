@@ -58,14 +58,13 @@ export class Installer {
             case 'darwin': // macOS
                 if (this.isBrewInstalled()) {
                     return {
-                        command: 'brew install --cask docker',
-                        message: 'This will install Docker Desktop using Homebrew.'
+                        command: 'brew install --cask --force --no-quarantine docker',
+                        message: 'Installing Docker Desktop for macOS using Homebrew...'
                     };
                 } else {
                     return {
-                        command: 'open https://desktop.docker.com/mac/main/amd64/Docker.dmg',
-                        message: 'Homebrew not found. Please download and install Docker manually.',
-                        isUrl: true
+                        command: 'echo "Homebrew not found. Installing Homebrew first..." && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install --cask --force --no-quarantine docker',
+                        message: 'Homebrew not available. Installing Homebrew and Docker Desktop automatically...'
                     };
                 }
 
