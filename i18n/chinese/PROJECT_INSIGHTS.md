@@ -1,0 +1,139 @@
+# OI-Code 项目洞察
+
+## 项目认识与技术要点
+
+本扩展旨在为 OI 选手提供一致、可靠的本地开发体验：通过容器将编译与运行彻底与宿主机隔离，避免"装编译器/环境不一致/路径权限"等问题，侧边栏聚焦题目信息管理与操作流，测试体系保障核心功能的稳定性。
+
+## 架构概览
+
+- **extension.ts**：
+  - 激活扩展、注册命令与视图
+  - 统一调用 runSingleInDocker，将运行入口（单测/对拍）都指向容器
+  - 侧边栏 OI-Code 的 WebviewViewProvider：题目信息、限制与操作（运行/对拍）
+  - 命令注册：`oicode.runCode`、`oicode.runPairCheck`、`oicode.createProblem` 等
+
+- **dockerManager.ts**：
+  - 动态选择官方镜像（gcc:13、python:3.11）
+  - run：拼装 docker run 限制参数（CPU/内存/PIDs/网络），并处理 stdout/stderr 与超限标志
+  - 临时写挂载位于 `~/.oi-code-tests/tmp`，避免桌面版共享路径问题
+  - **容器池优化**：复用 Docker 容器以提高性能，减少容器启动开销
+
+- **docker/install.ts**：
+  - 统一静默安装/启动 Docker 的策略（Win/Mac/Linux），并轮询 docker info 直至就绪
+  - 支持包管理器（winget/choco/brew/apt/pacman）和手动安装
+  - 统一的错误日志记录机制
+
+## 运行细节
+
+- **C/C++**：容器内执行 gcc/g++，应用 opt/std 设置后编译；可执行文件放置临时可写目录运行
+- **Python**：容器内 python3 直接运行
+- **资源限制**：
+  - timedOut：超时标志
+  - memoryExceeded：137 等退出码判定
+  - spaceExceeded：stderr 关键字
+- **错误处理**：统一的错误日志记录和用户友好的错误消息
+
+## 题目工程与 UI
+
+- **结构**：`ProblemFolder/main.ext`、`config/problem.json`、`statement.md`、`samples.txt`
+- **新建题目**：`oicode.createProblem` 生成骨架与语言模板，并支持"复用上次根目录/手动选择"
+- **侧边栏**：输入题目名称、URL、题面（Markdown 可编辑）、时间/内存限制、样例；下方选择 O2、语言标准；底部按钮运行/对拍/从文件导入样例
+
+## 测试策略
+
+- 使用 @vscode/test-electron 启动 VS Code 测试宿主
+- 用例先通过 `oicode.createProblem` 创建题目，再执行 `oicode.runCode`/`oicode.runPairCheck`
+- **跨平台兼容**：
+  - Docker 可用性检测：自动跳过需要 Docker 的测试
+  - 文件清理重试机制：解决 Windows 文件锁定问题
+  - Catalan 数算法测试：验证递归和动态规划实现
+- 测试日志输出到 `test-output.log`，便于 CI 与本地排查
+
+## 关键决策
+
+- **全量容器化**：对拍及单测全部走容器，消除本地差异
+- **放弃自建镜像**：直接使用官方语言镜像，降低构建与维护成本
+- **路径策略**：临时写挂载使用用户目录，避免 Desktop 的共享路径限制
+- **返回模型**：`runCode` 返回执行结果对象，由外层判断对错/展示
+- **错误处理**：统一的错误日志记录和用户友好的错误消息
+- **测试体系**：全面的测试覆盖，确保跨平台兼容性
+
+## 最新改进
+
+### 容器池优化
+1. **性能提升**：通过容器池复用 Docker 容器，显著减少容器启动时间
+2. **资源管理**：实现容器健康检查、超时清理和自动重启机制
+3. **回退机制**：当容器池出现问题时自动回退到传统模式
+4. **缓存挂载**：支持 Docker Volumes 挂载以提高文件复制效率
+
+### 安全性改进
+1. **Shell注入防护**：重构代码以避免 shell 注入风险
+2. **输入处理**：使用安全的 stdin 方式传递输入
+3. **资源限制**：严格执行 CPU、内存和进程数限制
+
+### 代码质量提升
+1. **错误处理**：完善错误处理机制，避免未处理的 Promise 拒绝
+2. **代码重构**：消除重复代码，提高可维护性
+3. **类型安全**：改进 TypeScript 类型定义
+4. **国际化**：将所有中文注释翻译为英文，提升代码的可读性
+5. **文档完善**：统一英文注释格式，改善代码文档质量
+6. **编辑器事件优化**：整合重复的编辑器监听器逻辑
+
+### 用户体验优化
+1. **编辑器内容加载**：使用轮询机制确保编辑器内容完全加载
+2. **输出处理**：直接使用 stdout 而不是临时文件
+3. **清理优化**：改进 Docker 资源清理逻辑，避免删除用户数据
+
+### 项目结构优化
+1. **构建产物管理**：清理错误的编译产物并修复.gitignore配置
+2. **目录结构规范**：确保构建文件在正确位置（out/目录）
+3. **代码组织**：优化文件结构和常量定义
+
+## 技术实现细节
+
+### 容器池架构
+```typescript
+interface DockerContainer {
+    containerId: string;
+    languageId: string;
+    image: string;
+    isReady: boolean;
+    lastUsed: number;
+}
+
+interface ContainerPool {
+    containers: Map<string, DockerContainer>;
+    isActive: boolean;
+}
+```
+
+容器池通过以下方式工作：
+1. 在扩展激活时预启动容器
+2. 为每种语言维护一个活动容器
+3. 实现健康检查和超时清理
+4. 支持自动回退到非池模式
+
+### 安全输入处理
+```typescript
+// 使用安全的 stdin 方式传递输入
+if (input) {
+    dockerProcess.stdin.write(input);
+    dockerProcess.stdin.end();
+}
+```
+
+### 资源清理优化
+```typescript
+// 批量停止和删除容器
+private static async _stopContainers(containerIds: string[]): Promise<void>
+private static async _removeContainers(containerIds: string[]): Promise<void>
+```
+
+## 后续可拓展点
+
+- 题库集成（如链接远端 OJ，抓取题目元数据）
+- 评测配置模板与多用例管理
+- 更细粒度的资源限制/沙箱策略（seccomp、AppArmor）
+- 评测报告可视化与历史记录
+- 多语言支持（Java、Go、Rust 等）
+- 在线评测集成
