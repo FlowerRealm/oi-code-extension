@@ -26,9 +26,7 @@ OI-Code 专用的 Clang 工具链镜像，现已在 Docker Hub 上架。这些�
 
 ### 开发工具
 - `llvm` - LLVM 工具链
-- `make` - GNU Make 构建工具
-- `gdb` - GNU 调试器
-- `valgrind` - 内存调试工具
+- `valgrind` - 内存检测工具
 
 ### 支持的标准
 - C: C99, C11, C17
@@ -68,8 +66,7 @@ docker run -it --rm flowerrealm/oi-code-clang-windows cmd
 
 ### 优化特性
 - ✅ 最小化镜像大小
-- ✅ 预配置的网络重试机制
-- ✅ 使用国内镜像源加速构建
+- ✅ 完整的Clang工具链预装
 - ✅ 完整的调试工具集成
 - ✅ 内存和CPU限制支持
 
@@ -90,19 +87,29 @@ docker run -it --rm flowerrealm/oi-code-clang-windows cmd
 ### Linux 版本 (`Dockerfile`)
 
 ```dockerfile
-# 基于 Ubuntu 24.04，使用清华镜像源加速
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS base
+
+# Install core LLVM/Clang toolchain - focused OI environment
 ENV DEBIAN_FRONTEND=noninteractive
-
-# 安装包含重试机制的工具链
-RUN apt-get update --retries=3 && \
+RUN apt-get update --quiet && \
     apt-get install -y \
-        clang clang++ lld lldb llvm make \
-        gdb valgrind ca-certificates \
-        && apt-get clean
+        clang-18 clang++-18 clangd-18 clang-format-18 clang-tidy-18 \
+        lldb-18 llvm-18 lld-18 libclang-18-dev libclang-cpp18-dev \
+        libc++-18-dev libc++abi-18-dev valgrind cppcheck && \
+    # Create symlinks for convenience
+    ln -sf /usr/bin/clang-18 /usr/bin/clang && \
+    ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
+    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
+    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 验证安装
-RUN clang --version && clang++ --version
+# Create runner user and verify installation
+RUN useradd -m -s /bin/bash runner && \
+    mkdir /sandbox && \
+    chown runner:runner /sandbox && \
+    clang --version && \
+    clang++ --version
 ```
 
 ### Windows 版本 (`Dockerfile.windows`)

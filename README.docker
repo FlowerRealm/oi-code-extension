@@ -82,7 +82,7 @@ docker run --rm \
 docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
 
 # 可用的工具：
-# clang, clang++, lldb, llvm, lld, gdb, valgrind, make
+# clang, clang++, lldb, llvm, lld, valgrind
 ```
 
 ### 🔧 技术架构
@@ -132,10 +132,7 @@ RUN clang --version && clang++ --version
 - `llvm-ar` / `llvm-nm` - 工具链组件
 
 **传统工具**:
-- `gcc` / `g++` - 兼容性后备
-- `gdb` - GNU调试器
 - `valgrind` - 内存检测工具
-- `make` - 构建系统
 
 #### ⚡ 性能优化
 
@@ -305,7 +302,7 @@ export HTTP_PROXY=http://proxy.company.com:8080
   - LLVM toolchain
   - lldb debugger
   - lld linker
-  - Development tools (make, gdb, valgrind)
+  - Development tools (valgrind)
 
 #### Windows Image (`oi-code-clang-windows:latest`)
 - **Base**: Windows Nano Server LTSC 2022

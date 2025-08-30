@@ -1,5 +1,0 @@
-[33m1f5321f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/docker-clang-automation[m[33m, [m[1;31morigin/feature/docker-clang-automation[m[33m)[m 🔧 修复代码审查建议
-[33m4ad33e7[m 📝 更新文档：同步 Clang 自动化发布
-[33me52fbfb[m 🔧 重构Docker镜像：Clang18 + Ubuntu24.04 + GitHub Actions自动发布
-[33md51bd36[m[33m ([m[1;31morigin/feature/code-optimization[m[33m)[m fix: address code review feedback for documentation
-[33m17b68d5[m docs: finalize bilingual documentation clean-up

@@ -1,5 +1,5 @@
-# Multi-stage build for OI-Code Clang++ container
-FROM ubuntu:24.04 AS base
+# OI-Code Clang container based on Ubuntu 24.04
+FROM ubuntu:24.04
 
 # Install Clang++ toolchain with complete debugging tools
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,18 +11,18 @@ RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
     echo "deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
     apt-get update --quiet && \
     apt-get install -y \
-        clang-18 \
-        clang++-18 \
-        clangd-18 \
-        clang-format-18 \
-        clang-tidy-18 \
-        lldb-18 \
-        llvm-18 \
-        lld-18 \
-        libclang-18-dev \
-        libclang-cpp18-dev \
-        libc++-18-dev \
-        libc++abi-18-dev \
+    clang-18 \
+    clang++-18 \
+    clangd-18 \
+    clang-format-18 \
+    clang-tidy-18 \
+    lldb-18 \
+    llvm-18 \
+    lld-18 \
+    libclang-18-dev \
+    libclang-cpp18-dev \
+    libc++-18-dev \
+    libc++abi-18-dev \
         valgrind \
         cppcheck \
         && \
@@ -34,14 +34,12 @@ RUN rm -f /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Verify Clang installation
-RUN clang --version && clang++ --version
-
-# Create runner user with proper permissions
-FROM base AS runner
+# Create runner user with proper permissions and verify Clang installation
 RUN useradd -m -s /bin/bash runner && \
     mkdir /sandbox && \
-    chown runner:runner /sandbox
+    chown runner:runner /sandbox && \
+    clang --version && \
+    clang++ --version
 
 USER runner
 WORKDIR /sandbox
