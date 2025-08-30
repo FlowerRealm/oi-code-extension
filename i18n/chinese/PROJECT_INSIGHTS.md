@@ -1,5 +1,7 @@
 # OI-Code 项目洞察
 
+[![English Documentation](https://img.shields.io/badge/Project-Insights-blue.svg)](../../docs/PROJECT_INSIGHTS.md)
+
 ## 项目认识与技术要点
 
 本扩展旨在为 OI 选手提供一致、可靠的本地开发体验：通过容器将编译与运行彻底与宿主机隔离，避免"装编译器/环境不一致/路径权限"等问题，侧边栏聚焦题目信息管理与操作流，测试体系保障核心功能的稳定性。

@@ -1,5 +1,7 @@
 # 贡献指南
 
+[![English Documentation](https://img.shields.io/badge/Contributing-Guide-blue.svg)](../../CONTRIBUTING.md)
+
 感谢您对 OI-Code 扩展的关注！我们欢迎各种形式的贡献。
 
 ## 开发环境设置
