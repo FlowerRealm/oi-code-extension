@@ -13,7 +13,7 @@ import * as vscode from 'vscode';
 import { Installer } from './docker/install';
 import { OI_CODE_TEST_TMP_PATH } from './constants';
 
-// Docker inspect 输出接口定义
+// Docker inspect output interface definitions
 interface DockerMount {
     Type: string;
     Source: string;
@@ -57,7 +57,7 @@ interface DockerContainerInfo {
     };
 }
 
-// 容器池管理接口
+// Container pool management interfaces
 interface DockerContainer {
     containerId: string;
     languageId: string;
@@ -72,10 +72,10 @@ interface ContainerPool {
     isActive: boolean;
 }
 
-// 容器池配置
+// Container pool configuration
 const CONTAINER_POOL_CONFIG = {
-    maxIdleTime: 30 * 60 * 1000, // 30分钟无使用自动清理
-    healthCheckInterval: 5 * 60 * 1000, // 5分钟健康检查
+    maxIdleTime: 30 * 60 * 1000, // Auto cleanup after 30 minutes of inactivity
+    healthCheckInterval: 5 * 60 * 1000, // Health check every 5 minutes
     supportedLanguages: ['c', 'cpp', 'python'] as const,
 };
 
@@ -84,13 +84,13 @@ const CONTAINER_POOL_CONFIG = {
  * and resource management for the OI extension.
  */
 export class DockerManager {
-    // 容器池实例
+    // Container pool instance
     public static containerPool: ContainerPool = {
         containers: new Map(),
         isActive: false
     };
 
-    // 健康检查定时器
+    // Health check timer
     private static healthCheckTimer: NodeJS.Timeout | null = null;
 
     /**
@@ -163,11 +163,11 @@ export class DockerManager {
         memoryExceeded: boolean;
         spaceExceeded: boolean;
     }> {
-        // 确保 Docker 可用
+        // Ensure Docker is available
         await this.ensureDockerIsReady(options.projectRootPath);
 
-        // 如果容器池已激活，则优先使用容器池
-        // 容器池中的容器可以动态调整内存限制
+        // If container pool is active, use it first
+        // Container pool containers can have dynamic memory limits
         if (this.containerPool.isActive) {
             try {
                 return await this.runWithContainerPool(options);
@@ -177,7 +177,7 @@ export class DockerManager {
             }
         }
 
-        // 否则使用原来的实现（包括自定义内存限制的情况）
+        // Otherwise use the original implementation (including custom memory limits)
         return this.runWithoutContainerPool(options);
     }
 
@@ -201,39 +201,39 @@ export class DockerManager {
     }> {
         const { sourceDir, command, input, memoryLimit, languageId, timeLimit } = options;
 
-        // 容器池中的容器预设为512MB内存
-        // 如果请求的内存超过512MB，使用临时容器
+        // Pool containers are pre-set to 512MB memory
+        // If requested memory exceeds 512MB, use temporary container
         if (parseInt(memoryLimit) > 512) {
             console.log(`[DockerManager] Requested memory ${memoryLimit}MB exceeds pool limit (512MB), using temporary container`);
             return this.runWithoutContainerPool(options);
         }
 
-        // 对于512MB及以下的请求，使用容器池
-        // 容器内部会通过cgroup等方式限制实际程序的内存使用
+        // For requests ≤512MB, use container pool
+        // Actual program memory is limited via cgroup inside container
         console.log(`[DockerManager] Using container pool with 512MB container limit (program limit: ${memoryLimit}MB)`);
 
-        // 获取容器
+        // Get container for language
         const container = await this.getContainerForLanguage(languageId);
 
         try {
-            // 使用缓存挂载进行高效的文件同步
+            // Use cache mount for efficient file synchronization
             const hasCacheMount = container.hasCacheMount ?? false;
             if (hasCacheMount) {
-                // 高效的文件同步：直接在宿主机上操作缓存目录
+                // Efficient file sync: operate directly on host cache directory
                 await this.syncFilesToCacheMount(sourceDir, languageId);
                 console.log(`[DockerManager] Using cache mount for container ${container.containerId}`);
             } else {
-                // 回退到原来的文件同步逻辑
+                // Fallback to original file sync logic
                 await this.copyFilesToContainer(sourceDir, container.containerId, false);
                 console.log(`[DockerManager] Using direct copy for container ${container.containerId}`);
             }
 
-            // 使用管道格式执行命令
+            // Execute command using pipe format
             const outputChannel = vscode.window.createOutputChannel('OI-Code Docker');
             outputChannel.show(true);
 
-            // 构建管道命令 - 使用安全的参数传递方式避免shell注入
-            // 将命令通过数组形式传递，而不是字符串拼接
+            // Build pipe command - use safe parameter passing to avoid shell injection
+            // Pass commands as array instead of string concatenation
             const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
             const dockerProcess = spawn('docker', dockerExecArgs);
 
@@ -253,13 +253,13 @@ export class DockerManager {
                 outputChannel.appendLine(`[pipe stderr] ${text.trimEnd()}`);
             });
 
-            // 通过stdin传递输入（如果有）
+            // Pass input via stdin if provided
             if (input) {
                 dockerProcess.stdin.write(input);
             }
             dockerProcess.stdin.end();
 
-            // 硬超时：如果超过时间限制则杀死进程
+            // Hard timeout: kill process if time limit exceeded
             const killTimer = setTimeout(() => {
                 console.warn(`[DockerManager] Timeout exceeded, killing process`);
                 dockerProcess.kill('SIGTERM');
@@ -270,7 +270,7 @@ export class DockerManager {
                 dockerProcess.on('close', async (pipeCode) => {
                     clearTimeout(killTimer);
 
-                    // 直接使用管道的输出，不需要额外获取
+                    // Use pipe output directly, no additional retrieval needed
                     const memoryExceeded = !timedOut && (pipeCode === 137 || /Out of memory|Killed process/m.test(stderr));
                     const spaceExceeded = /No space left on device|disk quota exceeded/i.test(stderr);
                     resolve({ stdout, stderr, timedOut, memoryExceeded, spaceExceeded });
