@@ -1,71 +1,283 @@
-## OI-Code Docker Image Documentation
+## OI-Code Clang Docker Images 自动化文档
 
-This document explains how to build and use custom Docker images for OI-Code extension with Clang toolchain support.
+本目录包含 OI-Code 扩展的 Docker Clang 镜像自动化构建和发布配置。
 
-### Overview
+### 🎯 核心特性
 
-OI-Code uses Docker containers to provide a consistent development environment. We've created custom Docker images that:
+OI-Code 现在自动使用基于 **Ubuntu 24.04 + Clang 18.1.8** 的镜像，提供：
 
-1. **Replace gcc with Clang**: Use LLVM/Clang toolchain instead of GCC
-2. **Platform-specific images**:
-   - Linux/macOS: Ubuntu 24.04-based image (`oi-code-clang:latest`)
-   - Windows: Windows Nano Server-based image (`oi-code-clang-windows:latest`)
+1. **全自动化构建**: GitHub Actions 自动构建和发布
+2. **统一的 Clang 工具链**: 替换原有的 GCC，确保一致性和性能
+3. **跨平台兼容**: 基于 Ubuntu 24.04，支持 Linux/macOS/Windows through Docker Desktop
+4. **构建缓存优化**: 使用 Docker 构建缓存加速 CI/CD 流程
+5. **安全认证**: 使用 Docker Hub 个人访问令牌而非密码
 
-### Prerequisites
+### 🚀 自动化流程
 
-- Docker installed and running
-- For Linux/macOS development: Standard Docker setup
-- For Windows development: Windows containers support enabled in Docker Desktop
+#### ⚡ GitHub Actions 自动工作流
 
-### Quick Start
+当您推送代码到 `main` 分支时：
 
-1. **Build Docker Images**:
-   ```bash
-   # Make build script executable (if not already)
-   chmod +x build-images.sh
+1. **自动测试**: 14种操作系统矩阵测试
+2. **构建镜像**: Ubuntu 24.04 + Clang 18 工具链
+3. **推送到 Docker Hub**: 生成两个标签
+4. **构建缓存储存**: 加快后续构建速度
 
-   # Build images for your platform
-   ./build-images.sh
-   ```
-
-2. **Configure OI-Code** (optional - automatic if images exist):
-   ```json
-   // Add to VS Code settings.json
-   "oicode.docker.compilers": {
-     "cpp": "oi-code-clang:latest",
-     "c": "oi-code-clang:latest"
-   }
-   ```
-
-3. **Start Coding**:
-   - Open C/C++ files in VS Code
-   - Use OI-Code commands (run, pair check, etc.)
-   - Extension will use Clang toolchain automatically
-
-### Building Images (Advanced)
-
-Use the provided build script to create images for your platform:
+#### 📦 自动生成的镜像标签
 
 ```bash
-# Build image for current platform only (recommended)
-./build-images.sh
-
-# Build Linux image only
-./build-images.sh linux
-
-# Build Windows image only
-./build-images.sh windows
-
-# Build both images
-./build-images.sh all
+🐳 flowerrealm/oi-code-clang:latest     # 最新版
+🐳 flowerrealm/oi-code-clang:v{x.y.z}   # 版本标签
+🔧 flowerrealm/oi-code-clang:buildcache # 构建缓存
 ```
 
-### Usage
+### 📋 使用方法
 
-Once built, the OI-Code extension will automatically use the custom images:
+#### 🌐 从 Docker Hub 拉取
 
-- **Linux/macOS**: `oi-code-clang:latest`
-- **Windows**: `oi-code-clang-windows:latest`
+```bash
+# 拉取最新版
+docker pull flowerrealm/oi-code-clang:latest
+
+# 验证 Clang 安装
+docker run --rm flowerrealm/oi-code-clang:latest clang++ --version
+```
+
+#### ⚙️ OI-Code 扩展自动使用
+
+安装镜像后，OI-Code 扩展会自动使用，**无需手动配置**：
+
+```json
+// settings.json (自动配置，无需修改)
+{
+  "oicode.docker.compilers": {
+    "cpp": "flowerrealm/oi-code-clang:latest",
+    "c": "flowerrealm/oi-code-clang:latest"
+  }
+}
+```
+
+#### 🧪 本地测试
+
+```bash
+# 创建测试用例
+echo '#include <bits/stdc++.h>
+int main() {
+    std::cout << "Hello OI-Clang!" << std::endl;
+    return 0;
+}' > test.cpp
+
+# 编译运行
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  flowerrealm/oi-code-clang:latest \
+  clang++ test.cpp -o test && ./test
+```
+
+#### 🐌 进入容器调试
+
+```bash
+# Linux/macOS
+docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
+
+# 可用的工具：
+# clang, clang++, lldb, llvm, lld, gdb, valgrind, make
+```
+
+### 🔧 技术架构
+
+#### 🐳 Dockerfile 简介
+
+```dockerfile
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 安装 Clang 18 完整工具链
+RUN apt-get update && apt-get install -y \
+    clang-18 clang++-18 lldb-18 llvm-18 \
+    lld-18 make gdb valgrind \
+    && apt-get clean
+
+# 设置默认编译器
+RUN update-alternatives --set clang /usr/bin/clang-18
+RUN update-alternatives --set clang++ /usr/bin/clang++-18
+
+# 验证安装
+RUN clang --version && clang++ --version
+```
+
+#### 🛠️ 预装工具
+
+**Clang 系列**:
+- `clang` / `clang++` - C/C++ 编译器
+- `lldb` - 调试器
+- `lld` - 高性能链接器
+- `llvm-ar` / `llvm-nm` - 工具链组件
+
+**传统工具**:
+- `gcc` / `g++` - 兼容性后备
+- `gdb` - GNU调试器
+- `valgrind` - 内存检测工具
+- `make` - 构建系统
+
+#### ⚡ 性能优化
+
+- **最小化镜像**: 基于 Ubuntu 24.04 LTS，去除了不必要的包
+- **构建缓存**: 多层缓存优化，显著提速 CI/CD
+- **网络优化**: 使用中国镜像源加速构建
+- **安全配置**: 非root用户运行，隔离文件系统
+
+### 🔐 安全配置
+
+#### 🏷️ 镜像安全特性
+
+- ✅ **最小化攻击面**: 只包含必要的编译工具
+- ✅ **网络隔离**: 容器内网络访问受限
+- ✅ **文件隔离**: 源代码独立挂载，防止数据泄露
+- ✅ **权限控制**: 非root用户运行应用
+
+#### 🔑 Docker Hub 认证
+
+使用个人访问令牌而非密码：
+
+```bash
+# 设置环境变量
+export DOCKERHUB_TOKEN="your-token-here"
+
+# 或使用发布脚本 (自动处理令牌认证)
+./push-to-dockerhub.sh --all
+```
+
+### 📊 CI/CD 集成
+
+#### 🚀 GitHub Actions 工作流
+
+`.github/workflows/ci.yml` 提供了完整的自动化流程：
+
+```yaml
+# 主要作业
+- test:          # 14种平台矩阵测试
+- deploy-docker: # 自动构建和发布镜像
+
+# 触发条件
+- push to main + manual deployment
+- 自动生成版本标签
+- 构建缓存管理
+```
+
+#### 🧪 本地开发
+
+开发过程中使用发布脚本：
+
+```bash
+# 构建并推送所有版本
+./push-to-dockerhub.sh --all
+
+# 构建但不推送 (测试)
+./push-to-dockerhub.sh --build-only
+
+# 推送特定版本
+./push-to-dockerhub.sh --version v1.2.3
+```
+
+### 🎵 故障排除
+
+#### 🚨 镜像拉取失败
+
+```bash
+# 清理缓存并重试
+docker system prune -a
+docker pull flowerrealm/oi-code-clang:latest
+
+# 故障排除
+docker logs <container_id>
+```
+
+#### 🐛 编译错误
+
+```bash
+# 检查 Clang 版本
+docker run --rm flowerrealm/oi-code-clang:latest clang++ --version
+
+# 使用特定标准
+clang++ main.cpp -std=c++17 -o main
+
+# 启用调试信息
+clang++ main.cpp -g -O0 -o main
+```
+
+#### 🖥️ Windows 兼容问题
+
+对于 Windows 用户，推荐使用 Docker Desktop 的 Linux 容器模式：
+
+```powershell
+# 检查容器模式
+docker version
+
+# 切换到 Linux 容器 (如果需要)
+# Docker Desktop > Settings > General
+```
+
+#### 📱 网络连接问题
+
+如果遇到网络超时：
+
+```bash
+# 检查网络连接
+curl -I https://hub.docker.com
+
+# 使用代理 (如果公司网络需要)
+export HTTP_PROXY=http://proxy.company.com:8080
+./push-to-dockerhub.sh --all
+```
+
+### 📚 迁移指南
+
+#### 📈 从 GCC 迁移
+
+旧版本使用了 GCC，新版本自动使用 Clang：
+
+```diff
+# 旧版本 (在容器内安装 gcc)
+- apt-get install -y gcc g++
+- gcc/g++ main.cpp -o main
+
+# 新版本 (预装 Clang)
++ clang++ main.cpp -o main  # 无需安装
++ clang --version           # 验证安装
+```
+
+#### 🔄 版本兼容性
+
+- ✅ **向后兼容**: 仍然支持 `c++17`, `c11` 等标准
+- ✅ **语法兼容**: Clang 完全兼容 GCC 语法
+- ✅ **库兼容**: libc++ 和 libstdc++ 兼容
+- ✅ **扩展支持**: Clang 特定的扩展支持
+
+### 🔗 完整集成
+
+#### 📋 推荐的完整流程
+
+1. **开发阶段**: 本地使用自动拉取的镜像
+2. **测试阶段**: GitHub Actions 自动测试
+3. **发布阶段**: 自动构建并推送新版本
+4. **使用阶段**: OI-Code 扩展无缝使用新镜像
+
+#### 🌟 项目链接
+
+- 🔗 **GitHub 仓库**: https://github.com/FlowerRealm/oi-code-extension
+- 🐳 **Docker Hub**: https://hub.docker.com/r/flowerrealm/oi-code-clang
+- 📖 **VS Code 扩展**: [OI-Code in VS Code Marketplace]
+
+### 📝 更新日志
+
+- **v1.0.0**: 初始 Clang 18 自动发布
+  - Ubuntu 24.04 LTS 基础
+  - 完整的 LLVM/Clang 工具链
+  - GitHub Actions CI/CD 集成
+  - 构建缓存和性能优化
+  - 跨平台兼容性改进
 
 ### Custom Image Details
 
