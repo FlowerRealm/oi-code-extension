@@ -1,5 +1,8 @@
 # OI-Code
 
+这已经是中文版本
+[![English Documentation](https://img.shields.io/badge/English-Documentation-blue.svg)](../../README.md)
+
 OI-Code 是一个为竞技编程者和学生设计的 Visual Studio Code 扩展，帮助练习编程题目。它提供了一个简化的工作流程，用于在受控的 Docker 环境中编写、编译、运行和测试代码。
 
 ## 功能特性
@@ -86,7 +89,7 @@ OI-Code 的初始版本，具有基本功能。
 
 ## 贡献
 
-有关如何为此项目做出贡献的详细信息，请参见 `i18n/english/CONTRIBUTING.md` 或 `i18n/chinese/CONTRIBUTING.md`。
+有关如何为此项目做出贡献的详细信息，请参见 `./CONTRIBUTING.md` 或主目录下的 `CONTRIBUTING.md`。
 
 ## 许可证
 
