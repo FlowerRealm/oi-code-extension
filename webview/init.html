@@ -135,8 +135,7 @@
                             c</label>
                         <label for="lang-cpp"><input type="checkbox" id="lang-cpp" name="language" value="cpp">
                             C++</label>
-                        <label for="lang-python"><input type="checkbox" id="lang-python" name="language" value="python">
-                            Python</label>
+
                     </div>
                     <div id="language-loading" class="hidden">
                         <p><strong>正在配置语言环境...</strong></p>
@@ -189,10 +188,10 @@
             const selected = [];
             const cCheckbox = document.getElementById('lang-c');
             const cppCheckbox = document.getElementById('lang-cpp');
-            const pythonCheckbox = document.getElementById('lang-python');
+
             if (cCheckbox && cCheckbox.checked) selected.push('c');
             if (cppCheckbox && cppCheckbox.checked) selected.push('cpp');
-            if (pythonCheckbox && pythonCheckbox.checked) selected.push('python');
+
             return selected;
         }
 
@@ -217,10 +216,9 @@
 
         const langCCheckbox = document.getElementById('lang-c');
         const langCppCheckbox = document.getElementById('lang-cpp');
-        const langPythonCheckbox = document.getElementById('lang-python');
         if (langCCheckbox) langCCheckbox.addEventListener('change', updateUI);
         if (langCppCheckbox) langCppCheckbox.addEventListener('change', updateUI);
-        if (langPythonCheckbox) langPythonCheckbox.addEventListener('change', updateUI);
+
 
         prevBtn.addEventListener('click', () => {
             if (currentStep > 0) {

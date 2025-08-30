@@ -76,7 +76,7 @@ interface ContainerPool {
 const CONTAINER_POOL_CONFIG = {
     maxIdleTime: 30 * 60 * 1000, // Auto cleanup after 30 minutes of inactivity
     healthCheckInterval: 5 * 60 * 1000, // Health check every 5 minutes
-    supportedLanguages: ['c', 'cpp', 'python'] as const,
+    supportedLanguages: ['c', 'cpp'] as const,
 };
 
 /**
@@ -84,6 +84,25 @@ const CONTAINER_POOL_CONFIG = {
  * and resource management for the OI extension.
  */
 export class DockerManager {
+    // Extension context for getting path reliably
+    private static extensionContext: vscode.ExtensionContext | null = null;
+
+    // Static getter for extension path
+    private static get extensionPath(): string {
+        if (!this.extensionContext) {
+            throw new Error('DockerManager not initialized with extension context');
+        }
+        return this.extensionContext.extensionPath;
+    }
+
+    /**
+     * Initialize DockerManager with extension context
+     */
+    public static initialize(context: vscode.ExtensionContext): void {
+        this.extensionContext = context;
+        console.log('[DockerManager] Initialized with extension path:', this.extensionPath);
+    }
+
     // Container pool instance
     public static containerPool: ContainerPool = {
         containers: new Map(),
@@ -234,7 +253,10 @@ export class DockerManager {
 
             // Build pipe command - use safe parameter passing to avoid shell injection
             // Pass commands as array instead of string concatenation
-            const dockerExecArgs = ['exec', '-i', container.containerId, 'bash', '-c', `cd /tmp/source && ${command}`];
+            // Detect Windows containers and use appropriate shell
+            const isWindowsContainer = container.image.includes('windows') || container.image.includes('nanoserver');
+            const shellCmd = isWindowsContainer ? ['cmd', '/S', '/C'] : ['bash', '-c'];
+            const dockerExecArgs = ['exec', '-i', container.containerId, ...shellCmd, `cd /tmp/source && ${command}`];
             const dockerProcess = spawn('docker', dockerExecArgs);
 
             let stdout = '';
@@ -407,6 +429,9 @@ export class DockerManager {
         const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
         const image = this.selectImageForCommand(languageId);
 
+        // Ensure Clang image exists before running the container
+        await this.ensureClangImageExists(image, os.platform());
+
         const containerName = `oi-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         // Build docker run parameters, use secure stdin method to pass input
@@ -514,21 +539,117 @@ export class DockerManager {
         if (compilers[languageId]) {
             return compilers[languageId];
         }
-
-        // For Windows environment, use Linux images (assuming Docker Desktop supports Linux containers)
-        // If user's Docker doesn't support Linux containers, they need to manually configure custom images
-        switch (languageId.toLowerCase()) {
-            case 'python':
-                return 'python:3.11';
-            case 'cpp':
-            case 'c++':
-                return 'gcc:13';
-            case 'c':
-                return 'gcc:13';
-            default:
-                return 'ubuntu:24.04';
-        }
+        return 'flowerrealm/oi-code-clang:latest';
     }
+
+    /**
+     * Ensure Clang image exists, try pull first, build locally if pull fails
+     */
+    private static async ensureClangImageExists(imageName: string, platform: NodeJS.Platform): Promise<void> {
+        // Use a static flag to prevent concurrent operations on the same image
+        if (this.imageBuildPromises.has(imageName)) {
+            console.log(`[DockerManager] Operation already in progress for ${imageName}, waiting...`);
+            return this.imageBuildPromises.get(imageName)!;
+        }
+
+        const handleResolve = () => {
+            this.imageBuildPromises.delete(imageName);
+        };
+
+        const handleResolveError = () => {
+            this.imageBuildPromises.delete(imageName);
+            // Continue with fallback - don't stop execution
+        };
+
+        return new Promise(async (resolve) => {
+            const checkImage = spawn('docker', ['images', '-q', imageName]);
+            let imageId = '';
+
+            checkImage.stdout.on('data', (data) => {
+                imageId += data.toString().trim();
+            });
+
+            checkImage.on('close', async (code) => {
+                if (code === 0 && imageId) {
+                    // Image exists locally
+                    console.log(`[DockerManager] Clang image ${imageName} found and ready`);
+                    handleResolve();
+                    resolve();
+                } else {
+                    // Image doesn't exist, try pulling first
+                    console.log(`[DockerManager] Clang image ${imageName} not found locally, attempting to pull from Docker Hub...`);
+
+                    const pullPromise = this.pullImageFromDockerHub(imageName);
+                    this.imageBuildPromises.set(imageName, pullPromise);
+
+                    try {
+                        await pullPromise;
+                        console.log(`[DockerManager] Successfully pulled Clang image ${imageName} from Docker Hub`);
+                        handleResolve();
+                        resolve();
+                    } catch (pullError) {
+                        console.warn(`[DockerManager] Failed to pull ${imageName} from Docker Hub: ${pullError}`);
+                        console.log(`[DockerManager] Skipping ${imageName} - will continue without this image. OI-Code will use available images or alternative methods.`);
+
+                        // 继续执行而不做任何进一步的尝试 - 让用户在后续执行时看到更清楚的错误信息
+                        handleResolveError();
+                        resolve(); // 不抛出错误，允许继续运行
+                    }
+                }
+            });
+
+            checkImage.on('error', (err) => {
+                console.warn(`[DockerManager] Error checking image ${imageName}: ${err.message}`);
+                handleResolveError();
+                resolve();
+            });
+        });
+    }
+
+    // Static map to track ongoing image builds
+    private static imageBuildPromises: Map<string, Promise<void>> = new Map();
+
+    /**
+     * Pull image from Docker Hub with reduced verbose logging
+     */
+    private static async pullImageFromDockerHub(imageName: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            console.log(`[DockerManager] Pulling ${imageName} from Docker Hub...`);
+
+            const pullProcess = spawn('docker', ['pull', imageName], {
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            // Reduce logging for minor progress updates, only log errors and completion
+            let pullError: string = '';
+
+            pullProcess.stderr.on('data', (data) => {
+                const errorMsg = data.toString();
+                if (errorMsg.includes('manifest') || errorMsg.includes('error') || errorMsg.includes('failed')) {
+                    pullError = errorMsg.trim();
+                    console.warn(`[DockerManager] Pull error for ${imageName}: ${pullError}`);
+                }
+            });
+
+            pullProcess.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`[DockerManager] Successfully pulled ${imageName}`);
+                    resolve();
+                } else {
+                    const errorMessage = pullError || `Pull command exited with code ${code}`;
+                    console.error(`[DockerManager] Failed to pull ${imageName}: ${errorMessage}`);
+                    reject(new Error(errorMessage));
+                }
+            });
+
+            pullProcess.on('error', (err) => {
+                console.error(`[DockerManager] Pull process error for ${imageName}: ${err.message}`);
+                reject(err);
+            });
+        });
+    }
+
+
 
     /**
      * Adopt existing healthy containers to avoid resource leaks
@@ -789,7 +910,7 @@ export class DockerManager {
             await this.forceRemoveOiContainers();
 
             // Only remove images created by oi-code, preserve base images
-            // Note: No longer removing gcc:13 and python:3.11 base images
+            // Note: No longer removing gcc:13 base images
             console.log('[DockerManager] Skipping base image removal to preserve Docker Hub images...');
 
             // Skip Docker system prune to avoid user data loss
@@ -846,12 +967,17 @@ export class DockerManager {
         });
     }
 
-    /**
-     * Start container for specified language - optimized version with Docker Volumes support
-     */
     private static async startContainerForLanguage(languageId: string): Promise<DockerContainer> {
         const image = this.selectImageForCommand(languageId);
+        const platform = os.platform();
+
+        // Ensure Clang image exists and is ready before starting container
+        await this.ensureClangImageExists(image, platform);
+
         const containerName = `oi-container-${languageId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
+        console.log(`[DockerManager] Container pool:`, this.containerPool.containers.size);
 
         console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
 

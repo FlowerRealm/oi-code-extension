@@ -54,21 +54,5 @@
             "value": "",
             "vscode_setting_id": "oi-code.language.cpp.Args"
         }
-    ],
-    "Python 语言配置": [
-        {
-            "name": "Python 解释器",
-            "description": "用于执行 Python 文件的解释器路径. 例如: /usr/bin/python",
-            "type": "fill",
-            "value": "",
-            "vscode_setting_id": "oi-code.language.python.Command"
-        },
-        {
-            "name": "Python 编译参数",
-            "description": "Python 语言的编译参数. 例如: -Wignore -u",
-            "type": "fill",
-            "value": "",
-            "vscode_setting_id": "oi-code.language.python.Args"
-        }
     ]
 }

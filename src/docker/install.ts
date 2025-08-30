@@ -58,14 +58,13 @@ export class Installer {
             case 'darwin': // macOS
                 if (this.isBrewInstalled()) {
                     return {
-                        command: 'brew install --cask docker',
-                        message: 'This will install Docker Desktop using Homebrew.'
+                        command: 'brew install --cask --force --no-quarantine docker',
+                        message: 'Installing Docker Desktop for macOS using Homebrew...'
                     };
                 } else {
                     return {
-                        command: 'open https://desktop.docker.com/mac/main/amd64/Docker.dmg',
-                        message: 'Homebrew not found. Please download and install Docker manually.',
-                        isUrl: true
+                        command: 'echo "Homebrew not found. Installing Homebrew first..." && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install --cask --force --no-quarantine docker',
+                        message: 'Homebrew not available. Installing Homebrew and Docker Desktop automatically...'
                     };
                 }
 
@@ -224,59 +223,153 @@ export class Installer {
                         }
                     }
                 } else if (platform === 'darwin') {
-                    if (this.isCommandAvailable('brew')) {
-                        progress.report({ message: 'Installing Docker Desktop via Homebrew (silently)...' });
-                        try {
-                            // Try non-interactive installation, log errors but don't throw if failed
-                            const result = cp.spawnSync('brew', ['install', '--cask', 'docker'], {
-                                stdio: ['ignore', 'pipe', 'pipe'],
-                                timeout: 300000 // 5 minute timeout
-                            });
+                    const isArm64 = process.arch === 'arm64';
+                    dockerInstallOutput.appendLine(`macOS ${isArm64 ? 'ARM64' : 'Intel'} architecture detected`);
 
-                            if (result.status === 0) {
-                                dockerInstallOutput.appendLine('Docker Desktop installed successfully via Homebrew');
-                            } else {
-                                const errorMsg = result.stderr?.toString() || 'Unknown error';
-                                dockerInstallOutput.appendLine(`Homebrew installation failed: ${errorMsg}`);
-                                console.warn('Homebrew Docker installation failed:', errorMsg);
-                            }
+                    // Check if Homebrew is available first
+                    if (!this.isCommandAvailable('brew')) {
+                        dockerInstallOutput.appendLine('Homebrew not found. Installing Homebrew first...');
+                        try {
+                            // Install Homebrew for macOS
+                            const installBrewCmd = isArm64
+                                ? '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+                                : '/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"';
+
+                            const installProcess = cp.execSync(installBrewCmd, {
+                                stdio: 'inherit',
+                                timeout: 300000 // 5 minutes
+                            });
+                            dockerInstallOutput.appendLine('Homebrew installed successfully');
                         } catch (error: any) {
-                            console.error('Failed to install Docker via Homebrew:', error);
-                            dockerInstallOutput.appendLine(`Failed to install Docker via Homebrew: ${error?.message || String(error)}`);
+                            dockerInstallOutput.appendLine(`Failed to install Homebrew: ${error.message}`);
+                            throw new Error(`Failed to install Homebrew: ${error.message}`);
                         }
-                    } else {
-                        dockerInstallOutput.appendLine('Homebrew not available for Docker installation');
                     }
 
-                    // Attempting to start Docker Desktop
-                    progress.report({ message: 'Attempting to start Docker Desktop...' });
-                    try {
-                        // First check if Docker.app exists in standard location
-                        const standardPath = '/Applications/Docker.app';
-                        const altPath = `${os.homedir()}/Applications/Docker.app`;
+                    // Check if Docker Desktop CLI is already available in PATH
+                    let dockerCliAvailable = this.isCommandAvailable('docker');
 
-                        let dockerPath = standardPath;
-                        if (!fs.existsSync(standardPath) && fs.existsSync(altPath)) {
-                            dockerPath = altPath;
+                    // Check for Docker Desktop application
+                    progress.report({ message: 'Checking Docker Desktop installation...' });
+                    const dockerPaths = [
+                        '/Applications/Docker.app',
+                        `${os.homedir()}/Applications/Docker.app`,
+                        '/opt/homebrew/bin/docker', // ARM64 Homebrew
+                        '/usr/local/bin/docker' // Intel Homebrew
+                    ];
+
+                    let dockerInstalled = dockerCliAvailable;
+                    let dockerPath = '';
+
+                    // Check for installed Docker application
+                    for (const path of dockerPaths) {
+                        if (fs.existsSync(path) || (path.includes('/bin/docker') && this.isCommandAvailable('docker'))) {
+                            dockerInstalled = true;
+                            dockerPath = path;
+                            dockerInstallOutput.appendLine(`Found Docker at: ${path}`);
+                            break;
                         }
+                    }
 
-                        if (fs.existsSync(dockerPath)) {
-                            cp.spawn('open', [dockerPath], { detached: true, stdio: 'ignore' });
-                            dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
-                        } else {
-                            dockerInstallOutput.appendLine('Docker Desktop application not found in standard locations. Trying to open via Launch Services...');
-                            try {
-                                // Use 'open -a' to let system find and open application by name
-                                cp.spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' });
-                                dockerInstallOutput.appendLine('Attempted to start Docker via Launch Services.');
-                            } catch (error: any) {
-                                console.error('Failed to start Docker via Launch Services:', error);
-                                dockerInstallOutput.appendLine(`Failed to start Docker via Launch Services: ${error?.message || String(error)}`);
+                    // If Docker is not available, install it
+                    if (!dockerInstalled) {
+                        dockerInstallOutput.appendLine('Docker not found. Installing Docker Desktop...');
+                        progress.report({ message: 'Installing Docker Desktop...' });
+
+                        try {
+                            // Install Docker Desktop using Homebrew (works for both Intel and ARM64)
+                            dockerInstallOutput.appendLine('Running: brew install --cask --no-quarantine docker');
+                            const installResult = cp.execSync('brew install --cask --no-quarantine docker', {
+                                stdio: ['ignore', 'pipe', 'pipe'],
+                                timeout: 900000, // 15 minute timeout for Docker Desktop installation
+                                maxBuffer: 1024 * 1024,
+                                env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: '1' }
+                            });
+
+                            if (installResult) {
+                                dockerInstallOutput.appendLine('Docker Desktop installed successfully');
+                                dockerPath = '/Applications/Docker.app';
+                                dockerInstalled = true;
+                            } else {
+                                throw new Error('brew install command failed');
+                            }
+                        } catch (error: any) {
+                            dockerInstallOutput.appendLine(`Failed to install Docker Desktop: ${error.message}`);
+
+                            // Fallback: Try direct download for ARM64
+                            if (isArm64) {
+                                try {
+                                    dockerInstallOutput.appendLine('Attempting ARM64 fallback installation...');
+                                    const downloadUrl = 'https://desktop.docker.com/mac/main/arm64/Docker.dmg';
+                                    const dmgPath = '/tmp/Docker.dmg';
+                                    const mountPath = '/Volumes/Docker';
+
+                                    // Download and mount DMG
+                                    cp.execSync(`curl -L -o ${dmgPath} ${downloadUrl}`, { stdio: 'inherit' });
+                                    cp.execSync(`hdiutil attach ${dmgPath} -mountpoint ${mountPath} -nobrowse`, { stdio: 'inherit' });
+
+                                    // Copy Docker app
+                                    cp.execSync(`cp -r "${mountPath}/Docker.app" /Applications/`, { stdio: 'inherit' });
+
+                                    // Unmount and cleanup
+                                    cp.execSync(`hdiutil detach ${mountPath}`, { stdio: 'inherit' });
+                                    cp.execSync(`rm ${dmgPath}`, { stdio: 'inherit' });
+
+                                    dockerInstallOutput.appendLine('Docker Desktop installed via DMG fallback');
+                                    dockerPath = '/Applications/Docker.app';
+                                    dockerInstalled = true;
+
+                                } catch (fallbackError: any) {
+                                    dockerInstallOutput.appendLine(`ARM64 fallback installation failed: ${fallbackError.message}`);
+                                    throw new Error(`Docker installation failed on macOS ARM64: ${error.message}`);
+                                }
+                            } else {
+                                throw new Error(`Docker installation failed: ${error.message}`);
                             }
                         }
-                    } catch (error: any) {
-                        console.error('Failed to start Docker Desktop on macOS:', error);
-                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop on macOS: ${error?.message || String(error)}`);
+                    }
+
+                    // Launch Docker Desktop (critical for CI environments)
+                    if (dockerInstalled) {
+                        progress.report({ message: 'Starting Docker Desktop...' });
+                        try {
+                            // Launch Docker Desktop (works for both ARM64 and Intel)
+                            dockerInstallOutput.appendLine(`Launching Docker Desktop from: ${dockerPath || '/Applications/Docker.app'}`);
+
+                            // Try multiple launch methods for CI stability
+                            const launchMethods = [
+                                () => cp.execSync('open -a Docker', { stdio: 'ignore', timeout: 5000 }),
+                                () => cp.execSync('open -j -g -a Docker', { stdio: 'ignore', timeout: 5000 }),
+                                () => cp.spawn('open', ['-j', '-g', '-a', 'Docker'], { detached: true, stdio: 'ignore' })
+                            ];
+
+                            let launched = false;
+                            for (let i = 0; i < launchMethods.length && !launched; i++) {
+                                try {
+                                    launchMethods[i]();
+                                    launched = true;
+                                    dockerInstallOutput.appendLine(`Docker Desktop launched successfully (method ${i + 1})`);
+                                } catch (launchError: any) {
+                                    dockerInstallOutput.appendLine(`Launch method ${i + 1} failed: ${launchError.message}`);
+                                }
+                            }
+
+                            if (!launched) {
+                                dockerInstallOutput.appendLine('All Docker launch methods failed, but continuing...');
+                            }
+
+                            // Wait longer for Docker daemon to start in CI
+                            dockerInstallOutput.appendLine('Waiting for Docker daemon to start...');
+                            const waitTime = launched ? 20000 : 15000; // Wait longer if we launched it
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                        } catch (error: any) {
+                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop: ${error.message}`);
+                            // Don't throw here - let the waitForDockerReady handle timeout
+                        }
+                    } else {
+                        dockerInstallOutput.appendLine('Docker installation was unsuccessful');
+                        throw new Error('Docker installation failed - no Docker installation found or completed');
                     }
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively

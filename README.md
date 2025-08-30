@@ -8,7 +8,7 @@ OI-Code is a Visual Studio Code extension designed for competitive programmers a
 ## Features
 
 - **Docker-based Execution**: All code runs in isolated Docker containers to ensure safety and consistency.
-- **Multi-language Support**: Ready-to-use support for C, C++, and Python.
+- **Language Support**: Efficient support for C and C++ compilation and execution.
 - **Problem Management**: Create and organize coding problems with their metadata.
 - **Pair Check Feature**: Compare outputs of two different implementations (e.g., brute force vs. optimized solutions).
 - **Resource Limits**: Enforce time and memory limits for fair evaluation.
@@ -30,7 +30,7 @@ OI-Code is a Visual Studio Code extension designed for competitive programmers a
 
 ### Running Code
 
-1. Open a C, C++, or Python file in VS Code.
+1. Open a C or C++ file in VS Code.
 2. Use the command palette (`Ctrl+Shift+P`) and run `OI-Code: Run Code`.
 3. Enter input for the program when prompted.
 4. View the output in the new panel.
