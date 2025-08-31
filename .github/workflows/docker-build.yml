@@ -28,22 +28,22 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: ${{ fromJSON('["linux","windows"]') }}
-      max-parallel: 1
-    if: |
-      github.event_name == 'workflow_dispatch' && (
-        github.event.inputs.target_platform == 'all' ||
-        github.event.inputs.target_platform == matrix.platform
-      ) || (
-        github.event_name != 'workflow_dispatch'
-      )
+        platform: [linux, windows]
+      fail-fast: false
+      max-parallel: 2
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU for cross-platform
+        if: matrix.platform == 'linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -51,13 +51,35 @@ jobs:
           username: flowerrealm
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Build and push
+      - name: Get version for tagging
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "latest")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 获取版本: $VERSION"
+
+      - name: 💚 Build and push Linux images
+        if: matrix.platform == 'linux'
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.platform == 'windows' && 'Dockerfile.windows' || 'Dockerfile' }}
-          platforms: ${{ matrix.platform == 'windows' && 'windows/amd64' || 'linux/amd64,linux/arm64' }}
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            flowerrealm/oi-code-clang:latest-${{ matrix.platform }}
-            flowerrealm/oi-code-clang:${{ github.sha }}-${{ matrix.platform }}
+            flowerrealm/oi-code-clang:latest
+            flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}
+            flowerrealm/oi-code-clang:${{ github.sha }}
+
+      - name: 🪟 Build and push Windows images
+        if: matrix.platform == 'windows'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.windows
+          platforms: windows/amd64
+          push: true
+          tags: |
+            flowerrealm/oi-code-clang:latest-win
+            flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win
+            flowerrealm/oi-code-clang:${{ github.sha }}-win
