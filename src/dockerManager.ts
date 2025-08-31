@@ -651,17 +651,7 @@ export class DockerManager {
         });
     }
 
-    private static selectImageForCommand(languageId: string): string {
-        // Read user-configured compiler settings
-        const config = vscode.workspace.getConfiguration();
-        const compilers = config.get<any>('oicode.docker.compilers') || {};
 
-        // Prioritize user-configured images
-        if (compilers[languageId]) {
-            return compilers[languageId];
-        }
-        return 'flowerrealm/oi-code-clang:latest';
-    }
 
     /**
      * Ensure Clang image exists, try pull first, build locally if pull fails
@@ -1413,18 +1403,23 @@ export class DockerManager {
      * @returns Docker parameter array
      */
     private static _getPlatformSpecificRunArgs(memoryLimit: string): string[] {
-        const isWindows = os.platform() === 'win32';
+        const platform = os.platform();
         const args: string[] = [];
 
-        if (!isWindows) {
-            // Options supported by Linux/macOS
+        if (platform === 'win32') {
+            // Windows Docker - simplified configuration
+            args.push('--memory=' + memoryLimit + 'm');
+        } else if (platform === 'darwin') {
+            // macOS Docker Desktop
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Linux Docker
             args.push('--memory=' + memoryLimit + 'm');
             args.push('--memory-swap=' + memoryLimit + 'm');
             args.push('--cpus=1.0');
             args.push('--pids-limit=64');
-        } else {
-            // Simplified configuration for Windows Docker
-            args.push('--memory=' + memoryLimit + 'm');
         }
 
         return args;
@@ -1436,21 +1431,71 @@ export class DockerManager {
      * @returns Docker parameter array
      */
     private static _getPlatformSpecificCreateArgs(memoryLimit: string = '512'): string[] {
-        const isWindows = os.platform() === 'win32';
+        const platform = os.platform();
         const args: string[] = [];
 
-        if (!isWindows) {
-            // Options supported by Linux/macOS
+        if (platform === 'win32') {
+            // Windows Docker - simplified configuration
+            args.push('--memory=' + memoryLimit + 'm');
+        } else if (platform === 'darwin') {
+            // macOS Docker Desktop
+            args.push('--memory=' + memoryLimit + 'm');
+            args.push('--cpus=1.0');
+            args.push('--pids-limit=64');
+        } else {
+            // Linux Docker
             args.push('--memory=' + memoryLimit + 'm');
             args.push('--memory-swap=' + memoryLimit + 'm');
             args.push('--cpus=1.0');
             args.push('--pids-limit=64');
-        } else {
-            // Simplified configuration for Windows Docker
-            args.push('--memory=' + memoryLimit + 'm');
         }
 
         return args;
+    }
+
+    /**
+     * 获取合适的Docker镜像，支持多平台检测和回退机制
+     * @param languageId 编程语言ID
+     * @returns Docker镜像名称
+     */
+    private static selectImageForCommand(languageId: string): string {
+        const platform = os.platform();
+        const host = os.hostname();
+        console.log(`[DockerManager] 检测到的平台: ${platform}, 主机: ${host}`);
+
+        // 读取用户配置的编译器设置
+        const config = vscode.workspace.getConfiguration();
+        const compilers = config.get<any>('oicode.docker.compilers') || {};
+
+        // 优先使用用户配置的镜像
+        if (compilers[languageId]) {
+            console.log(`[DockerManager] 使用用户配置的镜像: ${compilers[languageId]} for ${languageId}`);
+            return compilers[languageId];
+        }
+
+        // 根据操作系统和语言选择合适的镜像
+        let selectedImage = 'flowerrealm/oi-code-clang:latest';
+
+        // 检查是否为受支持的平台和语言
+        if (platform === 'win32' || platform === 'darwin') {
+            // Windows和macOS使用Linux镜像（Docker Desktop支持）
+            console.log(`[DockerManager] ${platform}平台使用Linux镜像`);
+        } else if (platform === 'linux') {
+            // Linux本地环境
+            console.log(`[DockerManager] Linux平台使用原生镜像`);
+        } else {
+            // 其他平台回退到Linux镜像
+            console.log(`[DockerManager] 不支持的平台 ${platform}，回退到Linux镜像`);
+        }
+
+        // 可以在这里添加更多复杂的镜像选择逻辑
+        // 比如根据硬件架构选择不同版本的镜像
+        const arch = os.arch();
+        console.log(`[DockerManager] 检测到的硬件架构: ${arch}`);
+
+        console.log(`[DockerManager] 选择的镜像: ${selectedImage} for ${languageId} on ${platform}`);
+
+        return selectedImage;
     }
 
     /**
