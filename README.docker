@@ -80,9 +80,48 @@ docker run --rm \
 ```bash
 # Linux/macOS
 docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
+docker run -it --rm flowerrealm/oi-code-clang:arm64 /bin/bash
 
 # 可用的工具：
 # clang, clang++, lldb, llvm, lld, valgrind
+# gdb-multiarch (ARM64 only), gcc-arm-linux-gnueabihf (ARM64 only)
+```
+
+#### 🚀 自动化构建和推送
+
+```bash
+# 一键构建多平台镜像
+docker buildx build --platform linux/amd64,linux/arm64 -t flowerrealm/oi-code-clang:latest --push .
+
+# 分步构建
+# 1. 创建builder
+docker buildx create --use --name multiarch-builder
+
+# 2. 构建和推送AMD64版本
+docker buildx build --platform linux/amd64 -t flowerrealm/oi-code-clang:amd64 --push .
+
+# 3. 构建和推送ARM64版本
+docker buildx build --platform linux/arm64 -t flowerrealm/oi-code-clang:arm64 --push .
+
+# 4. 创建多架构manifest
+docker buildx build --platform linux/amd64,linux/arm64 -t flowerrealm/oi-code-clang:latest --push .
+```
+
+#### 🐳 镜像管理
+
+```bash
+# 查看支持的平台
+docker buildx imagetools inspect flowerrealm/oi-code-clang:latest
+
+# 删除本地镜像
+docker rmi flowerrealm/oi-code-clang:latest
+
+# 查看镜像历史
+docker history flowerrealm/oi-code-clang:latest
+
+# 推送到其他仓库
+docker tag flowerrealm/oi-code-clang:latest my-registry/oi-code-clang:latest
+docker push my-registry/oi-code-clang:latest
 ```
 
 ### 🔧 技术架构

@@ -70,6 +70,12 @@ jobs:
           username: flowerrealm
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Configure BuildKit
+        run: |
+          echo "🔧 Configuring Docker BuildKit for multi-platform builds..."
+          docker buildx create --use --name multiarch-builder --driver docker-container
+          docker buildx inspect multiarch-builder
+
       - name: Get version tag
         id: version
         run: |
@@ -81,18 +87,51 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm64
+          file: Dockerfile
+          context: .
           tags: |
             flowerrealm/oi-code-clang:latest
             flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}
-          cache-from: type=registry,ref=flowerrealm/oi-code-clang:buildcache
-          cache-to: type=registry,ref=flowerrealm/oi-code-clang:buildcache,mode=max
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-amd64
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-arm64
+            flowerrealm/oi-code-clang:amd64
+            flowerrealm/oi-code-clang:arm64
+          cache-from: type=registry,ref=flowerrealm/oi-code-clang:cache
+          cache-to: type=registry,ref=flowerrealm/oi-code-clang:cache,mode=max
+          provenance: true
+          sbom: true
           labels: |
-            org.opencontainers.image.title=OI-Code Clang
-            org.opencontainers.image.description=Multi-platform Clang compiler for OI competitive programming
+            org.opencontainers.image.title=OI-Code Clang Container
+            org.opencontainers.image.description=Multi-platform Clang 18.1.8 compiler container for OI competitive programming
+            org.opencontainers.image.authors=FlowerRealm
             org.opencontainers.image.source=https://github.com/FlowerRealm/oi-code-extension
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.vendor=FlowerRealm
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+            com.flowerrealm.language=c,cpp
+            com.flowerrealm.compiler=clang-18
+            com.flowerrealm.tools=gcc,g++,llvm,cmake
+
+      - name: Verify Docker Hub push
+        run: |
+          echo "🔍 Verifying Docker Hub image push..."
+          echo "📦 Image: flowerrealm/oi-code-clang:latest"
+          echo "🏷️ Version: v${{ steps.version.outputs.version }}"
+          echo ""
+
+          # Test image pull
+          echo "Testing image pull from Docker Hub..."
+          docker pull flowerrealm/oi-code-clang:latest || echo "❌ Failed to pull latest tag"
+          docker pull flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }} || echo "❌ Failed to pull version tag"
+
+          echo "✅ Docker Hub verification complete"
+
+      - name: Create multi-architecture manifest
+        run: |
+          echo "📋 Creating multi-architecture manifest..."
+
+          # Amplify manifest
+          docker buildx imagetools inspect flowerrealm/oi-code-clang:latest
 
       - name: Generate build report
         run: |

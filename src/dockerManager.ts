@@ -112,6 +112,10 @@ export class DockerManager {
     // Health check timer
     private static healthCheckTimer: NodeJS.Timeout | null = null;
 
+    // Global lock for Docker operations to prevent race conditions
+    private static dockerOperationLocks = new Map<string, Promise<void>>();
+    private static imagePullProgress = new Map<string, boolean>();
+
     /**
      * Ensures Docker is available and ready for use.
      * It will show progress in a VS Code terminal.
@@ -138,6 +142,123 @@ export class DockerManager {
         if (!isDockerWorking) {
             throw new Error('Docker is not available or not working properly');
         }
+
+        // Wait for crucial images to be available
+        await this.ensureCriticalImagesAreAvailable();
+    }
+
+    /**
+     * Ensure critical Docker images are available and pulled
+     */
+    private static async ensureCriticalImagesAreAvailable(): Promise<void> {
+        const criticalImages = ['flowerrealm/oi-code-clang:latest'];
+
+        console.log('[DockerManager] Checking critical Docker images...');
+
+        for (const image of criticalImages) {
+            // Use lock to prevent concurrent operations on the same image
+            const lockKey = `image-pull-${image}`;
+            const existingLock = this.dockerOperationLocks.get(lockKey);
+
+            if (existingLock) {
+                console.log(`[DockerManager] Image ${image} is being pulled by another operation, waiting...`);
+                await existingLock;
+                console.log(`[DockerManager] Image ${image} is now ready`);
+                continue;
+            }
+
+            // Check if image exists locally
+            const isAvailable = await this.checkImageAvailableLocally(image);
+            if (isAvailable) {
+                console.log(`[DockerManager] Image ${image} is available locally`);
+                continue;
+            }
+
+            // Start pull operation with lock
+            console.log(`[DockerManager] Pulling image ${image}...`);
+            this.imagePullProgress.set(image, false);
+
+            const pullPromise = this.pullImageWithProgress(image)
+                .then(() => {
+                    console.log(`[DockerManager] Successfully pulled image ${image}`);
+                    this.imagePullProgress.set(image, true);
+                })
+                .catch((error) => {
+                    console.error(`[DockerManager] Failed to pull image ${image}:`, error);
+                    this.imagePullProgress.set(image, true);
+                    throw error;
+                })
+                .finally(() => {
+                    this.dockerOperationLocks.delete(lockKey);
+                });
+
+            this.dockerOperationLocks.set(lockKey, pullPromise);
+            await pullPromise;
+        }
+
+        console.log('[DockerManager] All critical images are available');
+    }
+
+    /**
+     * Check if image is available locally
+     */
+    private static async checkImageAvailableLocally(image: string): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
+            const inspectProcess = spawn('docker', ['inspect', image], { stdio: 'ignore' });
+            inspectProcess.on('close', (code) => {
+                resolve(code === 0);
+            });
+            inspectProcess.on('error', () => {
+                resolve(false);
+            });
+        });
+    }
+
+    /**
+     * Pull image with progress monitoring
+     */
+    private static async pullImageWithProgress(image: string): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const outputChannel = vscode.window.createOutputChannel('OI-Code Docker Pull');
+            outputChannel.show(true);
+            outputChannel.appendLine(`[${new Date().toISOString()}] Pulling Docker image: ${image}`);
+
+            const pullProcess = spawn('docker', ['pull', image], { stdio: 'pipe' });
+
+            pullProcess.stdout.on('data', (data) => {
+                const output = data.toString().trim();
+                outputChannel.appendLine(`[Pull] ${output}`);
+            });
+
+            pullProcess.stderr.on('data', (data) => {
+                const output = data.toString().trim();
+                outputChannel.appendLine(`[Pull Error] ${output}`);
+            });
+
+            pullProcess.on('close', (code) => {
+                if (code === 0) {
+                    outputChannel.appendLine(`[${new Date().toISOString()}] Successfully pulled: ${image}`);
+                    resolve();
+                } else {
+                    const error = new Error(`Failed to pull image ${image} with exit code ${code}`);
+                    outputChannel.appendLine(`[${new Date().toISOString()}] Failed to pull: ${image}`);
+                    reject(error);
+                }
+            });
+
+            pullProcess.on('error', (error) => {
+                outputChannel.appendLine(`[${new Date().toISOString()}] Error pulling ${image}: ${error.message}`);
+                reject(error);
+            });
+
+            // Set timeout for pull operation
+            setTimeout(() => {
+                pullProcess.kill('SIGKILL');
+                const timeoutError = new Error(`Pull operation for ${image} timed out after 15 minutes`);
+                outputChannel.appendLine(`[${new Date().toISOString()}] Timeout: ${image}`);
+                reject(timeoutError);
+            }, 15 * 60 * 1000); // 15 minutes
+        });
     }
 
     private static async checkDockerWorking(): Promise<boolean> {

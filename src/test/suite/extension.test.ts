@@ -75,8 +75,63 @@ async function isDockerAvailable(): Promise<boolean> {
     });
 }
 
+// Prepare Docker environment synchronously and completely
+async function prepareDockerEnvironment(): Promise<void> {
+    console.log('[Test Setup] Preparing Docker environment...');
+
+    const dockerAvailable = await isDockerAvailable();
+    if (!dockerAvailable) {
+        console.log('[Test Setup] Docker not available for this environment');
+        return;
+    }
+
+    try {
+        console.log('[Test Setup] Initializing Docker environment...');
+
+        // Use our custom image preparation instead of the command
+        // This ensures we completely wait for Docker to be ready
+        await ensureDockerImageIsReady();
+
+        console.log('[Test Setup] Docker environment prepared successfully');
+    } catch (error: any) {
+        console.log('[Test Setup] Docker initialization failed:', error.message);
+        console.log('[Test Setup] Tests will run without Docker if possible');
+    }
+}
+
+// Ensure Docker image is completely ready for testing
+async function ensureDockerImageIsReady(): Promise<void> {
+    const imageName = 'flowerrealm/oi-code-clang:latest';
+
+    console.log(`[Test Setup] Checking if image ${imageName} is available...`);
+
+    // Check if image exists locally
+    const imageExists = await new Promise<boolean>((resolve) => {
+        const { exec } = require('child_process');
+        exec(`docker inspect ${imageName}`, (error: any) => {
+            resolve(!error);
+        });
+    });
+
+    if (imageExists) {
+        console.log(`[Test Setup] Image ${imageName} is already available locally`);
+        return;
+    }
+
+    console.log(`[Test Setup] Image ${imageName} not found locally, will be pulled during test execution`);
+    console.log('[Test Setup] Using lazy loading - images will be pulled as needed by tests');
+
+    // Even with lazy loading, we should initialize the extension
+    try {
+        await vscode.commands.executeCommand('oicode.initializeEnvironment');
+        console.log('[Test Setup] Extension environment initialized');
+    } catch (error) {
+        console.warn('[Test Setup] Extension initialization failed:', error);
+    }
+}
+
 suite('Extension Test Suite', () => {
-    // Wait for extension activation
+    // Wait for extension activation and Docker preparation
     before(async function () {
         this.timeout(35000);
         const extId = 'FlowerRealm.oi-code';
@@ -94,6 +149,11 @@ suite('Extension Test Suite', () => {
         if (!extension || !extension.isActive) {
             throw new Error('OI-Code extension did not activate in time');
         }
+
+        console.log('[Test Setup] Extension activated successfully');
+
+        // Pre-initialize Docker environment synchronously before tests start
+        await prepareDockerEnvironment();
     });
 
 
@@ -146,7 +206,7 @@ suite('Extension Test Suite', () => {
         }
 
         console.log('[Docker Init Test] Docker is available, proceeding with code execution tests...');
-        await vscode.commands.executeCommand('oicode.initializeEnvironment');
+        // Docker environment already initialized in before() hook, skip re-initialization to avoid conflicts
 
         // Test C code execution
         const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;

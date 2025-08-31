@@ -1,11 +1,17 @@
 # OI-Code multi-platform Clang container optimized for competitive programming
+# Supports both AMD64 and ARM64 architectures
 FROM ubuntu:24.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Detect architecture for architecture-specific optimizations
+ARG TARGETARCH
+ENV TARGETARCH=${TARGETARCH}
+
 # Install essential build tools and libraries
-RUN apt-get update --quiet && \
+RUN echo "Building for architecture: $TARGETARCH" && \
+    apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
     # Core C/C++ development tools
     clang-18 \
@@ -47,8 +53,24 @@ RUN apt-get update --quiet && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     # Verify installations
+    # Architecture-specific verification
+    echo "Verifying installations for $TARGETARCH architecture:" && \
     clang --version && \
-    clang++ --version
+    clang++ --version && \
+    echo "Architecture verification complete"
+
+# Architecture-specific optimizations for ARM64
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        echo "Applying ARM64-specific optimizations..." && \
+        # Install ARM64-specific tools if available
+        apt-get install -y --no-install-recommends \
+            # ARM64 debugging tools
+            gdb-multiarch \
+            # ARM64 cross-compilation support
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            || echo "Some ARM64 tools not available, continuing..." \
+        ; fi
 
 # Switch to non-privileged user for security
 USER runner
@@ -58,8 +80,15 @@ WORKDIR /sandbox
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD clang --version > /dev/null || exit 1
 
+# Architecture-aware labels
+LABEL org.opencontainers.image.description="OI-Code Clang container for competitive programming - $TARGETARCH"
+LABEL org.opencontainers.image.architecture="$TARGETARCH"
+
 # Default entrypoint that can run both interactive and non-interactive
 ENTRYPOINT ["/bin/bash", "-lc"]
 
-# Build command:
-# docker build -t oi-code-clang:latest .
+# Multi-platform build commands:
+# AMD64 build: docker build --platform linux/amd64 -t oi-code-clang:amd64 .
+# ARM64 build: docker build --platform linux/arm64 -t oi-code-clang:arm64 .
+# Multi-arch build: docker buildx build --platform linux/amd64,linux/arm64 -t oi-code-clang:multi .
+# Local build: docker build -t oi-code-clang:latest .
