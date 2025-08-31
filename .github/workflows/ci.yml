@@ -82,7 +82,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push multi-platform image
+      - name: Build and push Linux multi-platform images
         uses: docker/build-push-action@v5
         with:
           push: true
@@ -96,6 +96,21 @@ jobs:
             flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-arm64
             flowerrealm/oi-code-clang:amd64
             flowerrealm/oi-code-clang:arm64
+
+      - name: Build and push Windows multi-platform images
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: windows/amd64,windows/arm64
+          file: Dockerfile.windows
+          context: .
+          tags: |
+            flowerrealm/oi-code-clang:latest-win
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-win
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-amd64-win
+            flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-arm64-win
+            flowerrealm/oi-code-clang:amd64-win
+            flowerrealm/oi-code-clang:arm64-win
           cache-from: type=registry,ref=flowerrealm/oi-code-clang:cache
           cache-to: type=registry,ref=flowerrealm/oi-code-clang:cache,mode=max
           provenance: true
@@ -138,17 +153,38 @@ jobs:
           echo "## 🐳 Docker Multi-Platform Build Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ✅ Build Status: Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tags**: latest, v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: linux/amd64, linux/arm64, windows/amd64, windows/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tags**: latest, v${{ steps.version.outputs.version }} + platform-specific variants" >> $GITHUB_STEP_SUMMARY
           echo "- **Cache**: Enabled with registry storage" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Build Details" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: flowerrealm/oi-code-clang" >> $GITHUB_STEP_SUMMARY
-          echo "- **Base**: Ubuntu 24.04 LTS" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tools**: Clang 18.1.8, LLVM, LLDB, Valgrind" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base**: Ubuntu 24.04 LTS (Linux), Windows Server Core 2022 (Windows)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tools**: Clang 18.1.8, LLVM, LLDB, Valgrind, GCC" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Platforms**: 4 (Linux AMD64/ARM64, Windows AMD64/ARM64)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎯 Usage Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Available Tags" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Main tags" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Platform-specific tags" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:amd64" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:arm64" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:amd64-win" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull flowerrealm/oi-code-clang:arm64-win" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Usage Examples" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Basic usage" >> $GITHUB_STEP_SUMMARY
           echo "docker run --rm flowerrealm/oi-code-clang:latest clang --version" >> $GITHUB_STEP_SUMMARY
-          echo "docker run --rm flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }} clang++ --version" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Compile C++ code" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -v \$(pwd):/work -w /work flowerrealm/oi-code-clang:latest \\" >> $GITHUB_STEP_SUMMARY
+          echo "  clang++ solution.cpp -o solution -O2 -std=c++17" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Interactive coding" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -it --rm -v \$(pwd):/work -w /work flowerrealm/oi-code-clang:latest bash" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
