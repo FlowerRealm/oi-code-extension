@@ -9,41 +9,29 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG TARGETARCH
 ENV TARGETARCH=${TARGETARCH}
 
-# Install essential build tools and libraries
+# Install minimal build tools and libraries for competitive programming
 RUN echo "Building for architecture: $TARGETARCH" && \
     apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
-    # Core C/C++ development tools
+    # Core C/C++ development tools (only essentials)
     clang-18 \
     clang++-18 \
     gcc \
     g++ \
+    # Essential runtime libraries
     libc6-dev \
     libc++-18-dev \
     libc++abi-18-dev \
     libstdc++-13-dev \
-    # Development utilities
-    cmake \
-    lldb-18 \
-    valgrind \
-    cppcheck \
-    # Code formatting and analysis
-    clang-format-18 \
-    clang-tidy-18 \
     # Essential libraries for competitive coding
     libboost-dev \
     libgmp-dev \
     libmpfr-dev \
-    # System tools
-    procps \
-    lsof \
+    # Minimal system tools (only coreutils already implied)
     && \
-    # Create symlinks for convenience and compatibility
+    # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
-    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
-    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
-    ln -sf /usr/bin/clang-format-18 /usr/bin/clang-format && \
     # Create runner user with proper permissions
     useradd -m -s /bin/bash runner && \
     mkdir -p /sandbox && \
@@ -61,16 +49,16 @@ RUN echo "Building for architecture: $TARGETARCH" && \
 
 # Architecture-specific optimizations for ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        echo "Applying ARM64-specific optimizations..." && \
-        # Install ARM64-specific tools if available
-        apt-get install -y --no-install-recommends \
-            # ARM64 debugging tools
-            gdb-multiarch \
-            # ARM64 cross-compilation support
-            gcc-arm-linux-gnueabihf \
-            g++-arm-linux-gnueabihf \
-            || echo "Some ARM64 tools not available, continuing..." \
-        ; fi
+    echo "Applying ARM64-specific optimizations..." && \
+    # Install ARM64-specific tools if available
+    apt-get install -y --no-install-recommends \
+    # ARM64 debugging tools
+    gdb-multiarch \
+    # ARM64 cross-compilation support
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    || echo "Some ARM64 tools not available, continuing..." \
+    ; fi
 
 # Switch to non-privileged user for security
 USER runner

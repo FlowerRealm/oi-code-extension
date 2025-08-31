@@ -1,68 +1,28 @@
-# OI-Code Clang container for Windows (supports both AMD64 and ARM64)
+# OI-Code Clang container for Windows (minimal setup)
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Prevent interactive prompts during installation
-ARG DEBIAN_FRONTEND=noninteractive
-
-# Add Windows PATH environment modification (for cross-platform compatibility)
-RUN echo "Setting up Windows development environment..."
-
-# Install Chocolatey package manager
+# Install Chocolatey and MSYS2 for Clang toolchain
 RUN powershell -Command " \
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')); \
-    RefreshEnv"
-
-# Update PATH to include Chocolatey
-ENV PATH="C:\ProgramData\chocolatey\bin;%PATH%"
-
-# Install MSYS2 and development tools
-RUN powershell -Command " \
+    RefreshEnv; \
     choco install -y msys2 --version 20240113.0.0; \
     RefreshEnv"
 
-# Update MSYS2 core packages
+# Update PATH to include Chocolatey and MSYS2
+ENV PATH="C:\ProgramData\chocolatey\bin;C:\tools\msys64\usr\bin;C:\tools\msys64\mingw64\bin;%PATH%"
+
+# Update MSYS2 and install minimal clang toolchain
 RUN powershell -Command " \
     C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -Syu --overwrite *'; \
-    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S pacman pacman-mirrors'"
-
-# Install Clang, GCC, and development tools via MSYS2
-RUN powershell -Command " \
-    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S clang gcc gcc-libs make cmake'; \
-    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S lldb valgrind gdb'; \
-    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S boost boost-libs gmp mpfr'; \
-    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S procps lsof vim nano'"
-
-# Add MSYS2 to system PATH (prioritize MSYS2 over Windows commands)
-ENV PATH="C:\tools\msys64\usr\bin;C:\tools\msys64\mingw64\bin;C:\tools\msys64\usr\bin;%PATH%"
+    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S clang gcc gcc-libs'; \
+    C:\tools\msys64\usr\bin\bash.exe -l -c 'pacman --noconfirm -S boost boost-libs'"
 
 # Create workspace directory
-RUN powershell -Command "mkdir C:\work; mkdir C:\tmp"
+RUN powershell -Command "mkdir C:\work"
 
 # Set working directory
 WORKDIR C:/work
 
-# Create non-privileged user (Windows equivalent)
-RUN powershell -Command " \
-    net user runner /add /passwordreq:no; \
-    net localgroup Administrators runner /add; \
-    wmic useraccount where \"name='runner'\" set passwordexpires=false"
-
-# Switch to runner user
-USER ContainerRunner
-
-# Health check for Windows container
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD powershell -Command " \
-        if (Get-Command clang -ErrorAction SilentlyContinue) { \
-            $version = & clang --version 2>$null; \
-            if ($version) { Write-Host 'Clang OK'; exit 0 } \
-        }; \
-        Write-Host 'Clang NG'; exit 1"
-
-# Default entrypoint command
-CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows Clang Container Ready'; bash.exe -l"]
-
-# Docker build command:
-# docker buildx build --platform windows/amd64 -t oi-code-clang:windows-amd64 .
-# docker buildx build --platform windows/arm64 -t oi-code-clang:windows-arm64 .
+# Default entrypoint
+CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows Clang Ready'; bash.exe -l"]

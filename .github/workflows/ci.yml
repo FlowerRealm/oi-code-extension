@@ -82,7 +82,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push Linux multi-platform images
+      - name: Build and push multi-platform images (Linux only)
         uses: docker/build-push-action@v5
         with:
           push: true
@@ -96,6 +96,21 @@ jobs:
             flowerrealm/oi-code-clang:v${{ steps.version.outputs.version }}-arm64
             flowerrealm/oi-code-clang:amd64
             flowerrealm/oi-code-clang:arm64
+          cache-from: type=registry,ref=flowerrealm/oi-code-clang:cache
+          cache-to: type=registry,ref=flowerrealm/oi-code-clang:cache,mode=max
+          provenance: true
+          sbom: true
+          labels: |
+            org.opencontainers.image.title=OI-Code Clang Container
+            org.opencontainers.image.description=Multi-platform Clang 18.1.8 compiler container for OI competitive programming
+            org.opencontainers.image.authors=FlowerRealm
+            org.opencontainers.image.source=https://github.com/FlowerRealm/oi-code-extension
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.vendor=FlowerRealm
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            com.flowerrealm.language=c,cpp
+            com.flowerrealm.compiler=clang-18
+            com.flowerrealm.tools=clang-18,clang++,gcc,g++,boost,gmp,mpfr
 
       - name: Build and push Windows multi-platform images
         uses: docker/build-push-action@v5
@@ -125,7 +140,7 @@ jobs:
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             com.flowerrealm.language=c,cpp
             com.flowerrealm.compiler=clang-18
-            com.flowerrealm.tools=gcc,g++,llvm,cmake
+            com.flowerrealm.tools=gcc,g++,llvm
 
       - name: Verify Docker Hub push
         run: |
@@ -159,9 +174,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏗️ Build Details" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: flowerrealm/oi-code-clang" >> $GITHUB_STEP_SUMMARY
-          echo "- **Base**: Ubuntu 24.04 LTS (Linux), Windows Server Core 2022 (Windows)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tools**: Clang 18.1.8, LLVM, LLDB, Valgrind, GCC" >> $GITHUB_STEP_SUMMARY
-          echo "- **Total Platforms**: 4 (Linux AMD64/ARM64, Windows AMD64/ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base**: Ubuntu 24.04 LTS (Linux amd64/arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Clang Version**: 18.1.8 with libc++" >> $GITHUB_STEP_SUMMARY
+          echo "- **GCC Compatibility**: Full GCC toolchain included" >> $GITHUB_STEP_SUMMARY
+          echo "- **Competitive Libraries**: Boost, GMP, MPFR for advanced algorithms" >> $GITHUB_STEP_SUMMARY
+          echo "- **Debug Tools**: LLDB, Valgrind, cppcheck, clang-format" >> $GITHUB_STEP_SUMMARY
+          echo "- **User**: Non-privileged runner user for security" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Check**: Automatic container monitoring" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 Available Tags" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
