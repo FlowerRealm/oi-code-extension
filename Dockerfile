@@ -74,9 +74,3 @@ LABEL org.opencontainers.image.architecture="$TARGETARCH"
 
 # Default entrypoint that can run both interactive and non-interactive
 ENTRYPOINT ["/bin/bash", "-lc"]
-
-# Multi-platform build commands:
-# AMD64 build: docker build --platform linux/amd64 -t oi-code-clang:amd64 .
-# ARM64 build: docker build --platform linux/arm64 -t oi-code-clang:arm64 .
-# Multi-arch build: docker buildx build --platform linux/amd64,linux/arm64 -t oi-code-clang:multi .
-# Local build: docker build -t oi-code-clang:latest .
