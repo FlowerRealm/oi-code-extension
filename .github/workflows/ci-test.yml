@@ -1,0 +1,68 @@
+name: CI - 自动化测试
+
+on:
+  # 自动触发条件：代码变更时运行测试
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'webpack.config.js'
+      - '.github/workflows/ci-test.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'webpack.config.js'
+      - '.github/workflows/ci-test.yml'
+
+jobs:
+  # ===== 跨平台测试 =====
+  test:
+    name: '测试 (${{ matrix.os }})'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-13, windows-11-arm, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    environment: check
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run tests
+        run: |
+          if command -v xvfb-run &> /dev/null; then
+            xvfb-run -a npm test
+          else
+            npm test
+          fi
+        shell: bash
+        env:
+          CI: true
+          # 禁用 Docker 相关测试，因为这是纯测试 job
+          SKIP_DOCKER_TESTS: true
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: test-output.log
+          retention-days: 7
