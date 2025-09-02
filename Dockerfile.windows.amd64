@@ -3,13 +3,22 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Install LLVM/Clang using Server Core's full capabilities
 RUN powershell -Command " \
-    # Download LLVM installer \
+    $ErrorActionPreference = 'Stop'; \
+    Write-Host 'Starting LLVM installation...'; \
     $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win64.exe'; \
     $output = 'C:\temp\llvm-installer.exe'; \
-    New-Item -ItemType Directory -Path C:\temp -Force; \
-    Invoke-WebRequest -Uri $url -OutFile $output; \
-    Start-Process -FilePath $output -ArgumentList '/S' -Wait; \
-    Remove-Item -Path C:\temp -Recurse -Force"
+    Write-Host 'Creating temp directory...'; \
+    New-Item -ItemType Directory -Path C:\temp -Force | Out-Null; \
+    Write-Host 'Downloading LLVM installer...'; \
+    Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing; \
+    Write-Host 'Verifying download...'; \
+    if (!(Test-Path $output)) { throw 'Download failed' }; \
+    Write-Host 'Installing LLVM silently...'; \
+    $process = Start-Process -FilePath $output -ArgumentList '/S', '/v/qn' -Wait -PassThru; \
+    if ($process.ExitCode -ne 0) { throw \"Installation failed with exit code $($process.ExitCode)\" }; \
+    Write-Host 'Cleaning up...'; \
+    Remove-Item -Path C:\temp -Recurse -Force; \
+    Write-Host 'LLVM installation completed successfully';"
 
 # Set environment variables
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
