@@ -223,17 +223,14 @@ export class Installer {
                         }
                     }
                 } else if (platform === 'darwin') {
-                    const isArm64 = process.arch === 'arm64';
-                    dockerInstallOutput.appendLine(`macOS ${isArm64 ? 'ARM64' : 'Intel'} 检测到 - 开始macOS Docker安装过程`);
+                    dockerInstallOutput.appendLine(`macOS Intel 检测到 - 开始macOS Docker安装过程`);
 
                     // 关键步骤1: 安装Homebrew（如果没有）
                     if (!this.isCommandAvailable('brew')) {
                         dockerInstallOutput.appendLine('正在安装 Homebrew...');
                         progress.report({ message: '安装 Homebrew...' });
                         try {
-                            const brewInstallCmd = isArm64
-                                ? '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-                                : '/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"';
+                            const brewInstallCmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
 
                             await new Promise<void>((resolve, reject) => {
                                 const brewProcess = cp.exec(brewInstallCmd, (error, stdout, stderr) => {
@@ -301,9 +298,7 @@ export class Installer {
                             // 备用方案：直接下载 DMG 文件
                             try {
                                 dockerInstallOutput.appendLine('正在下载 Docker Desktop DMG 文件...');
-                                const downloadUrl = isArm64
-                                    ? 'https://desktop.docker.com/mac/main/arm64/Docker.dmg'
-                                    : 'https://desktop.docker.com/mac/main/amd64/Docker.dmg';
+                                const downloadUrl = 'https://desktop.docker.com/mac/main/amd64/Docker.dmg';
 
                                 const dmgPath = '/tmp/Docker.dmg';
                                 const mountPath = '/Volumes/Docker';
