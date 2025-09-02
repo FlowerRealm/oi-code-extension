@@ -4,26 +4,28 @@ FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 # Switch to PowerShell for package management
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Install Chocolatey
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
-    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+# Install LLVM/Clang directly without Chocolatey for Nano Server compatibility
+RUN powershell -Command " \
+    # Download LLVM installer directly \
+    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win64.exe'; \
+    $output = 'C:\temp\llvm-installer.exe'; \
+    New-Item -ItemType Directory -Path C:\temp -Force; \
+    Invoke-WebRequest -Uri $url -OutFile $output; \
+    Start-Process -FilePath $output -ArgumentList '/S' -Wait; \
+    Remove-Item -Path C:\temp -Recurse -Force"
 
-# Install LLVM/Clang directly (AMD64 compatible)
-RUN choco install -y llvm --version 17.0.6
-
-# Set environment variables
-ENV PATH="C:\Program Files\LLVM\bin;C:\ProgramData\chocolatey\bin;${PATH}"
+# Set environment variables (use Windows PATH format)
+ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
 # Create workspace directory
-RUN New-Item -ItemType Directory -Path C:\work -Force
+RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
 
 # Set working directory
 WORKDIR C:/work
 
 # Test clang installation
-RUN clang --version
+RUN powershell -Command "& 'C:\Program Files\LLVM\bin\clang.exe' --version"
 
 # Default entrypoint
-CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]
+CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; & 'C:\\Program Files\\LLVM\\bin\\clang.exe' --version"]
 
