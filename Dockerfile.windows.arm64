@@ -1,0 +1,28 @@
+# OI-Code Clang container for Windows ARM64
+FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+
+# Switch to PowerShell for package management
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install LLVM/Clang directly (ARM64 compatible)
+RUN choco install -y llvm --version 17.0.6
+
+# Set environment variables
+ENV PATH="C:\Program Files\LLVM\bin;C:\ProgramData\chocolatey\bin;${PATH}"
+
+# Create workspace directory
+RUN New-Item -ItemType Directory -Path C:\work -Force
+
+# Set working directory
+WORKDIR C:/work
+
+# Test clang installation
+RUN clang --version
+
+# Default entrypoint
+CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows ARM64 Clang Ready'; clang --version"]

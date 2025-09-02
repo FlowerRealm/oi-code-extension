@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
+      - 'Dockerfile.windows.*'
       - '.github/workflows/docker-build.yml'
   pull_request:
     paths:
       - 'Dockerfile'
-      - 'Dockerfile.windows'
+      - 'Dockerfile.windows.*'
       - '.github/workflows/docker-build.yml'
   workflow_dispatch:
     inputs:
@@ -28,9 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [linux, windows]
+        platform: [linux, windows, windows-arm64]
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 3
 
     steps:
       - name: Checkout repository
@@ -71,15 +71,28 @@ jobs:
             flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}
             flowerrealm/oi-code-clang:${{ github.sha }}
 
-      - name: 🪟 Build and push Windows images
+      - name: 🪟 Build and push Windows AMD64 images
         if: matrix.platform == 'windows'
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.windows
-          platforms: windows/amd64,windows/arm64
+          file: Dockerfile.windows.amd64
+          platforms: windows/amd64
           push: true
           tags: |
             flowerrealm/oi-code-clang:latest-win
             flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win
             flowerrealm/oi-code-clang:${{ github.sha }}-win
+
+      - name: 🪟 Build and push Windows ARM64 images
+        if: matrix.platform == 'windows-arm64'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.windows.arm64
+          platforms: windows/arm64
+          push: true
+          tags: |
+            flowerrealm/oi-code-clang:latest-win-arm64
+            flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win-arm64
+            flowerrealm/oi-code-clang:${{ github.sha }}-win-arm64
