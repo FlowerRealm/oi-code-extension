@@ -1,8 +1,8 @@
 # OI-Code Clang container for Windows AMD64 (using Server Core for compatibility)
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Set PowerShell as default shell
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+# Set PowerShell as default shell using full path
+SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Install LLVM/Clang using Server Core's full capabilities
 RUN " \
@@ -36,5 +36,5 @@ WORKDIR C:/work
 RUN clang --version
 
 # Default entrypoint
-CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]
+CMD ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]
 
