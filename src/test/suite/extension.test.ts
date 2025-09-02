@@ -105,28 +105,61 @@ async function ensureDockerImageIsReady(): Promise<void> {
 
     console.log(`[Test Setup] Checking if image ${imageName} is available...`);
 
-    // Check if image exists locally
-    const imageExists = await new Promise<boolean>((resolve) => {
+    const execAsync = (cmd: string) => new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
         const { exec } = require('child_process');
-        exec(`docker inspect ${imageName}`, (error: any) => {
-            resolve(!error);
+        exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
+            if (error) {
+                reject(Object.assign(new Error(stderr || error.message), { stdout, stderr }));
+            } else {
+                resolve({ stdout, stderr });
+            }
         });
     });
 
-    if (imageExists) {
+    async function imageExistsLocally(): Promise<boolean> {
+        try {
+            await execAsync(`docker inspect ${imageName}`);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    if (await imageExistsLocally()) {
         console.log(`[Test Setup] Image ${imageName} is already available locally`);
         return;
     }
 
-    console.log(`[Test Setup] Image ${imageName} not found locally, will be pulled during test execution`);
-    console.log('[Test Setup] Using lazy loading - images will be pulled as needed by tests');
+    console.log(`[Test Setup] Image ${imageName} not found locally, pulling now...`);
 
-    // Even with lazy loading, we should initialize the extension
-    try {
-        await vscode.commands.executeCommand('oicode.initializeEnvironment');
-        console.log('[Test Setup] Extension environment initialized');
-    } catch (error) {
-        console.warn('[Test Setup] Extension initialization failed:', error);
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            console.log(`[Test Setup] docker pull attempt ${attempt}/${maxAttempts}...`);
+            await execAsync(`docker pull ${imageName}`);
+            // verify
+            if (await imageExistsLocally()) {
+                console.log('[Test Setup] Image pulled and verified');
+                // Initialize extension environment after image is ready
+                try {
+                    await vscode.commands.executeCommand('oicode.initializeEnvironment');
+                    console.log('[Test Setup] Extension environment initialized');
+                } catch (error) {
+                    console.warn('[Test Setup] Extension initialization failed:', error);
+                }
+                return;
+            }
+            throw new Error('Image verification failed after pull');
+        } catch (error: any) {
+            console.warn(`[Test Setup] docker pull failed (attempt ${attempt}): ${error?.message || error}`);
+            if (attempt < maxAttempts) {
+                const backoffMs = 2000 * attempt;
+                console.log(`[Test Setup] Waiting ${backoffMs}ms before retry...`);
+                await new Promise(res => setTimeout(res, backoffMs));
+            } else {
+                throw new Error(`Failed to pull required Docker image ${imageName} after ${maxAttempts} attempts: ${error?.message || error}`);
+            }
+        }
     }
 }
 
