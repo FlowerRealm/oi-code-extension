@@ -331,15 +331,34 @@ export class Installer {
                                     throw new Error('用户取消了需要管理员权限的安装步骤');
                                 }
 
-                                // 复制到应用程序
-                                dockerInstallOutput.appendLine('正在安装 Docker Desktop 到应用程序...');
-                                cp.execSync(`sudo cp -R "${mountPath}/Docker.app" /Applications/`, { stdio: 'inherit' });
+                                // 生成需要管理员权限的安装命令
+                                dockerInstallOutput.appendLine('生成 Docker Desktop 安装命令...');
+                                const installCommands = [
+                                    `sudo cp -R "${mountPath}/Docker.app" /Applications/`,
+                                    'sudo chown -R $USER:admin /Applications/Docker.app',
+                                    'sudo chmod -R 755 /Applications/Docker.app',
+                                    'sudo xattr -cr /Applications/Docker.app'
+                                ];
 
-                                // 设置权限
-                                dockerInstallOutput.appendLine('设置 Docker Desktop 权限...');
-                                cp.execSync('sudo chown -R $USER:admin /Applications/Docker.app', { stdio: 'inherit' });
-                                cp.execSync('sudo chmod -R 755 /Applications/Docker.app', { stdio: 'inherit' });
-                                cp.execSync('sudo xattr -cr /Applications/Docker.app', { stdio: 'inherit' });
+                                dockerInstallOutput.appendLine('');
+                                dockerInstallOutput.appendLine('⚠️  需要管理员权限完成安装，请在终端中依次执行以下命令：');
+                                dockerInstallOutput.appendLine('');
+                                installCommands.forEach((cmd, index) => {
+                                    dockerInstallOutput.appendLine(`${index + 1}. ${cmd}`);
+                                });
+                                dockerInstallOutput.appendLine('');
+
+                                // 提示用户手动执行命令
+                                const executeChoice = await vscode.window.showWarningMessage(
+                                    'Docker Desktop 安装需要管理员权限，请查看输出窗口中的命令并在终端中手动执行',
+                                    { modal: true },
+                                    '已完成安装',
+                                    '取消安装'
+                                );
+
+                                if (executeChoice !== '已完成安装') {
+                                    throw new Error('用户取消了 Docker Desktop 安装');
+                                }
 
                                 // 卸载 DMG
                                 cp.execSync(`hdiutil detach "${mountPath}"`, { stdio: 'inherit' });

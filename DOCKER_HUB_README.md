@@ -42,7 +42,7 @@ docker run --rm flowerrealm/oi-code-clang clang++ --version
 
 # 编译和运行简单程序
 echo '#include <iostream>\nint main() { std::cout<<"Hello OI!\n"; return 0; }' > test.cpp
-docker run --rm -v $(pwd):/src -w /src flowerrealm/oi-code-clang clang++ test.cpp -o test && ./test
+docker run --rm -v $(pwd):/src -w /src flowerrealm/oi-code-clang bash -c "clang++ test.cpp -o test && ./test"
 ```
 
 ### 进入容器

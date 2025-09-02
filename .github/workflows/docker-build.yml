@@ -85,14 +85,16 @@ jobs:
 
       - name: 🪟 Build and push Windows AMD64 images
         if: matrix.platform == 'windows'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.windows.amd64
-          platforms: windows/amd64
-          push: true
-          tags: |
-            flowerrealm/oi-code-clang:latest-win
-            flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win
-            flowerrealm/oi-code-clang:${{ github.sha }}-win
+        run: |
+          # 禁用 BuildKit 以避免版本兼容性问题
+          set DOCKER_BUILDKIT=0
+          # 使用 process 隔离模式构建
+          docker build --isolation=process -t flowerrealm/oi-code-clang:latest-win -f Dockerfile.windows.amd64 .
+          docker build --isolation=process -t flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win -f Dockerfile.windows.amd64 .
+          docker build --isolation=process -t flowerrealm/oi-code-clang:${{ github.sha }}-win -f Dockerfile.windows.amd64 .
+          
+          # 推送镜像
+          docker push flowerrealm/oi-code-clang:latest-win
+          docker push flowerrealm/oi-code-clang:v${{ steps.meta.outputs.version }}-win
+          docker push flowerrealm/oi-code-clang:${{ github.sha }}-win
 

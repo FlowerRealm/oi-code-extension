@@ -1,54 +1,56 @@
-## OI-Code Clang Docker Images 自动化文档
+# OI-Code Clang Docker 镜像文档
 
 本目录包含 OI-Code 扩展的 Docker Clang 镜像自动化构建和发布配置。
 
-### 🎯 核心特性
+## 🎯 核心特性
 
-OI-Code 现在自动使用基于 **Ubuntu 24.04 + Clang 18.1.8** 的镜像，提供：
+OI-Code 使用基于 **Ubuntu 24.04 + Clang 18.1.8** 的镜像，提供：
 
-1. **全自动化构建**: GitHub Actions 自动构建和发布
-2. **统一的 Clang 工具链**: 替换原有的 GCC，确保一致性和性能
-3. **跨平台兼容**: 基于 Ubuntu 24.04，支持 Linux/macOS/Windows through Docker Desktop
-4. **构建缓存优化**: 使用 Docker 构建缓存加速 CI/CD 流程
-5. **安全认证**: 使用 Docker Hub 个人访问令牌而非密码
+- **全自动化构建**: GitHub Actions 自动构建和发布
+- **统一工具链**: 使用 Clang 替换 GCC，确保一致性和性能
+- **跨平台兼容**: 支持 Linux/macOS/Windows (通过 Docker Desktop)
+- **构建缓存优化**: 使用 Docker 构建缓存加速 CI/CD 流程
+- **安全认证**: 使用 Docker Hub 个人访问令牌
 
-### 🚀 自动化流程
-
-#### ⚡ GitHub Actions 自动工作流
-
-当您推送代码到 `main` 分支时：
-
-1. **自动测试**: 14种操作系统矩阵测试
-2. **构建镜像**: Ubuntu 24.04 + Clang 18 工具链
-3. **推送到 Docker Hub**: 生成两个标签
-4. **构建缓存储存**: 加快后续构建速度
-
-#### 📦 自动生成的镜像标签
+## 📦 可用镜像标签
 
 ```bash
-🐳 flowerrealm/oi-code-clang:latest     # 最新版
-🐳 flowerrealm/oi-code-clang:v{x.y.z}   # 版本标签
-🔧 flowerrealm/oi-code-clang:buildcache # 构建缓存
+{{ ... }}
 ```
 
-### 📋 使用方法
+## 📋 使用方法
 
-#### 🌐 从 Docker Hub 拉取
+### 基本使用
 
 ```bash
-# 拉取最新版
+# 拉取最新版镜像
 docker pull flowerrealm/oi-code-clang:latest
 
 # 验证 Clang 安装
 docker run --rm flowerrealm/oi-code-clang:latest clang++ --version
+
+# 快速编译测试
+echo '#include <iostream>
+int main() { std::cout << "Hello OI!" << std::endl; return 0; }' > test.cpp
+
+docker run --rm -v $(pwd):/workspace -w /workspace \
+  flowerrealm/oi-code-clang:latest bash -c "clang++ test.cpp -o test && ./test"
 ```
 
-#### ⚙️ OI-Code 扩展自动使用
+### 交互式使用
 
-安装镜像后，OI-Code 扩展会自动使用，**无需手动配置**：
+```bash
+# 进入容器调试
+docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
+
+# 可用工具: clang, clang++, lldb, lld, valgrind
+```
+
+### OI-Code 扩展集成
+
+扩展会自动使用镜像，无需手动配置。如需自定义：
 
 ```json
-// settings.json (自动配置，无需修改)
 {
   "oicode.docker.compilers": {
     "cpp": "flowerrealm/oi-code-clang:latest",
@@ -57,78 +59,12 @@ docker run --rm flowerrealm/oi-code-clang:latest clang++ --version
 }
 ```
 
-#### 🧪 本地测试
-
-```bash
-# 创建测试用例
-echo '#include <bits/stdc++.h>
-int main() {
-    std::cout << "Hello OI-Clang!" << std::endl;
-    return 0;
-}' > test.cpp
-
-# 编译运行
-docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  flowerrealm/oi-code-clang:latest \
-  clang++ test.cpp -o test && ./test
-```
-
-#### 🐌 进入容器调试
-
-```bash
-# Linux/macOS
-docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
-docker run -it --rm flowerrealm/oi-code-clang:arm64 /bin/bash
-
-# 可用的工具：
-# clang, clang++, lldb, llvm, lld, valgrind
-# gdb-multiarch (ARM64 only), gcc-arm-linux-gnueabihf (ARM64 only)
-```
-
-#### 🚀 自动化构建和推送
-
-```bash
-# 一键构建多平台镜像
-docker buildx build --platform linux/amd64,linux/arm64 -t flowerrealm/oi-code-clang:latest --push .
-
-# 分步构建
-# 1. 创建builder
-docker buildx create --use --name multiarch-builder
-
-# 2. 构建和推送AMD64版本
-docker buildx build --platform linux/amd64 -t flowerrealm/oi-code-clang:amd64 --push .
-
-# 3. 构建和推送ARM64版本
-docker buildx build --platform linux/arm64 -t flowerrealm/oi-code-clang:arm64 --push .
-
-# 4. 创建多架构manifest
-docker buildx build --platform linux/amd64,linux/arm64 -t flowerrealm/oi-code-clang:latest --push .
-```
-
-#### 🐳 镜像管理
-
-```bash
-# 查看支持的平台
-docker buildx imagetools inspect flowerrealm/oi-code-clang:latest
-
-# 删除本地镜像
-docker rmi flowerrealm/oi-code-clang:latest
-
-# 查看镜像历史
-docker history flowerrealm/oi-code-clang:latest
-
-# 推送到其他仓库
-docker tag flowerrealm/oi-code-clang:latest my-registry/oi-code-clang:latest
-docker push my-registry/oi-code-clang:latest
-```
-
 ### 🔧 技术架构
 
 #### 🐳 Dockerfile 简介
 
 ```dockerfile
+{{ ... }}
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -330,88 +266,30 @@ export HTTP_PROXY=http://proxy.company.com:8080
   - 构建缓存和性能优化
   - 跨平台兼容性改进
 
-### Custom Image Details
+## 🛠️ 高级用法
 
-#### Linux Image (`oi-code-clang:latest`)
-- **Base**: Ubuntu 24.04
-- **Tools Installed**:
-  - Clang/Clang++
-  - libc++ (C++ standard library)
-  - LLVM toolchain
-  - lldb debugger
-  - lld linker
-  - Development tools (valgrind)
-
-### Troubleshooting
-
-#### Image Build Fails
-If custom image building fails, you can configure OI-Code to fall back to official images:
-
-In VS Code settings, add:
-```json
-"oicode.docker.compilers": {
-  "cpp": "ubuntu:24.04",
-  "c": "ubuntu:24.04"
-}
-```
-
-#### Linux: Clang Not Found
-Install Clang in the container:
-```bash
-apt-get update && apt-get install -y clang clang++
-```
-
-#### Windows: Setup Challenges
-For Windows containers with Clang:
-1. Download LLVM/Clang distribution from https://releases.llvm.org/
-2. Extract binaries to `C:\llvm\bin\`
-3. Add to PATH: `ENV PATH="C:\llvm\bin;%PATH%"`
-4. Update Dockerfile.windows with actual paths
-
-### Advanced Usage
-
-#### Manual Image Building
+### 手动构建镜像
 
 ```bash
-# Build Linux image manually
+# 手动构建 Linux 镜像
 docker build -t oi-code-clang:latest -f Dockerfile .
+
+# 构建 Windows 镜像
+docker build -t oi-code-clang:latest-win -f Dockerfile.windows.amd64 .
 ```
 
-#### Custom Compiler Configuration
-You can override the default images in VS Code settings:
-
-```json
-{
-  "oicode.docker.compilers": {
-    "cpp": "my-custom-gcc:latest",
-    "c": "my-custom-gcc:latest"
-  }
-}
-```
-
-#### Image Registry
-Push your custom images to a registry for team sharing:
+### 多平台构建
 
 ```bash
-# Tag and push to registry
-docker tag oi-code-clang:latest my-registry.com/oi-code-clang:latest
-docker push my-registry.com/oi-code-clang:latest
+# 创建多平台构建器
+docker buildx create --use
+
+# 构建多平台镜像
+docker buildx build --platform linux/amd64 -t flowerrealm/oi-code-clang:latest --push .
 ```
 
-### Performance Considerations
+## ⚠️ 已知限制
 
-- **Container Pool**: Custom images work with the container pool optimization
-- **Cache Mounting**: Enabled for better file synchronization performance
-- **Image Size**: Ubuntu-based image is ~1GB, Nano Server image is ~300MB
-
-### Known Limitations
-
-1. **Windows Support**: Windows Nano Server doesn't support direct package installation
-2. **Large Binaries**: Clang toolchain significantly increases image size
-3. **Cross-platform**: Windows containers cannot run on Linux hosts directly
-
-### Migration from GCC
-
-The extension automatically detects and uses the new Clang images. No manual configuration is required after building the images.
-
-Previous GCC-based configurations will still work if you don't build the new images.
+- **镜像大小**: Clang 工具链会显著增加镜像大小（约1GB）
+- **Windows容器**: 需要在 Windows 主机上构建 Windows 容器
+- **网络依赖**: 构建过程需要稳定的网络连接
