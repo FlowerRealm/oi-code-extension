@@ -1,12 +1,9 @@
-# OI-Code Clang container for Windows AMD64 (using Nano Server)
-FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+# OI-Code Clang container for Windows AMD64 (using Server Core for compatibility)
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Switch to PowerShell for package management
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
-# Install LLVM/Clang directly without Chocolatey for Nano Server compatibility
+# Install LLVM/Clang using Server Core's full capabilities
 RUN powershell -Command " \
-    # Download LLVM installer directly \
+    # Download LLVM installer \
     $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win64.exe'; \
     $output = 'C:\temp\llvm-installer.exe'; \
     New-Item -ItemType Directory -Path C:\temp -Force; \
@@ -14,7 +11,7 @@ RUN powershell -Command " \
     Start-Process -FilePath $output -ArgumentList '/S' -Wait; \
     Remove-Item -Path C:\temp -Recurse -Force"
 
-# Set environment variables (use Windows PATH format)
+# Set environment variables
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
 # Create workspace directory
@@ -24,8 +21,8 @@ RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
 WORKDIR C:/work
 
 # Test clang installation
-RUN powershell -Command "& 'C:\Program Files\LLVM\bin\clang.exe' --version"
+RUN powershell -Command "clang --version"
 
 # Default entrypoint
-CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; & 'C:\\Program Files\\LLVM\\bin\\clang.exe' --version"]
+CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]
 

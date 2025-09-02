@@ -1,18 +1,13 @@
-# OI-Code Clang container for Windows ARM64
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# OI-Code Clang container for Windows ARM64 - Use Windows base image for ARM64 support
+FROM mcr.microsoft.com/windows:ltsc2022
 
 # Switch to PowerShell for package management
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Install Chocolatey
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
-    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# Install LLVM/Clang for ARM64 - use a more compatible approach
+# Install LLVM/Clang for ARM64 directly without Chocolatey
 RUN powershell -Command " \
-    # Download and install LLVM manually for ARM64 \
-    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win64.exe'; \
+    # Download LLVM ARM64 installer directly \
+    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win-arm64.exe'; \
     $output = 'C:\temp\llvm-installer.exe'; \
     New-Item -ItemType Directory -Path C:\temp -Force; \
     Invoke-WebRequest -Uri $url -OutFile $output; \
@@ -20,7 +15,7 @@ RUN powershell -Command " \
     Remove-Item -Path C:\temp -Recurse -Force"
 
 # Set environment variables
-ENV PATH="C:\Program Files\LLVM\bin;${PATH}"
+ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
 # Create workspace directory
 RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
@@ -29,7 +24,7 @@ RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
 WORKDIR C:/work
 
 # Test clang installation
-RUN powershell -Command "& 'C:\Program Files\LLVM\bin\clang.exe' --version"
+RUN powershell -Command "clang --version"
 
 # Default entrypoint
-CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows ARM64 Clang Ready'; & 'C:\\Program Files\\LLVM\\bin\\clang.exe' --version"]
+CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows ARM64 Clang Ready'; clang --version"]
