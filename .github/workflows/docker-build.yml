@@ -25,11 +25,15 @@ on:
 
 jobs:
   docker-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     environment: check
     strategy:
       matrix:
-        platform: [linux, windows]
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
       fail-fast: false
       max-parallel: 2
 
@@ -54,10 +58,17 @@ jobs:
 
       - name: Get version for tagging
         id: meta
-        run: |
-          VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "latest")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 获取版本: $VERSION"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let version = 'latest';
+            try {
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              if (pkg && pkg.version) version = pkg.version;
+            } catch (e) {}
+            core.setOutput('version', version);
+            core.info(`📦 获取版本: ${version}`);
 
       - name: 💚 Build and push Linux images
         if: matrix.platform == 'linux'
