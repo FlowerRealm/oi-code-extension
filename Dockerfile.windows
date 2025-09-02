@@ -1,5 +1,5 @@
 # OI-Code Clang container for Windows (minimal setup)
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/windows/servercore:ltsc2022
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Install Chocolatey and MSYS2 for Clang toolchain
 RUN powershell -Command " \
