@@ -1,5 +1,5 @@
-# OI-Code Clang container for Windows ARM64 - Use Windows base image for ARM64 support
-FROM mcr.microsoft.com/windows:ltsc2022
+# OI-Code Clang container for Windows ARM64 - Use Server Core with explicit platform
+FROM --platform=windows/arm64 mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Switch to PowerShell for package management
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
