@@ -26,6 +26,7 @@ on:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    environment: check
     strategy:
       matrix:
         platform: [linux, windows]

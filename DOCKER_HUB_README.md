@@ -112,33 +112,36 @@ RUN useradd -m -s /bin/bash runner && \
     clang++ --version
 ```
 
-### Windows 版本 (`Dockerfile.windows`)
+### Windows 版本 (`Dockerfile.windows.amd64`)
 ```dockerfile
-# 基于 Windows Nano Server，专用 Clang 工具链
-FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+# 基于 Windows Server Core，专用 Clang 18 工具链
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# 安装 Clang 工具链及调试工具
-USER ContainerAdministrator
+# 安装 LLVM/Clang 18.1.8 使用增强的错误处理
+RUN powershell -Command " \
+    $ErrorActionPreference = 'Stop'; \
+    Write-Host 'Starting LLVM installation...'; \
+    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe'; \
+    $output = 'C:\temp\llvm-installer.exe'; \
+    Write-Host 'Creating temp directory...'; \
+    New-Item -ItemType Directory -Path C:\temp -Force | Out-Null; \
+    Write-Host 'Downloading LLVM installer...'; \
+    Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing; \
+    Write-Host 'Installing LLVM silently...'; \
+    $process = Start-Process -FilePath $output -ArgumentList '/S', '/v/qn' -Wait -PassThru; \
+    if ($process.ExitCode -ne 0) { throw \"Installation failed with exit code $($process.ExitCode)\" }; \
+    Remove-Item -Path C:\temp -Recurse -Force; \
+    Write-Host 'LLVM installation completed successfully';"
 
-# Nano Server 不支持直接包管理，需要手动设置
-# Windows 容器中设置 Clang 的最佳实践：
+# 设置环境变量
+ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
-# 方法1: 使用 PowerShell 预下载二进制文件
-RUN powershell -Command \
-    Invoke-WebRequest -Uri 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe' -OutFile 'C:\llvm-installer.exe'; \
-    Start-Process 'C:\llvm-installer.exe' -ArgumentList '/S /D=C:\llvm' -NoNewWindow -Wait; \
-    setx /M PATH '%PATH%;C:\llvm\bin'; \
-    Remove-Item 'C:\llvm-installer.exe' -Force;
-
-# 方法2: 如果使用预构建的 ZIP 文件
-# RUN powershell -Command \
-#     Expand-Archive -Path C:\llvm-18.1.8-win64.zip -DestinationPath C:\llvm; \
-#     setx /M PATH '%PATH%;C:\llvm\bin';
+# 创建工作目录
+RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
+WORKDIR C:/work
 
 # 验证安装
-RUN clang --version
-
-USER ContainerUser
+RUN powershell -Command "clang --version"
 ```
 
 ## 构建和发布

@@ -1,11 +1,14 @@
 # OI-Code Clang container for Windows AMD64 (using Server Core for compatibility)
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
+# Set PowerShell as default shell
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
 # Install LLVM/Clang using Server Core's full capabilities
-RUN powershell -Command " \
+RUN " \
     $ErrorActionPreference = 'Stop'; \
     Write-Host 'Starting LLVM installation...'; \
-    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/LLVM-17.0.6-win64.exe'; \
+    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe'; \
     $output = 'C:\temp\llvm-installer.exe'; \
     Write-Host 'Creating temp directory...'; \
     New-Item -ItemType Directory -Path C:\temp -Force | Out-Null; \
@@ -24,13 +27,13 @@ RUN powershell -Command " \
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
 # Create workspace directory
-RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
+RUN New-Item -ItemType Directory -Path C:\work -Force
 
 # Set working directory
 WORKDIR C:/work
 
 # Test clang installation
-RUN powershell -Command "clang --version"
+RUN clang --version
 
 # Default entrypoint
 CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]

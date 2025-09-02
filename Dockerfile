@@ -13,11 +13,9 @@ ENV TARGETARCH=${TARGETARCH}
 RUN echo "Building for architecture: $TARGETARCH" && \
     apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
-    # Core C/C++ development tools (only essentials)
+    # Core C/C++ development tools (Clang-only for consistency)
     clang-18 \
     clang++-18 \
-    gcc \
-    g++ \
     # Essential runtime libraries
     libc6-dev \
     libc++-18-dev \

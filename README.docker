@@ -132,31 +132,30 @@ docker push my-registry/oi-code-clang:latest
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 安装 Clang 18 完整工具链
+# 安装 Clang 18 核心工具链（竞技编程优化）
 RUN apt-get update --quiet && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         clang-18 \
         clang++-18 \
-        clangd-18 \
-        clang-format-18 \
-        clang-tidy-18 \
-        lldb-18 \
-        llvm-18 \
-        lld-18 \
-        libclang-18-dev \
-        libclang-cpp18-dev \
+        libc6-dev \
         libc++-18-dev \
         libc++abi-18-dev \
-        valgrind \
-        cppcheck \
+        libstdc++-13-dev \
+        libboost-dev \
+        libgmp-dev \
+        libmpfr-dev \
         && \
-    # Create symlinks for convenience
+    # 创建符号链接
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
-    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
-    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
+    # 创建运行用户
+    useradd -m -s /bin/bash runner && \
+    mkdir -p /sandbox && \
+    chown -R runner:runner /sandbox && \
+    # 清理缓存
+    apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # 验证安装
 RUN clang --version && clang++ --version

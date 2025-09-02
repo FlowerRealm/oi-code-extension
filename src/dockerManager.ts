@@ -654,7 +654,7 @@ export class DockerManager {
 
 
     /**
-     * Ensure Clang image exists, try pull first, build locally if pull fails
+     * Ensure Clang image exists, try to pull from Docker Hub if not available locally
      */
     private static async ensureClangImageExists(imageName: string, platform: NodeJS.Platform): Promise<void> {
         // Use a static flag to prevent concurrent operations on the same image
@@ -1089,8 +1089,6 @@ export class DockerManager {
 
         console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
         console.log(`[DockerManager] Container pool:`, this.containerPool.containers.size);
-
-        console.log(`[DockerManager] Starting container for ${languageId} using ${image}`);
 
         // Get user home directory path, cross-platform compatible, create separate subdirectory for each language
         const homedir = os.homedir();

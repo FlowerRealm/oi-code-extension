@@ -319,6 +319,18 @@ export class Installer {
                                 dockerInstallOutput.appendLine('正在挂载 Docker DMG...');
                                 cp.execSync(`hdiutil attach "${dmgPath}" -mountpoint "${mountPath}" -nobrowse`, { stdio: 'inherit' });
 
+                                // 提示用户需要管理员权限
+                                const installChoice = await vscode.window.showWarningMessage(
+                                    'Docker Desktop 安装需要管理员权限来完成文件复制和权限设置。这将在终端中请求您的密码。',
+                                    { modal: true },
+                                    '继续安装',
+                                    '取消'
+                                );
+                                
+                                if (installChoice !== '继续安装') {
+                                    throw new Error('用户取消了需要管理员权限的安装步骤');
+                                }
+
                                 // 复制到应用程序
                                 dockerInstallOutput.appendLine('正在安装 Docker Desktop 到应用程序...');
                                 cp.execSync(`sudo cp -R "${mountPath}/Docker.app" /Applications/`, { stdio: 'inherit' });
