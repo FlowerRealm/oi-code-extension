@@ -49,7 +49,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: flowerrealm
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Get version for tagging
         id: meta

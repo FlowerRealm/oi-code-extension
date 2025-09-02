@@ -26,3 +26,4 @@ WORKDIR C:/work
 
 # Default entrypoint
 CMD ["powershell.exe", "-Command", "Write-Host 'OI-Code Windows Clang Ready'; bash.exe -l"]
+
