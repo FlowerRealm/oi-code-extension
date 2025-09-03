@@ -156,44 +156,8 @@ export class DockerManager {
         console.log('[DockerManager] Checking critical Docker images...');
 
         for (const image of criticalImages) {
-            // Use lock to prevent concurrent operations on the same image
-            const lockKey = `image-pull-${image}`;
-            const existingLock = this.dockerOperationLocks.get(lockKey);
-
-            if (existingLock) {
-                console.log(`[DockerManager] Image ${image} is being pulled by another operation, waiting...`);
-                await existingLock;
-                console.log(`[DockerManager] Image ${image} is now ready`);
-                continue;
-            }
-
-            // Check if image exists locally
-            const isAvailable = await this.checkImageAvailableLocally(image);
-            if (isAvailable) {
-                console.log(`[DockerManager] Image ${image} is available locally`);
-                continue;
-            }
-
-            // Start pull operation with lock
-            console.log(`[DockerManager] Pulling image ${image}...`);
-            this.imagePullProgress.set(image, false);
-
-            const pullPromise = this.pullImageWithProgress(image)
-                .then(() => {
-                    console.log(`[DockerManager] Successfully pulled image ${image}`);
-                    this.imagePullProgress.set(image, true);
-                })
-                .catch((error) => {
-                    console.error(`[DockerManager] Failed to pull image ${image}:`, error);
-                    this.imagePullProgress.set(image, true);
-                    throw error;
-                })
-                .finally(() => {
-                    this.dockerOperationLocks.delete(lockKey);
-                });
-
-            this.dockerOperationLocks.set(lockKey, pullPromise);
-            await pullPromise;
+            // Delegate to unified image ensuring logic to avoid duplication
+            await this.ensureClangImageExists(image, os.platform());
         }
 
         console.log('[DockerManager] All critical images are available');
@@ -428,6 +392,48 @@ export class DockerManager {
             });
         } catch (err) {
             throw err;
+        }
+    }
+
+    /**
+     * Force remove all oi-container containers
+     */
+    private static async forceRemoveOiContainers(): Promise<void> {
+        try {
+            // Find all oi-container containers by name
+            const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
+            let containerIds = '';
+
+            findProcess.stdout.on('data', (data) => {
+                containerIds += data.toString();
+            });
+
+            const findCode: number = await new Promise<number>((resolve) => {
+                findProcess.on('close', resolve);
+                findProcess.on('error', () => resolve(-1));
+            });
+
+            if (findCode !== 0) {
+                console.warn(`[DockerManager] Failed to find oi-containers: ${findCode}`);
+                return;
+            }
+
+            const ids = containerIds.trim().split('\n').filter(id => id);
+            if (ids.length === 0) {
+                console.log('[DockerManager] No oi-containers found to remove');
+                return;
+            }
+
+            console.log(`[DockerManager] Force removing ${ids.length} oi-container(s)`);
+            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
+            const rmCode: number = await new Promise<number>((resolve) => {
+                rmProcess.on('close', resolve);
+                rmProcess.on('error', () => resolve(-1));
+            });
+
+            console.log(`[DockerManager] Force removed oi-containers with code: ${rmCode}`);
+        } catch (error) {
+            console.warn(`[DockerManager] Error force removing oi-containers: ${error}`);
         }
     }
 
@@ -667,12 +673,21 @@ export class DockerManager {
             this.imageBuildPromises.delete(imageName);
         };
 
-        const handleResolveError = () => {
+        const failWith = (reason: string): never => {
             this.imageBuildPromises.delete(imageName);
-            // Continue with fallback - don't stop execution
+            const guidance = [
+                `Image '${imageName}' is not available locally and could not be pulled.`,
+                `Reason: ${reason}`,
+                `Actions:`,
+                `  - Verify the image exists and is public on Docker Hub: docker pull ${imageName}`,
+                `  - Ensure you are logged in if the image is private (docker login)`,
+                `  - Optionally set 'oicode.docker.compilers' to a valid oi-code image tag if you use a pinned version`,
+                `  - Ensure Docker is logged in if the image is private`,
+            ].join('\n');
+            throw new Error(guidance);
         };
 
-        return new Promise(async (resolve) => {
+        return new Promise(async (resolve, reject) => {
             const checkImage = spawn('docker', ['images', '-q', imageName]);
             let imageId = '';
 
@@ -686,139 +701,110 @@ export class DockerManager {
                     console.log(`[DockerManager] Clang image ${imageName} found and ready`);
                     handleResolve();
                     resolve();
-                } else {
-                    // Image doesn't exist, try pulling first
-                    console.log(`[DockerManager] Clang image ${imageName} not found locally, attempting to pull from Docker Hub...`);
+                    return;
+                }
 
+                // Image doesn't exist, try pulling, with a single retry on failure
+                console.log(`[DockerManager] Clang image ${imageName} not found locally, attempting to pull from Docker Hub...`);
+
+                const attemptPull = async (): Promise<void> => {
                     const pullPromise = this.pullImageFromDockerHub(imageName);
                     this.imageBuildPromises.set(imageName, pullPromise);
+                    await pullPromise;
 
+                    // Recheck to ensure image is indeed available
+                    const available = await this.checkImageAvailableLocally(imageName);
+                    if (!available) {
+                        throw new Error('Image pull completed but image not found locally');
+                    }
+                };
+
+                try {
+                    await attemptPull();
+                    console.log(`[DockerManager] Successfully pulled Clang image ${imageName} from Docker Hub`);
+                    handleResolve();
+                    resolve();
+                } catch (pullError1: any) {
+                    console.warn(`[DockerManager] Pull attempt 1 failed for ${imageName}: ${pullError1?.message || pullError1}`);
+                    // Backoff and retry once
+                    await new Promise(r => setTimeout(r, 2000));
                     try {
-                        await pullPromise;
-                        console.log(`[DockerManager] Successfully pulled Clang image ${imageName} from Docker Hub`);
+                        await attemptPull();
+                        console.log(`[DockerManager] Successfully pulled Clang image ${imageName} after retry`);
                         handleResolve();
                         resolve();
-                    } catch (pullError) {
-                        console.warn(`[DockerManager] Failed to pull ${imageName} from Docker Hub: ${pullError}`);
-                        console.log(`[DockerManager] Skipping ${imageName} - will continue without this image. OI-Code will use available images or alternative methods.`);
-
-                        // 继续执行而不做任何进一步的尝试 - 让用户在后续执行时看到更清楚的错误信息
-                        handleResolveError();
-                        resolve(); // 不抛出错误，允许继续运行
+                    } catch (pullError2: any) {
+                        const reason = pullError2?.message || pullError1?.message || String(pullError2 || pullError1);
+                        try {
+                            // Final sanity check: maybe image appeared meanwhile
+                            const available = await this.checkImageAvailableLocally(imageName);
+                            if (available) {
+                                console.log(`[DockerManager] Image ${imageName} became available after failures`);
+                                handleResolve();
+                                resolve();
+                                return;
+                            }
+                        } catch {
+                            // ignore
+                        }
+                        reject(failWith(reason));
                     }
                 }
             });
 
             checkImage.on('error', (err) => {
-                console.warn(`[DockerManager] Error checking image ${imageName}: ${err.message}`);
-                handleResolveError();
-                resolve();
+                reject(failWith(`Failed to check local images: ${err.message}`));
             });
         });
     }
 
-    // Static map to track ongoing image builds
+    // Static map to track ongoing image pulls/builds
     private static imageBuildPromises: Map<string, Promise<void>> = new Map();
 
     /**
-     * Pull image from Docker Hub with reduced verbose logging
+     * Pull image from Docker Hub with retries and exponential backoff
      */
     private static async pullImageFromDockerHub(imageName: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            console.log(`[DockerManager] Pulling ${imageName} from Docker Hub...`);
+        const maxAttempts = 4;
+        const baseDelayMs = 2000;
 
-            const pullProcess = spawn('docker', ['pull', imageName], {
-                stdio: ['ignore', 'pipe', 'pipe']
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+        let lastError: any = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            console.log(`[DockerManager] Pulling image ${imageName} (attempt ${attempt}/${maxAttempts})`);
+
+            let exitCode: number | null = null;
+            let stderr = '';
+            let stdout = '';
+
+            await new Promise<void>((resolve) => {
+                const proc = spawn('docker', ['pull', imageName]);
+                proc.stdout.on('data', (d) => { stdout += d.toString(); });
+                proc.stderr.on('data', (d) => { stderr += d.toString(); });
+                proc.on('close', (code) => { exitCode = code; resolve(); });
+                proc.on('error', (err) => { lastError = err; resolve(); });
             });
 
-            // Reduce logging for minor progress updates, only log errors and completion
-            let pullError: string = '';
-
-            pullProcess.stderr.on('data', (data) => {
-                const errorMsg = data.toString();
-                if (errorMsg.includes('manifest') || errorMsg.includes('error') || errorMsg.includes('failed')) {
-                    pullError = errorMsg.trim();
-                    console.warn(`[DockerManager] Pull error for ${imageName}: ${pullError}`);
+            if (exitCode === 0) {
+                const available = await this.checkImageAvailableLocally(imageName);
+                if (available) {
+                    console.log(`[DockerManager] Image ${imageName} pulled and verified locally`);
+                    return;
                 }
-            });
-
-            pullProcess.on('close', (code) => {
-                if (code === 0) {
-                    console.log(`[DockerManager] Successfully pulled ${imageName}`);
-                    resolve();
-                } else {
-                    const errorMessage = pullError || `Pull command exited with code ${code}`;
-                    console.error(`[DockerManager] Failed to pull ${imageName}: ${errorMessage}`);
-                    reject(new Error(errorMessage));
-                }
-            });
-
-            pullProcess.on('error', (err) => {
-                console.error(`[DockerManager] Pull process error for ${imageName}: ${err.message}`);
-                reject(err);
-            });
-        });
-    }
-
-
-
-    /**
-     * Adopt existing healthy containers to avoid resource leaks
-     */
-    private static async adoptExistingContainers(): Promise<void> {
-        console.log('[DockerManager] Scanning for existing oi-container containers...');
-
-        try {
-            // Scan all oi-container-* containers
-            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container*', '--format', '{{.Names}}']);
-            let containerNames = '';
-
-            psProcess.stdout.on('data', (data) => {
-                containerNames += data.toString();
-            });
-
-            await new Promise<void>((resolve, reject) => {
-                psProcess.on('close', (code) => {
-                    if (code === 0) {
-                        resolve();
-                    } else {
-                        reject(new Error(`Failed to list containers: ${code}`));
-                    }
-                });
-                psProcess.on('error', (err) => {
-                    reject(new Error(`Error listing containers: ${err.message}`));
-                });
-            });
-
-            const names = containerNames.trim().split('\n').filter(name => name);
-            if (names.length === 0) {
-                console.log('[DockerManager] No existing oi-container containers found');
-                return;
+                lastError = new Error(`Image pull reported success but image not found locally. stdout=${stdout}`);
+            } else {
+                lastError = new Error(`docker pull exited with code ${exitCode}. stderr=${stderr || '(empty)'} stdout=${stdout || '(empty)'}`);
             }
 
-            console.log(`[DockerManager] Found ${names.length} existing containers: ${names.join(', ')}`);
-
-            // Check each container's health status and attempt to adopt
-            for (const containerName of names) {
-                try {
-                    const container = await this.inspectAndAdoptContainer(containerName);
-                    if (container) {
-                        console.log(`[DockerManager] Successfully adopted container ${containerName} for ${container.languageId}`);
-                    } else {
-                        console.log(`[DockerManager] Container ${containerName} is not healthy, will be cleaned up`);
-                        // Clean up unhealthy containers
-                        await this.cleanupUnhealthyContainer(containerName);
-                    }
-                } catch (error) {
-                    console.warn(`[DockerManager] Failed to adopt container ${containerName}:`, error);
-                    // Clean up containers that cannot be adopted
-                    await this.cleanupUnhealthyContainer(containerName);
-                }
+            if (attempt < maxAttempts) {
+                const delay = baseDelayMs * Math.pow(2, attempt - 1);
+                console.warn(`[DockerManager] Pull failed for ${imageName}, retrying after ${delay}ms`);
+                await sleep(delay);
             }
-        } catch (error) {
-            console.warn('[DockerManager] Error during container adoption:', error);
-            // Continue initialization even if adoption fails, don't affect normal functionality
         }
+
+        throw lastError || new Error(`Failed to pull ${imageName}`);
     }
 
     /**
@@ -1348,50 +1334,55 @@ export class DockerManager {
             }
         }
 
-        return container;
+        // At this point we must have a container
+        return container!;
     }
 
     /**
-     * Force remove all oi-container containers
+     * Adopt existing healthy containers to avoid resource leaks
      */
-    private static async forceRemoveOiContainers(): Promise<void> {
+    private static async adoptExistingContainers(): Promise<void> {
+        console.log('[DockerManager] Scanning for existing oi-container containers...');
         try {
-            // Find all oi-container containers
-            const findProcess = spawn('docker', ['ps', '-a', '-q', '--filter', 'name=oi-container*']);
-            let containerIds = '';
+            const psProcess = spawn('docker', ['ps', '-a', '--filter', 'name=oi-container*', '--format', '{{.Names}}']);
+            let containerNames = '';
 
-            findProcess.stdout.on('data', (data) => {
-                containerIds += data.toString();
+            psProcess.stdout.on('data', (data) => {
+                containerNames += data.toString();
             });
 
-            const findCode = await new Promise<number>((resolve) => {
-                findProcess.on('close', resolve);
-                findProcess.on('error', () => resolve(-1));
+            await new Promise<void>((resolve, reject) => {
+                psProcess.on('close', (code) => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`Failed to list containers: ${code}`));
+                });
+                psProcess.on('error', (err) => reject(new Error(`Error listing containers: ${err.message}`)));
             });
 
-            if (findCode !== 0) {
-                console.warn(`[DockerManager] Failed to find oi-containers: ${findCode}`);
+            const names = containerNames.trim().split('\n').filter(name => name);
+            if (names.length === 0) {
+                console.log('[DockerManager] No existing oi-container containers found');
                 return;
             }
 
-            const ids = containerIds.trim().split('\n').filter(id => id);
-            if (ids.length === 0) {
-                console.log('[DockerManager] No oi-containers found to remove');
-                return;
+            console.log(`[DockerManager] Found ${names.length} existing containers: ${names.join(', ')}`);
+
+            for (const name of names) {
+                try {
+                    const adopted = await this.inspectAndAdoptContainer(name);
+                    if (adopted) {
+                        console.log(`[DockerManager] Adopted ${name} for ${adopted.languageId}`);
+                    } else {
+                        console.log(`[DockerManager] ${name} is not healthy, cleaning up`);
+                        await this.cleanupUnhealthyContainer(name);
+                    }
+                } catch (e) {
+                    console.warn(`[DockerManager] Failed to adopt ${name}:`, e);
+                    await this.cleanupUnhealthyContainer(name);
+                }
             }
-
-            console.log(`[DockerManager] Found ${ids.length} oi-container(s) to force remove`);
-
-            // Force remove all oi-container containers
-            const rmProcess = spawn('docker', ['rm', '-f', ...ids]);
-            const rmCode = await new Promise<number>((resolve) => {
-                rmProcess.on('close', resolve);
-                rmProcess.on('error', () => resolve(-1));
-            });
-
-            console.log(`[DockerManager] Force removed oi-containers with code: ${rmCode}`);
         } catch (error) {
-            console.warn(`[DockerManager] Error force removing oi-containers: ${error}`);
+            console.warn('[DockerManager] Error during container adoption:', error);
         }
     }
 

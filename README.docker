@@ -15,7 +15,9 @@ OI-Code 使用基于 **Ubuntu 24.04 + Clang 18.1.8** 的镜像，提供：
 ## 📦 可用镜像标签
 
 ```bash
-{{ ... }}
+🐳 flowerrealm/oi-code-clang:latest      # 最新版本
+🐳 flowerrealm/oi-code-clang:v{x.y.z}   # 版本标签
+🪟 flowerrealm/oi-code-clang:latest-win # Windows版本
 ```
 
 ## 📋 使用方法
@@ -64,7 +66,6 @@ docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
 #### 🐳 Dockerfile 简介
 
 ```dockerfile
-{{ ... }}
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -99,14 +100,23 @@ RUN clang --version && clang++ --version
 
 #### 🛠️ 预装工具
 
-**Clang 系列**:
+**Clang 工具链 (版本 18)**:
 - `clang` / `clang++` - C/C++ 编译器
-- `lldb` - 调试器
-- `lld` - 高性能链接器
-- `llvm-ar` / `llvm-nm` - 工具链组件
+- `clang-18` / `clang++-18` - 完整版本编译器
 
-**传统工具**:
-- `valgrind` - 内存检测工具
+**开发库和运行时**:
+- `libc6-dev` - C 标准库开发文件
+- `libc++-18-dev` - LLVM C++ 标准库
+- `libc++abi-18-dev` - LLVM C++ ABI 库
+- `libstdc++-13-dev` - GNU C++ 标准库
+
+**竞技编程常用库**:
+- `libboost-dev` - Boost C++ 库
+- `libgmp-dev` - 大数运算库
+- `libmpfr-dev` - 多精度浮点运算库
+
+**调试工具 (ARM64)**:
+- `gdb-multiarch` - 多架构调试器
 
 #### ⚡ 性能优化
 
@@ -255,7 +265,7 @@ export HTTP_PROXY=http://proxy.company.com:8080
 
 - 🔗 **GitHub 仓库**: https://github.com/FlowerRealm/oi-code-extension
 - 🐳 **Docker Hub**: https://hub.docker.com/r/flowerrealm/oi-code-clang
-- 📖 **VS Code 扩展**: [OI-Code in VS Code Marketplace]
+- 📖 **VS Code 扩展**: [OI-Code in VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlowerRealm.oi-code)
 
 ### 📝 更新日志
 

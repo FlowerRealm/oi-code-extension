@@ -46,12 +46,6 @@ async function cleanupDir(dir: string, maxRetries = 3) {
 
 // Helper to check if Docker is available and working
 async function isDockerAvailable(): Promise<boolean> {
-    // Check if tests should skip Docker entirely
-    if (process.env.SKIP_DOCKER_TESTS === 'true') {
-        console.log('[Docker Check] Skipping Docker tests as requested by environment');
-        return false;
-    }
-
     return new Promise<boolean>((resolve) => {
         const { exec } = require('child_process');
         // First check if docker command exists

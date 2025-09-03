@@ -48,15 +48,13 @@ RUN echo "Building for architecture: $TARGETARCH" && \
 # Architecture-specific optimizations for ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
     echo "Applying ARM64-specific optimizations..." && \
-    # Install ARM64-specific tools if available
+    apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
-    # ARM64 debugging tools
-    gdb-multiarch \
-    # ARM64 cross-compilation support
-    gcc-arm-linux-gnueabihf \
-    g++-arm-linux-gnueabihf \
-    || echo "Some ARM64 tools not available, continuing..." \
-    ; fi
+    # ARM64 debugging tools for enhanced debugging capabilities
+    gdb-multiarch && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Switch to non-privileged user for security
 USER runner

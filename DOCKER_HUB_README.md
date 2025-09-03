@@ -12,8 +12,8 @@ OI-Code 专用的 Clang 工具链镜像，现已在 Docker Hub 上架。这些�
 - **适用于**: Linux 和 macOS (Apple Silicon 通过 Rosetta)
 
 ### Windows 镜像
-- **标签**: `flowerrealm/oi-code-clang-windows:latest`
-- **基于**: Windows Nano Server (`mcr.microsoft.com/windows/nanoserver:ltsc2022`)
+- **标签**: `flowerrealm/oi-code-clang:latest-win`
+- **基于**: Windows Server Core (`mcr.microsoft.com/windows/servercore:ltsc2022`)
 - **适用于**: Windows (使用 Docker Desktop)
 
 ## 预装工具链

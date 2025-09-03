@@ -4,28 +4,9 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 # Set PowerShell as default shell (PowerShell is available in PATH on ltsc2022)
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Install LLVM/Clang, create workspace, and verify installation
-RUN " \
-    $ErrorActionPreference = 'Stop'; \
-    Write-Host 'Starting LLVM installation...'; \
-    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe'; \
-    $output = 'C:\temp\llvm-installer.exe'; \
-    Write-Host 'Creating temp directory...'; \
-    New-Item -ItemType Directory -Path C:\temp -Force | Out-Null; \
-    Write-Host 'Downloading LLVM installer...'; \
-    Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing; \
-    Write-Host 'Verifying download...'; \
-    if (!(Test-Path $output)) { throw 'Download failed' }; \
-    Write-Host 'Installing LLVM silently...'; \
-    $process = Start-Process -FilePath $output -ArgumentList '/S', '/v/qn' -Wait -PassThru; \
-    if ($process.ExitCode -ne 0) { throw \"Installation failed with exit code $($process.ExitCode)\" }; \
-    Write-Host 'Cleaning up installer...'; \
-    Remove-Item -Path C:\temp -Recurse -Force; \
-    Write-Host 'Creating workspace directory...'; \
-    New-Item -ItemType Directory -Path C:\work -Force | Out-Null; \
-    Write-Host 'Verifying Clang installation...'; \
-    & 'C:\Program Files\LLVM\bin\clang.exe' --version; \
-    Write-Host 'LLVM installation and setup completed successfully';"
+# Copy and run LLVM installer script
+COPY scripts/install-llvm.ps1 C:/scripts/install-llvm.ps1
+RUN powershell -File C:\\scripts\\install-llvm.ps1
 
 # Set environment variables
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
