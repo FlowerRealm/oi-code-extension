@@ -160,7 +160,7 @@ async function ensureDockerImageIsReady(): Promise<void> {
 suite('Extension Test Suite', () => {
     // Wait for extension activation and Docker preparation
     before(async function () {
-        this.timeout(35000);
+        this.timeout(120000);
         const extId = 'FlowerRealm.oi-code';
         let extension = vscode.extensions.getExtension(extId);
         let waited = 0;

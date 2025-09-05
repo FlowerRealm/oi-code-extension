@@ -218,12 +218,12 @@ export class Installer {
 
                 } else if (platform === 'darwin') {
                     progress.report({ message: 'Installing Docker CLI on macOS...' });
-                    
+
                     // Install Homebrew if not available
                     if (!this.isCommandAvailable('brew')) {
                         dockerInstallOutput.appendLine('Installing Homebrew...');
                         await run('/bin/bash', ['-c', '"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"']);
-                        
+
                         // Add Homebrew to PATH for Apple Silicon Macs
                         try {
                             const homebrewPath = cp.execSync('echo $(/opt/homebrew/bin/brew --prefix)/bin', { encoding: 'utf8' }).trim();
@@ -247,7 +247,7 @@ export class Installer {
                     try {
                         const colimaStatus = cp.execSync('colima status', { encoding: 'utf8', stdio: 'pipe' }).trim();
                         dockerInstallOutput.appendLine(`Colima status: ${colimaStatus}`);
-                        
+
                         if (colimaStatus.includes('running')) {
                             dockerInstallOutput.appendLine('Colima already running');
                         } else {
@@ -265,26 +265,26 @@ export class Installer {
                         // Get Docker context from colima
                         const dockerContext = cp.execSync('docker context ls', { encoding: 'utf8' });
                         dockerInstallOutput.appendLine(`Docker contexts:\n${dockerContext}`);
-                        
+
                         // Use colima context
                         await run('docker', ['context', 'use', 'colima']);
                         dockerInstallOutput.appendLine('Docker context set to colima');
-                        
+
                         // Test Docker connection
                         const dockerVersion = cp.execSync('docker --version', { encoding: 'utf8' }).trim();
                         dockerInstallOutput.appendLine(`Docker version: ${dockerVersion}`);
-                        
+
                         const dockerInfo = cp.execSync('docker info', { encoding: 'utf8', stdio: 'pipe' }).trim();
                         dockerInstallOutput.appendLine(`Docker info: ${dockerInfo}`);
-                        
+
                     } catch (envError: any) {
                         dockerInstallOutput.appendLine(`Docker environment setup warning: ${envError.message}`);
                         // Try alternative approach
                         dockerInstallOutput.appendLine('Trying alternative Docker setup...');
-                        
+
                         // Set DOCKER_HOST environment variable
                         process.env.DOCKER_HOST = 'unix:///Users/${process.env.USER}/.colima/default/docker.sock';
-                        
+
                         // Test Docker connection again
                         try {
                             const testResult = cp.execSync('docker ps', { encoding: 'utf8', stdio: 'pipe' }).trim();

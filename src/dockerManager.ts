@@ -1395,7 +1395,7 @@ export class DockerManager {
 
         args.push('--memory=' + memoryLimit + 'm');
         args.push('--memory-swap=' + memoryLimit + 'm');
-        
+
         if (isWindows) {
             // Windows Docker configuration
             args.push('--cpus=1.0');
