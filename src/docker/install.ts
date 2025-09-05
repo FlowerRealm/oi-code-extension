@@ -49,22 +49,22 @@ export class Installer {
 
         switch (platform) {
             case 'win32':
+                // Windows: Install Docker CLI and Docker Machine for container runtime
                 return {
-                    command: 'start https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe',
-                    message: 'Please download and run the Docker Desktop installer.',
-                    isUrl: true
+                    command: 'powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\')); choco install -y docker-cli docker-machine"',
+                    message: 'Installing Docker CLI and Docker Machine via Chocolatey...'
                 };
 
             case 'darwin': // macOS
                 if (this.isBrewInstalled()) {
                     return {
-                        command: 'brew install --cask --force --no-quarantine docker',
-                        message: 'Installing Docker Desktop for macOS using Homebrew...'
+                        command: 'brew install docker docker-compose docker-machine colima',
+                        message: 'Installing Docker CLI and Colima via Homebrew...'
                     };
                 } else {
                     return {
-                        command: 'echo "Homebrew not found. Installing Homebrew first..." && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install --cask --force --no-quarantine docker',
-                        message: 'Homebrew not available. Installing Homebrew and Docker Desktop automatically...'
+                        command: 'echo "Installing Homebrew first..." && /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && brew install docker docker-compose docker-machine colima',
+                        message: 'Installing Homebrew and Docker CLI with Colima...'
                     };
                 }
 
@@ -74,24 +74,23 @@ export class Installer {
                     case 'ubuntu':
                     case 'debian':
                         return {
-                            command: 'sudo apt-get update && sudo apt-get install -y docker.io',
-                            message: 'This will install Docker using apt-get. Sudo password will be required.'
+                            command: 'sudo apt-get update && sudo apt-get install -y docker.io docker-compose containerd',
+                            message: 'Installing Docker CLI and Docker Compose via apt-get...'
                         };
                     case 'arch':
                         return {
-                            command: 'sudo pacman -Syu --noconfirm docker',
-                            message: 'This will install Docker using pacman. Sudo password will be required.'
+                            command: 'sudo pacman -Syu --noconfirm docker docker-compose',
+                            message: 'Installing Docker CLI and Docker Compose via pacman...'
                         };
                     case 'fedora':
                         return {
-                            command: 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin',
-                            message: 'This will add the Docker repository and install it using dnf. Sudo password will be required.'
+                            command: 'sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin',
+                            message: 'Installing Docker CLI and Docker Compose via dnf...'
                         };
                     default:
                         return {
-                            command: 'open https://docs.docker.com/engine/install/',
-                            message: `Unsupported Linux distribution '${distro}'. Please install Docker manually.`,
-                            isUrl: true
+                            command: 'curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh',
+                            message: 'Installing Docker CLI via official script...'
                         };
                 }
             }
@@ -161,10 +160,10 @@ export class Installer {
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: 'Preparing to run environment...',
+            title: 'Preparing Docker CLI environment...',
             cancellable: false
         }, async (progress) => {
-            dockerInstallOutput.appendLine('Starting silent Docker installation...');
+            dockerInstallOutput.appendLine('Starting Docker CLI installation...');
             const platform = os.platform();
 
             function run(cmd: string, args: string[], cwd?: string): Promise<number> {
@@ -178,315 +177,113 @@ export class Installer {
 
             try {
                 if (platform === 'win32') {
-                    // Prefer winget, then choco
-                    if (this.isCommandAvailable('winget')) {
-                        progress.report({ message: 'Installing Docker Desktop via winget (silently)...' });
-                        await run('winget', ['install', '-e', '--id', 'Docker.DockerDesktop', '--silent', '--accept-package-agreements', '--accept-source-agreements']);
-                    } else if (this.isCommandAvailable('choco')) {
-                        progress.report({ message: 'Installing Docker Desktop via choco (silently)...' });
-                        await run('choco', ['install', 'docker-desktop', '-y', '--no-progress']);
+                    progress.report({ message: 'Installing Docker CLI on Windows...' });
+                    
+                    // Install Chocolatey if not available
+                    if (!this.isCommandAvailable('choco')) {
+                        dockerInstallOutput.appendLine('Installing Chocolatey package manager...');
+                        await run('powershell', [
+                            '-Command',
+                            'Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\'))'
+                        ]);
                     }
-                    // Try to launch Docker Desktop
+
+                    // Install Docker CLI and Docker Machine
+                    dockerInstallOutput.appendLine('Installing Docker CLI and Docker Machine...');
+                    await run('choco', ['install', '-y', 'docker-cli', 'docker-machine']);
+
+                    // Install Docker Machine driver (VirtualBox is commonly used)
+                    dockerInstallOutput.appendLine('Installing VirtualBox for Docker Machine...');
+                    await run('choco', ['install', '-y', 'virtualbox']);
+
+                    // Create Docker Machine if not exists
                     try {
-                        // Try to start Docker Desktop from PATH first
-                        cp.spawn('Docker Desktop.exe', [], { detached: true, stdio: 'ignore' });
-                    } catch (error) {
-                        console.error('Failed to start Docker Desktop from PATH:', error);
-                        dockerInstallOutput.appendLine(`Failed to start Docker Desktop from PATH: ${(error as any)?.message || String(error)}`);
-                        try {
-                            // Try common installation paths
-                            const commonPaths = [
-                                'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
-                                'C:\\Program Files (x86)\\Docker\\Docker\\Docker Desktop.exe',
-                                'C:\\Program Files\\Docker\\Docker Desktop\\Docker Desktop.exe',
-                                'C:\\Program Files (x86)\\Docker\\Docker Desktop\\Docker Desktop.exe'
-                            ];
+                        cp.execSync('docker-machine ls', { stdio: 'pipe' });
+                        dockerInstallOutput.appendLine('Docker Machine already configured');
+                    } catch {
+                        dockerInstallOutput.appendLine('Creating Docker Machine...');
+                        await run('docker-machine', ['create', '--driver', 'virtualbox', 'default']);
+                    }
 
-                            let started = false;
-                            for (const dockerPath of commonPaths) {
-                                try {
-                                    cp.spawn('cmd', ['/c', 'start', '', `"${dockerPath}"`], { detached: true, stdio: 'ignore' });
-                                    started = true;
-                                    dockerInstallOutput.appendLine(`Started Docker Desktop from: ${dockerPath}`);
-                                    break;
-                                } catch (pathError: any) {
-                                    // Continue to next path
-                                }
-                            }
-
-                            if (!started) {
-                                throw new Error('Could not find Docker Desktop in common installation paths');
-                            }
-                        } catch (fallbackError: any) {
-                            console.error('Failed to start Docker Desktop from fallback paths:', fallbackError);
-                            dockerInstallOutput.appendLine(`Failed to start Docker Desktop from fallback paths: ${fallbackError?.message || String(fallbackError)}`);
+                    // Set Docker environment
+                    dockerInstallOutput.appendLine('Configuring Docker environment...');
+                    const envOutput = cp.execSync('docker-machine env default', { encoding: 'utf8' });
+                    const envLines = envOutput.split('\n');
+                    for (const line of envLines) {
+                        if (line.startsWith('SET ')) {
+                            const [key, value] = line.substring(4).split('=');
+                            process.env[key] = value;
                         }
                     }
-                } else if (platform === 'darwin') {
-                    dockerInstallOutput.appendLine(`macOS Intel detected - Starting macOS Docker installation process`);
 
-                    // 关键步骤1: 安装Homebrew（如果没有）
+                } else if (platform === 'darwin') {
+                    progress.report({ message: 'Installing Docker CLI on macOS...' });
+                    
+                    // Install Homebrew if not available
                     if (!this.isCommandAvailable('brew')) {
                         dockerInstallOutput.appendLine('Installing Homebrew...');
-                        progress.report({ message: 'Installing Homebrew...' });
-                        try {
-                            const brewInstallCmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
-
-                            await new Promise<void>((resolve, reject) => {
-                                const brewProcess = cp.exec(brewInstallCmd, (error, stdout, stderr) => {
-                                    if (error) {
-                                        dockerInstallOutput.appendLine(`Homebrew installation failed: ${error.message}`);
-                                        reject(error);
-                                        return;
-                                    }
-                                    dockerInstallOutput.appendLine('✅ Homebrew installed successfully');
-                                    resolve();
-                                });
-                            });
-                        } catch (error: any) {
-                            dockerInstallOutput.appendLine(`Unable to install Homebrew: ${error.message}`);
-                            // Continue trying, in some cases Homebrew might already exist but detection is inaccurate
-                        }
+                        await run('/bin/bash', ['-c', '"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"']);
                     }
 
-                    // 关键步骤2: 检查并安装Docker Desktop
-                    progress.report({ message: 'Installing Docker Desktop...' });
+                    // Install Docker CLI and Colima (Docker Desktop alternative)
+                    dockerInstallOutput.appendLine('Installing Docker CLI, Docker Compose, and Colima...');
+                    await run('brew', ['install', 'docker', 'docker-compose', 'colima']);
 
-                    // 检查 Docker 是否已经安装
-                    const dockerPaths = [
-                        '/Applications/Docker.app',
-                        `${os.homedir()}/Applications/Docker.app`,
-                        '/opt/homebrew/bin/docker',
-                        '/usr/local/bin/docker'
-                    ];
-
-                    let dockerFound = false;
-                    let dockerPath = '';
-
-                    for (const path of dockerPaths) {
-                        if (fs.existsSync(path)) {
-                            dockerFound = true;
-                            dockerPath = path;
-                            dockerInstallOutput.appendLine(`✅ Found Docker installation: ${path}`);
-                            break;
-                        }
-                    }
-
-                    // 如果没找到，安装 Docker Desktop
-                    if (!dockerFound) {
-                        dockerInstallOutput.appendLine('Installing Docker Desktop via Homebrew...');
-                        try {
-                            await new Promise<void>((resolve, reject) => {
-                                const installProcess = cp.exec('brew install --cask --no-quarantine docker', {
-                                    timeout: 1200000 // 20分钟超时
-                                }, (error, stdout, stderr) => {
-                                    if (error) {
-                                        dockerInstallOutput.appendLine(`Docker Desktop installation failed: ${error.message}`);
-                                        dockerInstallOutput.appendLine(`STDOUT: ${stdout}`);
-                                        dockerInstallOutput.appendLine(`STDERR: ${stderr}`);
-                                        reject(error);
-                                        return;
-                                    }
-                                    dockerInstallOutput.appendLine('✅ Docker Desktop installed successfully');
-                                    dockerPath = '/Applications/Docker.app';
-                                    resolve();
-                                });
-                            });
-                        } catch (error: any) {
-                            dockerInstallOutput.appendLine(`🍺 Homebrew installation failed, trying direct download...`);
-
-                            // 备用方案：直接下载 DMG 文件
-                            try {
-                                dockerInstallOutput.appendLine('Downloading Docker Desktop DMG file...');
-                                const downloadUrl = 'https://desktop.docker.com/mac/main/amd64/Docker.dmg';
-
-                                const dmgPath = '/tmp/Docker.dmg';
-                                const mountPath = '/Volumes/Docker';
-
-                                // 下载 DMG
-                                await new Promise<void>((resolve, reject) => {
-                                    const curl = cp.exec(`curl -L -o ${dmgPath} "${downloadUrl}"`, (error) => {
-                                        if (error) {
-                                            reject(new Error(`Download failed: ${error.message}`));
-                                            return;
-                                        }
-                                        dockerInstallOutput.appendLine('✅ Docker DMG download completed');
-                                        resolve();
-                                    });
-                                });
-
-                                // 挂载 DMG
-                                dockerInstallOutput.appendLine('Mounting Docker DMG...');
-                                cp.execSync(`hdiutil attach "${dmgPath}" -mountpoint "${mountPath}" -nobrowse`, { stdio: 'inherit' });
-
-                                // 提示用户需要管理员权限
-                                const installChoice = await vscode.window.showWarningMessage(
-                                    'Docker Desktop installation requires administrator privileges to complete file copying and permission settings. This will prompt for your password in the terminal.',
-                                    { modal: true },
-                                    'Continue installation',
-                                    'Cancel'
-                                );
-
-                                if (installChoice !== 'Continue installation') {
-                                    throw new Error('User cancelled installation step requiring administrator privileges');
-                                }
-
-                                // 生成需要管理员权限的安装命令
-                                dockerInstallOutput.appendLine('Generating Docker Desktop installation commands...');
-                                const installCommands = [
-                                    `sudo cp -R "${mountPath}/Docker.app" /Applications/`,
-                                    'sudo chown -R $USER:admin /Applications/Docker.app',
-                                    'sudo chmod -R 755 /Applications/Docker.app',
-                                    'sudo xattr -cr /Applications/Docker.app'
-                                ];
-
-                                dockerInstallOutput.appendLine('');
-                                dockerInstallOutput.appendLine('⚠️  Administrator privileges required to complete installation, please execute the following commands in terminal:');
-                                dockerInstallOutput.appendLine('');
-                                installCommands.forEach((cmd, index) => {
-                                    dockerInstallOutput.appendLine(`${index + 1}. ${cmd}`);
-                                });
-                                dockerInstallOutput.appendLine('');
-
-                                // 提示用户手动执行命令
-                                const executeChoice = await vscode.window.showWarningMessage(
-                                    'Docker Desktop installation requires administrator privileges, please view the commands in output window and execute them manually in terminal',
-                                    { modal: true },
-                                    'Installation completed',
-                                    'Cancel installation'
-                                );
-
-                                if (executeChoice !== 'Installation completed') {
-                                    throw new Error('User cancelled Docker Desktop installation');
-                                }
-
-                                // 卸载 DMG
-                                cp.execSync(`hdiutil detach "${mountPath}"`, { stdio: 'inherit' });
-                                cp.execSync(`rm "${dmgPath}"`, { stdio: 'inherit' });
-
-                                dockerInstallOutput.appendLine('✅ Docker Desktop installation via DMG completed');
-                                dockerPath = '/Applications/Docker.app';
-                                dockerFound = true;
-
-                            } catch (fallbackError: any) {
-                                dockerInstallOutput.appendLine(`DMG installation failed: ${fallbackError.message}`);
-                                throw new Error(`Docker installation failed on macOS: ${error.message} and ${fallbackError.message}`);
-                            }
-                        }
-                    }
-
-                    // 关键步骤3: 启动 Docker Desktop
-                    progress.report({ message: 'Starting Docker Desktop...' });
-                    dockerInstallOutput.appendLine('Starting Docker Desktop...');
-
-                    let launchSuccess = false;
+                    // Start Colima (Docker runtime)
+                    dockerInstallOutput.appendLine('Starting Colima Docker runtime...');
                     try {
-                        // 尝试多种启动方式
-                        const launchCommands = [
-                            'open -a Docker --hide',
-                            'open -j -g -a Docker',
-                            `open "${dockerPath || '/Applications/Docker.app'}"`
-                        ];
-
-                        for (const cmd of launchCommands) {
-                            try {
-                                dockerInstallOutput.appendLine(`Trying launch command: ${cmd}`);
-                                cp.execSync(cmd, { stdio: 'ignore', timeout: 3000 });
-                                launchSuccess = true;
-                                dockerInstallOutput.appendLine('✅ Docker Desktop launched successfully');
-                                break;
-                            } catch (cmdError: any) {
-                                dockerInstallOutput.appendLine(`Launch method failed: ${cmdError.message}`);
-                            }
-                        }
-
-                        if (!launchSuccess) {
-                            throw new Error('All launch methods failed');
-                        }
-
-                        // 等待 Docker 服务启动
-                        dockerInstallOutput.appendLine('Waiting for Docker service to start...');
-                        const waitTime = launchSuccess ? 25000 : 20000; // 启动成功等待更长时间
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
-
-                    } catch (startError: any) {
-                        dockerInstallOutput.appendLine(`Docker Desktop launch failed: ${startError.message}`);
-                        dockerInstallOutput.appendLine('Please start Docker Desktop manually and retry extension installation');
-                        // Don't throw error, let waiting logic handle it
+                        cp.execSync('colima status', { stdio: 'pipe' });
+                        dockerInstallOutput.appendLine('Colima already running');
+                    } catch {
+                        dockerInstallOutput.appendLine('Starting Colima...');
+                        await run('colima', ['start', '--memory', '4', '--cpu', '2']);
                     }
 
-                    // 步骤4: 设置环境
-                    try {
-                        dockerInstallOutput.appendLine('Configuring Docker environment...');
-
-                        // 如果之前安装了 DMG，确保在 PATH 中
-                        if (dockerFound && dockerPath.includes('/Applications/')) {
-                            dockerInstallOutput.appendLine('Adding Docker to system PATH...');
-                            const dockerBinaryPath = '/Applications/Docker.app/Contents/Resources/bin';
-                            if (fs.existsSync(dockerBinaryPath)) {
-                                // 这里扩展可能无法永久修改用户PATH，但在本地环境中可以使用
-                                dockerInstallOutput.appendLine(`Docker installation path: ${dockerBinaryPath}`);
-                            }
-                        }
-                    } catch (envError: any) {
-                        dockerInstallOutput.appendLine(`Environment configuration warning: ${envError.message}`);
-                    }
-
-                    dockerInstallOutput.appendLine('🛠️ macOS Docker Desktop installation process completed');
                 } else if (platform === 'linux') {
-                    // Best-effort: use distro-specific commands non-interactively
+                    progress.report({ message: 'Installing Docker CLI on Linux...' });
                     const distro = this.getLinuxDistro();
-                    progress.report({ message: `Installing Docker via ${distro} package manager...` });
-                    try {
-                        if (distro === 'ubuntu' || distro === 'debian') {
-                            dockerInstallOutput.appendLine('Updating package lists...');
-                            await run('sudo', ['apt-get', 'update', '-q']);
-                            dockerInstallOutput.appendLine('Installing Docker.io package...');
-                            await run('sudo', ['apt-get', 'install', '-y', 'docker.io']);
-                        } else if (distro === 'arch') {
-                            await run('bash', ['-lc', 'sudo pacman -Syu --noconfirm docker']);
-                        } else if (distro === 'fedora') {
-                            await run('bash', ['-lc', 'sudo dnf install -y dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin']);
-                        }
 
-                        // Verify installation
-                        const dockerVersion = cp.execSync('docker --version', { encoding: 'utf8', stdio: 'ignore' }).trim();
-                        dockerInstallOutput.appendLine(`Docker installed successfully: ${dockerVersion}`);
-
-                    } catch (error) {
-                        dockerInstallOutput.appendLine(`Failed to install Docker via package manager: ${(error as any)?.message || String(error)}`);
-                        throw error;
+                    // Install Docker CLI based on distribution
+                    if (distro === 'ubuntu' || distro === 'debian') {
+                        dockerInstallOutput.appendLine('Updating package lists...');
+                        await run('sudo', ['apt-get', 'update', '-q']);
+                        dockerInstallOutput.appendLine('Installing Docker CLI...');
+                        await run('sudo', ['apt-get', 'install', '-y', 'docker.io', 'docker-compose', 'containerd']);
+                    } else if (distro === 'arch') {
+                        await run('sudo', ['pacman', '-Syu', '--noconfirm', 'docker', 'docker-compose']);
+                    } else if (distro === 'fedora') {
+                        await run('sudo', ['dnf', 'install', '-y', 'docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-compose-plugin']);
+                    } else {
+                        // Use official Docker install script for other distributions
+                        dockerInstallOutput.appendLine('Using official Docker install script...');
+                        await run('bash', ['-c', 'curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh']);
                     }
 
                     // Start and enable Docker service
                     progress.report({ message: 'Starting Docker service...' });
+                    dockerInstallOutput.appendLine('Enabling Docker service...');
+                    await run('sudo', ['systemctl', 'enable', 'docker']);
+                    
+                    dockerInstallOutput.appendLine('Starting Docker service...');
+                    await run('sudo', ['systemctl', 'start', 'docker']);
+
+                    // Add current user to docker group
                     try {
-                        dockerInstallOutput.appendLine('Enabling Docker service...');
-                        cp.execSync('sudo systemctl enable docker', { stdio: 'ignore' });
-
-                        dockerInstallOutput.appendLine('Starting Docker service...');
-                        cp.execSync('sudo systemctl start docker', { stdio: 'ignore' });
-
-                        // Check service status
-                        const serviceStatus = cp.execSync('sudo systemctl is-active docker', { encoding: 'utf8' }).trim();
-                        dockerInstallOutput.appendLine(`Docker service status: ${serviceStatus}`);
-
-                        if (serviceStatus !== 'active') {
-                            throw new Error(`Docker service not active, status: ${serviceStatus}`);
-                        }
-
-                    } catch (error: any) {
-                        dockerInstallOutput.appendLine(`Failed to start Docker service: ${error?.message || String(error)}`);
-                        throw error;
+                        const currentUser = cp.execSync('whoami', { encoding: 'utf8' }).trim();
+                        dockerInstallOutput.appendLine(`Adding user ${currentUser} to docker group...`);
+                        await run('sudo', ['usermod', '-aG', 'docker', currentUser]);
+                        dockerInstallOutput.appendLine('Note: You may need to log out and log back in for group changes to take effect');
+                    } catch (groupError: any) {
+                        dockerInstallOutput.appendLine(`Warning: Could not add user to docker group: ${groupError.message}`);
                     }
                 }
 
                 progress.report({ message: 'Waiting for Docker to be ready...' });
                 await this.waitForDockerReady();
-                dockerInstallOutput.appendLine('Docker is ready.');
+                dockerInstallOutput.appendLine('Docker CLI is ready.');
+
             } catch (e: any) {
-                dockerInstallOutput.appendLine(`Silent installation failed: ${e?.message || String(e)}`);
-                // Pass error to upper layer, let caller decide how to handle
+                dockerInstallOutput.appendLine(`Docker CLI installation failed: ${e?.message || String(e)}`);
                 throw e;
             }
         });
