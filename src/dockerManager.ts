@@ -1466,7 +1466,7 @@ export class DockerManager {
         if (process.platform === 'win32') {
             return 'flowerrealm/oi-code-clang:latest-win';
         }
-        
+
         // Linux platform uses multi-architecture image (supports both AMD64 and ARM64)
         return 'flowerrealm/oi-code-clang:latest';
     }

@@ -94,17 +94,17 @@ jobs:
           REM 禁用 BuildKit 以避免版本兼容性问题
           set DOCKER_BUILDKIT=0
           set DOCKER_CLI_EXPERIMENTAL=disabled
-          
+
           REM 使用 process 隔离模式构建
           docker build --isolation=process -t flowerrealm/oi-code-clang:latest-win -f Dockerfile.windows.amd64 .
           if %errorlevel% neq 0 exit /b %errorlevel%
-          
+
           docker build --isolation=process -t flowerrealm/oi-code-clang:v%PKG_VERSION%-win -f Dockerfile.windows.amd64 .
           if %errorlevel% neq 0 exit /b %errorlevel%
-          
+
           docker build --isolation=process -t flowerrealm/oi-code-clang:${{ github.sha }}-win -f Dockerfile.windows.amd64 .
           if %errorlevel% neq 0 exit /b %errorlevel%
-          
+
           REM 推送镜像
           docker push flowerrealm/oi-code-clang:latest-win
           docker push flowerrealm/oi-code-clang:v%PKG_VERSION%-win

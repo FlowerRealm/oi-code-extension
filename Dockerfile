@@ -16,6 +16,7 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     # Core C/C++ development tools (Clang-only for consistency)
     clang-18 \
     clang++-18 \
+    valgrind \
     # Essential runtime libraries
     libc6-dev \
     libc++-18-dev \

@@ -74,6 +74,7 @@ RUN apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
         clang-18 \
         clang++-18 \
+        valgrind \
         libc6-dev \
         libc++-18-dev \
         libc++abi-18-dev \
@@ -92,10 +93,12 @@ RUN apt-get update --quiet && \
     # 清理缓存
     apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# 验证安装
-RUN clang --version && clang++ --version
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    # 验证安装
+    echo "Verifying installations for $TARGETARCH architecture:" && \
+    clang --version && \
+    clang++ --version && \
+    echo "Architecture verification complete"
 ```
 
 #### 🛠️ 预装工具
