@@ -49,9 +49,12 @@ RUN echo "Building for architecture: $TARGETARCH" && \
 # Architecture-specific optimizations for ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
     echo "Applying ARM64-specific optimizations..." && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     # ARM64 debugging tools for enhanced debugging capabilities
-    gdb-multiarch && \
+    gdb \
+    linux-tools-generic \
+    && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*; \
     fi
