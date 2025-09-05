@@ -16,7 +16,7 @@
   - 命令注册：`oicode.runCode`、`oicode.runPairCheck`、`oicode.createProblem` 等
 
 - **dockerManager.ts**：
-  - 动态选择官方镜像（gcc:13）
+  - 动态选择官方镜像（flowerrealm/oi-code-clang）
   - run：拼装 docker run 限制参数（CPU/内存/PIDs/网络），并处理 stdout/stderr 与超限标志
   - 临时写挂载位于 `~/.oi-code-tests/tmp`，避免桌面版共享路径问题
   - **容器池优化**：复用 Docker 容器以提高性能，减少容器启动开销

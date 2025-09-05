@@ -15,7 +15,7 @@ This extension aims to provide OI competitors with a consistent and reliable loc
   - Command registration: `oicode.runCode`, `oicode.runPairCheck`, `oicode.createProblem`, etc.
 
 - **dockerManager.ts**:
-  - Dynamically selects official images (gcc:13)
+  - Dynamically selects official images (flowerrealm/oi-code-clang)
   - Run: assembles docker run restriction parameters (CPU/memory/PIDs/network), and handles stdout/stderr and timeout flags
   - Temporary write mounts located at `~/.oi-code-tests/tmp`, avoiding Desktop shared path issues
   - **Container Pool Optimization**: Reuse Docker containers for improved performance, reducing container startup overhead

@@ -19,6 +19,7 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     # Essential runtime libraries
     libc6-dev \
     libc++-18-dev \
+
     libc++abi-18-dev \
     libstdc++-13-dev \
     # Memory debugging tool
@@ -27,8 +28,10 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     libboost-dev \
     libgmp-dev \
     libmpfr-dev \
+    # LLVM debugging tools for all architectures
+    lldb-18 \
     # Architecture-specific tools
-    $(if [ "$TARGETARCH" = "arm64" ]; then echo "lldb-18"; fi) \
+    $(if [ "$TARGETARCH" = "arm64" ]; then echo "linux-tools-generic"; fi) \
     && \
     # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \

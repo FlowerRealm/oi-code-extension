@@ -129,7 +129,7 @@ WORKDIR /sandbox
 - `libmpfr-dev` - 多精度浮点运算库
 
 **调试工具 (ARM64)**:
-- `gdb-multiarch` - 多架构调试器
+- `lldb-18` - LLVM 调试器
 
 #### ⚡ 性能优化
 

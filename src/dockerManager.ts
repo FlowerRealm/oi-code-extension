@@ -146,8 +146,8 @@ export class DockerManager {
 
         // For ARM64 architecture, use specific image tag
         if (arch === 'arm64') {
-            criticalImages = ['flowerrealm/oi-code-clang:latest-arm64'];
-            // Also add Windows image if on Windows ARM64
+            criticalImages = ['flowerrealm/oi-code-clang:latest'];
+            // Add Windows image if on Windows
             if (platform === 'win32') {
                 criticalImages.push('flowerrealm/oi-code-clang:latest-win');
             }
@@ -1387,26 +1387,20 @@ export class DockerManager {
     }
 
     /**
-     * Get platform-specific Docker run arguments
-     * @param memoryLimit Memory limit (MB)
-     * @returns Docker parameter array
+     * Get platform-specific Docker parameters for memory and CPU limits
      */
-    private static _getPlatformSpecificRunArgs(memoryLimit: string): string[] {
-        const platform = os.platform();
+    private static getPlatformSpecificArgs(memoryLimit: string = '512'): string[] {
+        const isWindows = os.platform() === 'win32';
         const args: string[] = [];
 
-        if (platform === 'win32') {
-            // Windows Docker - simplified configuration
-            args.push('--memory=' + memoryLimit + 'm');
-        } else if (platform === 'darwin') {
-            // macOS Docker Desktop
-            args.push('--memory=' + memoryLimit + 'm');
+        args.push('--memory=' + memoryLimit + 'm');
+        args.push('--memory-swap=' + memoryLimit + 'm');
+        
+        if (isWindows) {
+            // Windows Docker configuration
             args.push('--cpus=1.0');
-            args.push('--pids-limit=64');
         } else {
-            // Linux Docker
-            args.push('--memory=' + memoryLimit + 'm');
-            args.push('--memory-swap=' + memoryLimit + 'm');
+            // Linux/macOS Docker Desktop configuration
             args.push('--cpus=1.0');
             args.push('--pids-limit=64');
         }
@@ -1414,32 +1408,12 @@ export class DockerManager {
         return args;
     }
 
-    /**
-     * Get platform-specific container creation arguments
-     * @param memoryLimit Memory limit (MB), default 512MB for container pool compatibility
-     * @returns Docker parameter array
-     */
     private static _getPlatformSpecificCreateArgs(memoryLimit: string = '512'): string[] {
-        const platform = os.platform();
-        const args: string[] = [];
+        return this.getPlatformSpecificArgs(memoryLimit);
+    }
 
-        if (platform === 'win32') {
-            // Windows Docker - simplified configuration
-            args.push('--memory=' + memoryLimit + 'm');
-        } else if (platform === 'darwin') {
-            // macOS Docker Desktop
-            args.push('--memory=' + memoryLimit + 'm');
-            args.push('--cpus=1.0');
-            args.push('--pids-limit=64');
-        } else {
-            // Linux Docker
-            args.push('--memory=' + memoryLimit + 'm');
-            args.push('--memory-swap=' + memoryLimit + 'm');
-            args.push('--cpus=1.0');
-            args.push('--pids-limit=64');
-        }
-
-        return args;
+    private static _getPlatformSpecificRunArgs(memoryLimit: string = '512'): string[] {
+        return this.getPlatformSpecificArgs(memoryLimit);
     }
 
     /**
