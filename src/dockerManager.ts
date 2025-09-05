@@ -151,13 +151,19 @@ export class DockerManager {
      * Ensure critical Docker images are available and pulled
      */
     private static async ensureCriticalImagesAreAvailable(): Promise<void> {
-        const criticalImages = ['flowerrealm/oi-code-clang:latest'];
+        const platform = os.platform();
+        let criticalImages = ['flowerrealm/oi-code-clang:latest'];
+
+        // Add Windows-specific image for Windows platform
+        if (platform === 'win32') {
+            criticalImages.push('flowerrealm/oi-code-clang:latest-win');
+        }
 
         console.log('[DockerManager] Checking critical Docker images...');
 
         for (const image of criticalImages) {
             // Delegate to unified image ensuring logic to avoid duplication
-            await this.ensureClangImageExists(image, os.platform());
+            await this.ensureClangImageExists(image, platform);
         }
 
         console.log('[DockerManager] All critical images are available');
@@ -1466,9 +1472,13 @@ export class DockerManager {
         let selectedImage = 'flowerrealm/oi-code-clang:latest';
 
         // Check if platform and language are supported
-        if (platform === 'win32' || platform === 'darwin') {
-            // Windows and macOS use Linux image (Docker Desktop support)
-            console.log(`[DockerManager] ${platform} platform uses Linux image`);
+        if (platform === 'win32') {
+            // Windows platform uses Windows-specific image
+            selectedImage = 'flowerrealm/oi-code-clang:latest-win';
+            console.log(`[DockerManager] Windows platform uses Windows image: ${selectedImage}`);
+        } else if (platform === 'darwin') {
+            // macOS uses Linux image (Docker Desktop support)
+            console.log(`[DockerManager] macOS platform uses Linux image`);
         } else if (platform === 'linux') {
             // Linux本地环境
             console.log(`[DockerManager] Linux platform uses native image`);
