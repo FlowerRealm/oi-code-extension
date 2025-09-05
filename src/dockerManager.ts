@@ -570,7 +570,7 @@ export class DockerManager {
         // Create temporary directory for output
         await fs.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
         const tempDir = await fs.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-run-'));
-        const image = this.selectImageForCommand(languageId);
+        const image = this.selectImageForCommand();
 
         // Ensure Clang image exists before running the container
         await this.ensureClangImageExists(image, os.platform());
@@ -1081,7 +1081,7 @@ export class DockerManager {
     }
 
     private static async startContainerForLanguage(languageId: string): Promise<DockerContainer> {
-        const image = this.selectImageForCommand(languageId);
+        const image = this.selectImageForCommand();
         const platform = os.platform();
 
         // Ensure Clang image exists and is ready before starting container
@@ -1459,9 +1459,9 @@ export class DockerManager {
     }
 
     /**
-     * Select the appropriate Docker image for a given command
+     * Select the appropriate Docker image based on the platform
      */
-    static selectImageForCommand(command: string): string {
+    static selectImageForCommand(): string {
         // Windows platform uses Windows-specific image
         if (process.platform === 'win32') {
             return 'flowerrealm/oi-code-clang:latest-win';
