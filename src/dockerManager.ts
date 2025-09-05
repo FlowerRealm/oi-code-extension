@@ -1443,46 +1443,45 @@ export class DockerManager {
     }
 
     /**
-     * 获取合适的Docker镜像，支持多平台检测和回退机制
-     * @param languageId 编程语言ID
-     * @returns Docker镜像名称
+     * Get appropriate Docker image with multi-platform detection and fallback mechanism
+     * @param languageId Programming language ID
+     * @returns Docker image name
      */
     private static selectImageForCommand(languageId: string): string {
         const platform = os.platform();
         const host = os.hostname();
-        console.log(`[DockerManager] 检测到的平台: ${platform}, 主机: ${host}`);
+        console.log(`[DockerManager] Detected platform: ${platform}, host: ${host}`);
 
-        // 读取用户配置的编译器设置
+        // Read user-configured compiler settings
         const config = vscode.workspace.getConfiguration();
         const compilers = config.get<any>('oicode.docker.compilers') || {};
 
-        // 优先使用用户配置的镜像
+        // Prefer user-configured images
         if (compilers[languageId]) {
-            console.log(`[DockerManager] 使用用户配置的镜像: ${compilers[languageId]} for ${languageId}`);
+            console.log(`[DockerManager] Using user-configured image: ${compilers[languageId]} for ${languageId}`);
             return compilers[languageId];
         }
 
-        // 根据操作系统和语言选择合适的镜像
+        // Select appropriate image based on OS and language
         let selectedImage = 'flowerrealm/oi-code-clang:latest';
 
-        // 检查是否为受支持的平台和语言
+        // Check if platform and language are supported
         if (platform === 'win32' || platform === 'darwin') {
-            // Windows和macOS使用Linux镜像（Docker Desktop支持）
-            console.log(`[DockerManager] ${platform}平台使用Linux镜像`);
+            // Windows and macOS use Linux image (Docker Desktop support)
+            console.log(`[DockerManager] ${platform} platform uses Linux image`);
         } else if (platform === 'linux') {
             // Linux本地环境
-            console.log(`[DockerManager] Linux平台使用原生镜像`);
+            console.log(`[DockerManager] Linux platform uses native image`);
         } else {
             // 其他平台回退到Linux镜像
-            console.log(`[DockerManager] 不支持的平台 ${platform}，回退到Linux镜像`);
+            console.log(`[DockerManager] Unsupported platform ${platform}, falling back to Linux image`);
         }
 
         // 可以在这里添加更多复杂的镜像选择逻辑
         // 比如根据硬件架构选择不同版本的镜像
         const arch = os.arch();
-        console.log(`[DockerManager] 检测到的硬件架构: ${arch}`);
-
-        console.log(`[DockerManager] 选择的镜像: ${selectedImage} for ${languageId} on ${platform}`);
+        console.log(`[DockerManager] Detected hardware architecture: ${arch}`);
+        console.log(`[DockerManager] Selected image: ${selectedImage} for ${languageId} on ${platform}`);
 
         return selectedImage;
     }

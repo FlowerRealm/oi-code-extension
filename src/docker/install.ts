@@ -223,34 +223,34 @@ export class Installer {
                         }
                     }
                 } else if (platform === 'darwin') {
-                    dockerInstallOutput.appendLine(`macOS Intel 检测到 - 开始macOS Docker安装过程`);
+                    dockerInstallOutput.appendLine(`macOS Intel detected - Starting macOS Docker installation process`);
 
                     // 关键步骤1: 安装Homebrew（如果没有）
                     if (!this.isCommandAvailable('brew')) {
-                        dockerInstallOutput.appendLine('正在安装 Homebrew...');
-                        progress.report({ message: '安装 Homebrew...' });
+                        dockerInstallOutput.appendLine('Installing Homebrew...');
+                        progress.report({ message: 'Installing Homebrew...' });
                         try {
                             const brewInstallCmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
 
                             await new Promise<void>((resolve, reject) => {
                                 const brewProcess = cp.exec(brewInstallCmd, (error, stdout, stderr) => {
                                     if (error) {
-                                        dockerInstallOutput.appendLine(`Homebrew 安装失败: ${error.message}`);
+                                        dockerInstallOutput.appendLine(`Homebrew installation failed: ${error.message}`);
                                         reject(error);
                                         return;
                                     }
-                                    dockerInstallOutput.appendLine('✅ Homebrew 安装成功');
+                                    dockerInstallOutput.appendLine('✅ Homebrew installed successfully');
                                     resolve();
                                 });
                             });
                         } catch (error: any) {
-                            dockerInstallOutput.appendLine(`无法安装 Homebrew: ${error.message}`);
-                            // 继续尝试，在某些情况下 Homebrew 可能已经存在但检测不准确
+                            dockerInstallOutput.appendLine(`Unable to install Homebrew: ${error.message}`);
+                            // Continue trying, in some cases Homebrew might already exist but detection is inaccurate
                         }
                     }
 
                     // 关键步骤2: 检查并安装Docker Desktop
-                    progress.report({ message: '安装 Docker Desktop...' });
+                    progress.report({ message: 'Installing Docker Desktop...' });
 
                     // 检查 Docker 是否已经安装
                     const dockerPaths = [
@@ -267,37 +267,37 @@ export class Installer {
                         if (fs.existsSync(path)) {
                             dockerFound = true;
                             dockerPath = path;
-                            dockerInstallOutput.appendLine(`✅ 找到 Docker 安装: ${path}`);
+                            dockerInstallOutput.appendLine(`✅ Found Docker installation: ${path}`);
                             break;
                         }
                     }
 
                     // 如果没找到，安装 Docker Desktop
                     if (!dockerFound) {
-                        dockerInstallOutput.appendLine('正在通过 Homebrew 安装 Docker Desktop...');
+                        dockerInstallOutput.appendLine('Installing Docker Desktop via Homebrew...');
                         try {
                             await new Promise<void>((resolve, reject) => {
                                 const installProcess = cp.exec('brew install --cask --no-quarantine docker', {
                                     timeout: 1200000 // 20分钟超时
                                 }, (error, stdout, stderr) => {
                                     if (error) {
-                                        dockerInstallOutput.appendLine(`Docker Desktop 安装失败: ${error.message}`);
+                                        dockerInstallOutput.appendLine(`Docker Desktop installation failed: ${error.message}`);
                                         dockerInstallOutput.appendLine(`STDOUT: ${stdout}`);
                                         dockerInstallOutput.appendLine(`STDERR: ${stderr}`);
                                         reject(error);
                                         return;
                                     }
-                                    dockerInstallOutput.appendLine('✅ Docker Desktop 安装成功');
+                                    dockerInstallOutput.appendLine('✅ Docker Desktop installed successfully');
                                     dockerPath = '/Applications/Docker.app';
                                     resolve();
                                 });
                             });
                         } catch (error: any) {
-                            dockerInstallOutput.appendLine(`🍺 Homebrew 安装失败，正在尝试直接下载...`);
+                            dockerInstallOutput.appendLine(`🍺 Homebrew installation failed, trying direct download...`);
 
                             // 备用方案：直接下载 DMG 文件
                             try {
-                                dockerInstallOutput.appendLine('正在下载 Docker Desktop DMG 文件...');
+                                dockerInstallOutput.appendLine('Downloading Docker Desktop DMG file...');
                                 const downloadUrl = 'https://desktop.docker.com/mac/main/amd64/Docker.dmg';
 
                                 const dmgPath = '/tmp/Docker.dmg';
@@ -307,32 +307,32 @@ export class Installer {
                                 await new Promise<void>((resolve, reject) => {
                                     const curl = cp.exec(`curl -L -o ${dmgPath} "${downloadUrl}"`, (error) => {
                                         if (error) {
-                                            reject(new Error(`下载失败: ${error.message}`));
+                                            reject(new Error(`Download failed: ${error.message}`));
                                             return;
                                         }
-                                        dockerInstallOutput.appendLine('✅ Docker DMG 下载完成');
+                                        dockerInstallOutput.appendLine('✅ Docker DMG download completed');
                                         resolve();
                                     });
                                 });
 
                                 // 挂载 DMG
-                                dockerInstallOutput.appendLine('正在挂载 Docker DMG...');
+                                dockerInstallOutput.appendLine('Mounting Docker DMG...');
                                 cp.execSync(`hdiutil attach "${dmgPath}" -mountpoint "${mountPath}" -nobrowse`, { stdio: 'inherit' });
 
                                 // 提示用户需要管理员权限
                                 const installChoice = await vscode.window.showWarningMessage(
-                                    'Docker Desktop 安装需要管理员权限来完成文件复制和权限设置。这将在终端中请求您的密码。',
+                                    'Docker Desktop installation requires administrator privileges to complete file copying and permission settings. This will prompt for your password in the terminal.',
                                     { modal: true },
-                                    '继续安装',
-                                    '取消'
+                                    'Continue installation',
+                                    'Cancel'
                                 );
-                                
-                                if (installChoice !== '继续安装') {
-                                    throw new Error('用户取消了需要管理员权限的安装步骤');
+
+                                if (installChoice !== 'Continue installation') {
+                                    throw new Error('User cancelled installation step requiring administrator privileges');
                                 }
 
                                 // 生成需要管理员权限的安装命令
-                                dockerInstallOutput.appendLine('生成 Docker Desktop 安装命令...');
+                                dockerInstallOutput.appendLine('Generating Docker Desktop installation commands...');
                                 const installCommands = [
                                     `sudo cp -R "${mountPath}/Docker.app" /Applications/`,
                                     'sudo chown -R $USER:admin /Applications/Docker.app',
@@ -341,7 +341,7 @@ export class Installer {
                                 ];
 
                                 dockerInstallOutput.appendLine('');
-                                dockerInstallOutput.appendLine('⚠️  需要管理员权限完成安装，请在终端中依次执行以下命令：');
+                                dockerInstallOutput.appendLine('⚠️  Administrator privileges required to complete installation, please execute the following commands in terminal:');
                                 dockerInstallOutput.appendLine('');
                                 installCommands.forEach((cmd, index) => {
                                     dockerInstallOutput.appendLine(`${index + 1}. ${cmd}`);
@@ -350,34 +350,34 @@ export class Installer {
 
                                 // 提示用户手动执行命令
                                 const executeChoice = await vscode.window.showWarningMessage(
-                                    'Docker Desktop 安装需要管理员权限，请查看输出窗口中的命令并在终端中手动执行',
+                                    'Docker Desktop installation requires administrator privileges, please view the commands in output window and execute them manually in terminal',
                                     { modal: true },
-                                    '已完成安装',
-                                    '取消安装'
+                                    'Installation completed',
+                                    'Cancel installation'
                                 );
 
-                                if (executeChoice !== '已完成安装') {
-                                    throw new Error('用户取消了 Docker Desktop 安装');
+                                if (executeChoice !== 'Installation completed') {
+                                    throw new Error('User cancelled Docker Desktop installation');
                                 }
 
                                 // 卸载 DMG
                                 cp.execSync(`hdiutil detach "${mountPath}"`, { stdio: 'inherit' });
                                 cp.execSync(`rm "${dmgPath}"`, { stdio: 'inherit' });
 
-                                dockerInstallOutput.appendLine('✅ Docker Desktop 通过 DMG 安装完成');
+                                dockerInstallOutput.appendLine('✅ Docker Desktop installation via DMG completed');
                                 dockerPath = '/Applications/Docker.app';
                                 dockerFound = true;
 
                             } catch (fallbackError: any) {
-                                dockerInstallOutput.appendLine(`DMG 安装失败: ${fallbackError.message}`);
-                                throw new Error(`Docker 在 macOS 上安装失败: ${error.message} 和 ${fallbackError.message}`);
+                                dockerInstallOutput.appendLine(`DMG installation failed: ${fallbackError.message}`);
+                                throw new Error(`Docker installation failed on macOS: ${error.message} and ${fallbackError.message}`);
                             }
                         }
                     }
 
                     // 关键步骤3: 启动 Docker Desktop
-                    progress.report({ message: '启动 Docker Desktop...' });
-                    dockerInstallOutput.appendLine('启动 Docker Desktop...');
+                    progress.report({ message: 'Starting Docker Desktop...' });
+                    dockerInstallOutput.appendLine('Starting Docker Desktop...');
 
                     let launchSuccess = false;
                     try {
@@ -390,49 +390,49 @@ export class Installer {
 
                         for (const cmd of launchCommands) {
                             try {
-                                dockerInstallOutput.appendLine(`尝试启动命令: ${cmd}`);
+                                dockerInstallOutput.appendLine(`Trying launch command: ${cmd}`);
                                 cp.execSync(cmd, { stdio: 'ignore', timeout: 3000 });
                                 launchSuccess = true;
-                                dockerInstallOutput.appendLine('✅ Docker Desktop 启动成功');
+                                dockerInstallOutput.appendLine('✅ Docker Desktop launched successfully');
                                 break;
                             } catch (cmdError: any) {
-                                dockerInstallOutput.appendLine(`启动方式失败: ${cmdError.message}`);
+                                dockerInstallOutput.appendLine(`Launch method failed: ${cmdError.message}`);
                             }
                         }
 
                         if (!launchSuccess) {
-                            throw new Error('所有启动方式都失败了');
+                            throw new Error('All launch methods failed');
                         }
 
                         // 等待 Docker 服务启动
-                        dockerInstallOutput.appendLine('等待 Docker 服务启动...');
+                        dockerInstallOutput.appendLine('Waiting for Docker service to start...');
                         const waitTime = launchSuccess ? 25000 : 20000; // 启动成功等待更长时间
                         await new Promise(resolve => setTimeout(resolve, waitTime));
 
                     } catch (startError: any) {
-                        dockerInstallOutput.appendLine(`Docker Desktop 启动失败: ${startError.message}`);
-                        dockerInstallOutput.appendLine('请手动启动 Docker Desktop，然后重试扩展安装');
-                        // 不抛出错误，让等待逻辑处理
+                        dockerInstallOutput.appendLine(`Docker Desktop launch failed: ${startError.message}`);
+                        dockerInstallOutput.appendLine('Please start Docker Desktop manually and retry extension installation');
+                        // Don't throw error, let waiting logic handle it
                     }
 
                     // 步骤4: 设置环境
                     try {
-                        dockerInstallOutput.appendLine('配置 Docker 环境...');
+                        dockerInstallOutput.appendLine('Configuring Docker environment...');
 
                         // 如果之前安装了 DMG，确保在 PATH 中
                         if (dockerFound && dockerPath.includes('/Applications/')) {
-                            dockerInstallOutput.appendLine('添加 Docker 到系统 PATH...');
+                            dockerInstallOutput.appendLine('Adding Docker to system PATH...');
                             const dockerBinaryPath = '/Applications/Docker.app/Contents/Resources/bin';
                             if (fs.existsSync(dockerBinaryPath)) {
                                 // 这里扩展可能无法永久修改用户PATH，但在本地环境中可以使用
-                                dockerInstallOutput.appendLine(`Docker 安装路径: ${dockerBinaryPath}`);
+                                dockerInstallOutput.appendLine(`Docker installation path: ${dockerBinaryPath}`);
                             }
                         }
                     } catch (envError: any) {
-                        dockerInstallOutput.appendLine(`环境配置警告: ${envError.message}`);
+                        dockerInstallOutput.appendLine(`Environment configuration warning: ${envError.message}`);
                     }
 
-                    dockerInstallOutput.appendLine('🛠️ macOS Docker Desktop 安装流程完成');
+                    dockerInstallOutput.appendLine('🛠️ macOS Docker Desktop installation process completed');
                 } else if (platform === 'linux') {
                     // Best-effort: use distro-specific commands non-interactively
                     const distro = this.getLinuxDistro();

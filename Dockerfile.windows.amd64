@@ -6,7 +6,7 @@ SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPref
 
 # Copy and run LLVM installer script
 COPY scripts/install-llvm.ps1 C:/scripts/install-llvm.ps1
-RUN powershell -File C:\\scripts\\install-llvm.ps1
+RUN powershell -File C:\scripts\install-llvm.ps1
 
 # Set environment variables
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"

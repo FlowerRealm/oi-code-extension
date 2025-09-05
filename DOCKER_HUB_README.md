@@ -51,7 +51,7 @@ docker run --rm -v $(pwd):/src -w /src flowerrealm/oi-code-clang bash -c "clang+
 docker run -it --rm flowerrealm/oi-code-clang /bin/bash
 
 # Windows (PowerShell)
-docker run -it --rm flowerrealm/oi-code-clang-windows cmd
+docker run -it --rm flowerrealm/oi-code-clang:latest-win cmd
 ```
 
 ### 专项使用场景
@@ -87,61 +87,99 @@ docker run -it --rm flowerrealm/oi-code-clang-windows cmd
 ### Linux 版本 (`Dockerfile`)
 
 ```dockerfile
-FROM ubuntu:24.04 AS base
+# OI-Code multi-platform Clang container optimized for competitive programming
+# Supports both AMD64 and ARM64 architectures
+FROM ubuntu:24.04
 
-# Install core LLVM/Clang toolchain - focused OI environment
+# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update --quiet && \
-    apt-get install -y \
-        clang-18 clang++-18 clangd-18 clang-format-18 clang-tidy-18 \
-        lldb-18 llvm-18 lld-18 libclang-18-dev libclang-cpp18-dev \
-        libc++-18-dev libc++abi-18-dev valgrind cppcheck && \
-    # Create symlinks for convenience
+
+# Detect architecture for architecture-specific optimizations
+ARG TARGETARCH
+ENV TARGETARCH=${TARGETARCH}
+
+# Install minimal build tools and libraries for competitive programming
+RUN echo "Building for architecture: $TARGETARCH" && \
+    apt-get update --quiet && \
+    apt-get install -y --no-install-recommends \
+    # Core C/C++ development tools (Clang-only for consistency)
+    clang-18 \
+    clang++-18 \
+    # Essential runtime libraries
+    libc6-dev \
+    libc++-18-dev \
+    libc++abi-18-dev \
+    libstdc++-13-dev \
+    # Essential libraries for competitive coding
+    libboost-dev \
+    libgmp-dev \
+    libmpfr-dev \
+    # Minimal system tools (only coreutils already implied)
+    && \
+    # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
     ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
-    ln -sf /usr/bin/lld-18 /usr/bin/lld && \
-    ln -sf /usr/bin/lldb-18 /usr/bin/lldb && \
+    # Create runner user with proper permissions
+    useradd -m -s /bin/bash runner && \
+    mkdir -p /sandbox && \
+    chown -R runner:runner /sandbox && \
+    # Clean up package cache to reduce image size
+    apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create runner user and verify installation
-RUN useradd -m -s /bin/bash runner && \
-    mkdir /sandbox && \
-    chown runner:runner /sandbox && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    # Verify installations
+    # Architecture-specific verification
+    echo "Verifying installations for $TARGETARCH architecture:" && \
     clang --version && \
-    clang++ --version
+    clang++ --version && \
+    echo "Architecture verification complete"
+
+# Architecture-specific optimizations for ARM64
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+    echo "Applying ARM64-specific optimizations..." && \
+    apt-get install -y --no-install-recommends \
+    # ARM64 debugging tools for enhanced debugging capabilities
+    gdb-multiarch && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Switch to non-privileged user for security
+USER runner
+WORKDIR /sandbox
+
+# Health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD clang --version > /dev/null || exit 1
+
+# Architecture-aware labels
+LABEL org.opencontainers.image.description="OI-Code Clang container for competitive programming - $TARGETARCH"
+LABEL org.opencontainers.image.architecture="$TARGETARCH"
+
+# Default entrypoint that can run both interactive and non-interactive
+ENTRYPOINT ["/bin/bash", "-lc"]
 ```
 
 ### Windows 版本 (`Dockerfile.windows.amd64`)
 ```dockerfile
-# 基于 Windows Server Core，专用 Clang 18 工具链
+# OI-Code Clang container for Windows AMD64 (Windows Server 2022)
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# 安装 LLVM/Clang 18.1.8 使用增强的错误处理
-RUN powershell -Command " \
-    $ErrorActionPreference = 'Stop'; \
-    Write-Host 'Starting LLVM installation...'; \
-    $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe'; \
-    $output = 'C:\temp\llvm-installer.exe'; \
-    Write-Host 'Creating temp directory...'; \
-    New-Item -ItemType Directory -Path C:\temp -Force | Out-Null; \
-    Write-Host 'Downloading LLVM installer...'; \
-    Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing; \
-    Write-Host 'Installing LLVM silently...'; \
-    $process = Start-Process -FilePath $output -ArgumentList '/S', '/v/qn' -Wait -PassThru; \
-    if ($process.ExitCode -ne 0) { throw \"Installation failed with exit code $($process.ExitCode)\" }; \
-    Remove-Item -Path C:\temp -Recurse -Force; \
-    Write-Host 'LLVM installation completed successfully';"
+# Set PowerShell as default shell (PowerShell is available in PATH on ltsc2022)
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# 设置环境变量
+# Copy and run LLVM installer script
+COPY scripts/install-llvm.ps1 C:/scripts/install-llvm.ps1
+RUN powershell -File C:\scripts\install-llvm.ps1
+
+# Set environment variables
 ENV PATH="C:\Program Files\LLVM\bin;C:\Windows\System32;C:\Windows"
 
-# 创建工作目录
-RUN powershell -Command "New-Item -ItemType Directory -Path C:\work -Force"
+# Set working directory
 WORKDIR C:/work
 
-# 验证安装
-RUN powershell -Command "clang --version"
+# Default entrypoint
+CMD ["powershell", "-Command", "Write-Host 'OI-Code Windows AMD64 Clang Ready'; clang --version"]
 ```
 
 ## 构建和发布
