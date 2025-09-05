@@ -49,10 +49,10 @@ export class Installer {
 
         switch (platform) {
             case 'win32':
-                // Windows: Install Docker CLI and Docker Machine for container runtime
+                // Windows: Install Docker CLI and guide users to set up Docker Desktop with WSL 2
                 return {
-                    command: 'powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\')); choco install -y docker-cli docker-machine"',
-                    message: 'Installing Docker CLI and Docker Machine via Chocolatey...'
+                    command: 'powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString(\'https://community.chocolatey.org/install.ps1\')); choco install -y docker-cli"',
+                    message: 'Installing Docker CLI via Chocolatey. Please install Docker Desktop and enable WSL 2 integration.'
                 };
 
             case 'darwin': // macOS
@@ -188,33 +188,18 @@ export class Installer {
                         ]);
                     }
 
-                    // Install Docker CLI and Docker Machine
-                    dockerInstallOutput.appendLine('Installing Docker CLI and Docker Machine...');
-                    await run('choco', ['install', '-y', 'docker-cli', 'docker-machine']);
+                    // Install Docker CLI only
+                    dockerInstallOutput.appendLine('Installing Docker CLI...');
+                    await run('choco', ['install', '-y', 'docker-cli']);
 
-                    // Install Docker Machine driver (VirtualBox is commonly used)
-                    dockerInstallOutput.appendLine('Installing VirtualBox for Docker Machine...');
-                    await run('choco', ['install', '-y', 'virtualbox']);
-
-                    // Create Docker Machine if not exists
-                    try {
-                        cp.execSync('docker-machine ls', { stdio: 'pipe' });
-                        dockerInstallOutput.appendLine('Docker Machine already configured');
-                    } catch {
-                        dockerInstallOutput.appendLine('Creating Docker Machine...');
-                        await run('docker-machine', ['create', '--driver', 'virtualbox', 'default']);
-                    }
-
-                    // Set Docker environment
-                    dockerInstallOutput.appendLine('Configuring Docker environment...');
-                    const envOutput = cp.execSync('docker-machine env default', { encoding: 'utf8' });
-                    const envLines = envOutput.split('\n');
-                    for (const line of envLines) {
-                        if (line.startsWith('SET ')) {
-                            const [key, value] = line.substring(4).split('=');
-                            process.env[key] = value;
-                        }
-                    }
+                    // Guide users to install Docker Desktop with WSL 2
+                    dockerInstallOutput.appendLine('');
+                    dockerInstallOutput.appendLine('IMPORTANT: Please install Docker Desktop from https://www.docker.com/products/docker-desktop');
+                    dockerInstallOutput.appendLine('1. Run the installer with default settings');
+                    dockerInstallOutput.appendLine('2. Enable WSL 2 integration in Docker Desktop settings');
+                    dockerInstallOutput.appendLine('3. Restart Docker Desktop after enabling WSL 2');
+                    dockerInstallOutput.appendLine('4. Verify Docker is working with: docker --version');
+                    dockerInstallOutput.appendLine('');
 
                 } else if (platform === 'darwin') {
                     progress.report({ message: 'Installing Docker CLI on macOS...' });

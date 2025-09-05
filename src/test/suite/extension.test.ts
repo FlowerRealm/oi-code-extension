@@ -120,13 +120,33 @@ async function ensureDockerImageIsReady(): Promise<void> {
     console.log(`[Test Setup] Checking if image ${imageName} is available...`);
 
     const execAsync = (cmd: string) => new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-        const { exec } = require('child_process');
-        exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: string, stderr: string) => {
-            if (error) {
-                reject(Object.assign(new Error(stderr || error.message), { stdout, stderr }));
+        const { spawn } = require('child_process');
+        const args = cmd.split(' ');
+        const command = args.shift();
+        
+        const child = spawn(command, args, { maxBuffer: 10 * 1024 * 1024 });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data: Buffer) => {
+            stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data: Buffer) => {
+            stderr += data.toString();
+        });
+        
+        child.on('close', (code: number) => {
+            if (code !== 0) {
+                reject(Object.assign(new Error(`Command failed with exit code ${code}`), { stdout, stderr }));
             } else {
                 resolve({ stdout, stderr });
             }
+        });
+        
+        child.on('error', (error: any) => {
+            reject(Object.assign(new Error(error.message), { stdout, stderr }));
         });
     });
 

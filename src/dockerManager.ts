@@ -1394,17 +1394,14 @@ export class DockerManager {
      */
     private static getPlatformSpecificArgs(memoryLimit: string = '512'): string[] {
         const isWindows = os.platform() === 'win32';
-        const args: string[] = [];
+        const args = [
+            `--memory=${memoryLimit}m`,
+            '--cpus=1.0'
+        ];
 
-        args.push('--memory=' + memoryLimit + 'm');
-
-        if (isWindows) {
-            // Windows Docker configuration - MemorySwap is not supported on Windows
-            args.push('--cpus=1.0');
-        } else {
+        if (!isWindows) {
             // Linux/macOS Docker Desktop configuration
-            args.push('--memory-swap=' + memoryLimit + 'm');
-            args.push('--cpus=1.0');
+            args.push(`--memory-swap=${memoryLimit}m`);
             args.push('--pids-limit=64');
         }
 
