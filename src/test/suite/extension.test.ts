@@ -95,7 +95,10 @@ async function prepareDockerEnvironment(): Promise<void> {
 
 // Ensure Docker image is completely ready for testing
 async function ensureDockerImageIsReady(): Promise<void> {
-    const imageName = 'flowerrealm/oi-code-clang:latest';
+    // Use platform-specific image
+    const imageName = process.platform === 'win32' 
+        ? 'flowerrealm/oi-code-clang:latest-win'
+        : 'flowerrealm/oi-code-clang:latest';
 
     console.log(`[Test Setup] Checking if image ${imageName} is available...`);
 

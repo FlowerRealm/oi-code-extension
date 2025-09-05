@@ -17,3 +17,6 @@ out/
 
 # Test logs (local temporary files)
 test-output.log
+
+# Claude Code documentation (internal use)
+CLAUDE.md

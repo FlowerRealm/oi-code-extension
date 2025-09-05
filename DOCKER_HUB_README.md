@@ -116,8 +116,8 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     libboost-dev \
     libgmp-dev \
     libmpfr-dev \
-    # Architecture-specific tools
-    $(if [ "$TARGETARCH" = "arm64" ]; then echo "lldb-18"; fi) \
+    # LLVM debugging tools for all architectures
+    lldb-18 \
     && \
     # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \

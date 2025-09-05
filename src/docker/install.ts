@@ -283,7 +283,7 @@ export class Installer {
                         dockerInstallOutput.appendLine('Trying alternative Docker setup...');
 
                         // Set DOCKER_HOST environment variable
-                        process.env.DOCKER_HOST = 'unix:///Users/${process.env.USER}/.colima/default/docker.sock';
+                        process.env.DOCKER_HOST = `unix://${os.homedir()}/.colima/default/docker.sock`;
 
                         // Test Docker connection again
                         try {

@@ -30,8 +30,6 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     libmpfr-dev \
     # LLVM debugging tools for all architectures
     lldb-18 \
-    # Architecture-specific tools
-    $(if [ "$TARGETARCH" = "arm64" ]; then echo "linux-tools-generic"; fi) \
     && \
     # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \

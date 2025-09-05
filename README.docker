@@ -87,7 +87,7 @@ RUN echo "Building for architecture: $TARGETARCH" && \
         libboost-dev \
         libgmp-dev \
         libmpfr-dev \
-        $(if [ "$TARGETARCH" = "arm64" ]; then echo "lldb-18"; fi) \
+        lldb-18 \
         && \
     # 创建符号链接
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
