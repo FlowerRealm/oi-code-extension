@@ -151,6 +151,9 @@ export class DockerManager {
             if (platform === 'win32') {
                 criticalImages.push('flowerrealm/oi-code-clang:latest-win');
             }
+        } else if (platform === 'win32' && arch === 'x64') {
+            // For Windows x64, only use Windows-specific image
+            criticalImages = ['flowerrealm/oi-code-clang:latest-win'];
         }
 
         console.log('[DockerManager] Checking critical Docker images...');
@@ -1394,13 +1397,13 @@ export class DockerManager {
         const args: string[] = [];
 
         args.push('--memory=' + memoryLimit + 'm');
-        args.push('--memory-swap=' + memoryLimit + 'm');
 
         if (isWindows) {
-            // Windows Docker configuration
+            // Windows Docker configuration - MemorySwap is not supported on Windows
             args.push('--cpus=1.0');
         } else {
             // Linux/macOS Docker Desktop configuration
+            args.push('--memory-swap=' + memoryLimit + 'm');
             args.push('--cpus=1.0');
             args.push('--pids-limit=64');
         }
