@@ -75,8 +75,25 @@ async function prepareDockerEnvironment(): Promise<void> {
 
     const dockerAvailable = await isDockerAvailable();
     if (!dockerAvailable) {
-        console.log('[Test Setup] Docker not available for this environment');
-        return;
+        console.log('[Test Setup] Docker not available for this environment, attempting to install...');
+        
+        try {
+            // Import and run Docker installer
+            const { Installer } = require('../docker/install');
+            await Installer.ensureDockerAvailableSilently();
+            console.log('[Test Setup] Docker installation completed');
+        } catch (error: any) {
+            console.log('[Test Setup] Docker installation failed:', error.message);
+            console.log('[Test Setup] Tests will run without Docker if possible');
+            return;
+        }
+        
+        // Check again after installation
+        if (!await isDockerAvailable()) {
+            console.log('[Test Setup] Docker still not available after installation attempt');
+            console.log('[Test Setup] Tests will run without Docker if possible');
+            return;
+        }
     }
 
     try {
