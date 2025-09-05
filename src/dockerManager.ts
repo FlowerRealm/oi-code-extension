@@ -84,24 +84,8 @@ const CONTAINER_POOL_CONFIG = {
  * and resource management for the OI extension.
  */
 export class DockerManager {
-    // Extension context for getting path reliably
-    private static extensionContext: vscode.ExtensionContext | null = null;
-
-    // Static getter for extension path
-    private static get extensionPath(): string {
-        if (!this.extensionContext) {
-            throw new Error('DockerManager not initialized with extension context');
-        }
-        return this.extensionContext.extensionPath;
-    }
-
-    /**
-     * Initialize DockerManager with extension context
-     */
-    public static initialize(context: vscode.ExtensionContext): void {
-        this.extensionContext = context;
-        console.log('[DockerManager] Initialized with extension path:', this.extensionPath);
-    }
+    private static instance: DockerManager | null = null;
+    private static isInitialized = false;
 
     // Container pool instance
     public static containerPool: ContainerPool = {

@@ -69,8 +69,13 @@ docker run -it --rm flowerrealm/oi-code-clang:latest /bin/bash
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Detect architecture for architecture-specific optimizations
+ARG TARGETARCH
+ENV TARGETARCH=${TARGETARCH}
+
 # 安装 Clang 18 核心工具链（竞技编程优化）
-RUN apt-get update --quiet && \
+RUN echo "Building for architecture: $TARGETARCH" && \
+    apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
         clang-18 \
         clang++-18 \
@@ -82,6 +87,7 @@ RUN apt-get update --quiet && \
         libboost-dev \
         libgmp-dev \
         libmpfr-dev \
+        $(if [ "$TARGETARCH" = "arm64" ]; then echo "lldb-18"; fi) \
         && \
     # 创建符号链接
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
@@ -99,6 +105,10 @@ RUN apt-get update --quiet && \
     clang --version && \
     clang++ --version && \
     echo "Architecture verification complete"
+
+# Switch to non-privileged user for security
+USER runner
+WORKDIR /sandbox
 ```
 
 #### 🛠️ 预装工具

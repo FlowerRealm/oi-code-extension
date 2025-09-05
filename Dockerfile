@@ -16,17 +16,19 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     # Core C/C++ development tools (Clang-only for consistency)
     clang-18 \
     clang++-18 \
-    valgrind \
     # Essential runtime libraries
     libc6-dev \
     libc++-18-dev \
     libc++abi-18-dev \
     libstdc++-13-dev \
+    # Memory debugging tool
+    valgrind \
     # Essential libraries for competitive coding
     libboost-dev \
     libgmp-dev \
     libmpfr-dev \
-    # Minimal system tools (only coreutils already implied)
+    # Architecture-specific tools
+    $(if [ "$TARGETARCH" = "arm64" ]; then echo "lldb-18"; fi) \
     && \
     # Create essential symlinks only
     ln -sf /usr/bin/clang-18 /usr/bin/clang && \
@@ -45,19 +47,6 @@ RUN echo "Building for architecture: $TARGETARCH" && \
     clang --version && \
     clang++ --version && \
     echo "Architecture verification complete"
-
-# Architecture-specific optimizations for ARM64
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-    echo "Applying ARM64-specific optimizations..." && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    # ARM64 debugging tools for enhanced debugging capabilities
-    gdb \
-    linux-tools-generic \
-    && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*; \
-    fi
 
 # Switch to non-privileged user for security
 USER runner
