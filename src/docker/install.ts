@@ -178,7 +178,7 @@ export class Installer {
             try {
                 if (platform === 'win32') {
                     progress.report({ message: 'Installing Docker CLI on Windows...' });
-                    
+
                     // Install Chocolatey if not available
                     if (!this.isCommandAvailable('choco')) {
                         dockerInstallOutput.appendLine('Installing Chocolatey package manager...');
@@ -223,22 +223,76 @@ export class Installer {
                     if (!this.isCommandAvailable('brew')) {
                         dockerInstallOutput.appendLine('Installing Homebrew...');
                         await run('/bin/bash', ['-c', '"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"']);
+                        
+                        // Add Homebrew to PATH for Apple Silicon Macs
+                        try {
+                            const homebrewPath = cp.execSync('echo $(/opt/homebrew/bin/brew --prefix)/bin', { encoding: 'utf8' }).trim();
+                            process.env.PATH = `${homebrewPath}:${process.env.PATH}`;
+                            dockerInstallOutput.appendLine(`Added Homebrew to PATH: ${homebrewPath}`);
+                        } catch (pathError) {
+                            dockerInstallOutput.appendLine('Could not determine Homebrew path, continuing...');
+                        }
                     }
 
-                    // Install Docker CLI and Colima (Docker Desktop alternative)
-                    dockerInstallOutput.appendLine('Installing Docker CLI, Docker Compose, and Colima...');
-                    await run('brew', ['install', 'docker', 'docker-compose', 'colima']);
+                    // Install Docker CLI and Docker Compose
+                    dockerInstallOutput.appendLine('Installing Docker CLI and Docker Compose...');
+                    await run('brew', ['install', 'docker', 'docker-compose']);
+
+                    // Install Colima (Docker Desktop alternative)
+                    dockerInstallOutput.appendLine('Installing Colima...');
+                    await run('brew', ['install', 'colima']);
 
                     // Start Colima (Docker runtime)
                     dockerInstallOutput.appendLine('Starting Colima Docker runtime...');
                     try {
-                        cp.execSync('colima status', { stdio: 'pipe' });
-                        dockerInstallOutput.appendLine('Colima already running');
-                    } catch {
-                        dockerInstallOutput.appendLine('Starting Colima...');
+                        const colimaStatus = cp.execSync('colima status', { encoding: 'utf8', stdio: 'pipe' }).trim();
+                        dockerInstallOutput.appendLine(`Colima status: ${colimaStatus}`);
+                        
+                        if (colimaStatus.includes('running')) {
+                            dockerInstallOutput.appendLine('Colima already running');
+                        } else {
+                            dockerInstallOutput.appendLine('Starting Colima...');
+                            await run('colima', ['start', '--memory', '4', '--cpu', '2']);
+                        }
+                    } catch (statusError) {
+                        dockerInstallOutput.appendLine('Colima not running, starting...');
                         await run('colima', ['start', '--memory', '4', '--cpu', '2']);
                     }
 
+                    // Setup Docker environment
+                    dockerInstallOutput.appendLine('Setting up Docker environment...');
+                    try {
+                        // Get Docker context from colima
+                        const dockerContext = cp.execSync('docker context ls', { encoding: 'utf8' });
+                        dockerInstallOutput.appendLine(`Docker contexts:\n${dockerContext}`);
+                        
+                        // Use colima context
+                        await run('docker', ['context', 'use', 'colima']);
+                        dockerInstallOutput.appendLine('Docker context set to colima');
+                        
+                        // Test Docker connection
+                        const dockerVersion = cp.execSync('docker --version', { encoding: 'utf8' }).trim();
+                        dockerInstallOutput.appendLine(`Docker version: ${dockerVersion}`);
+                        
+                        const dockerInfo = cp.execSync('docker info', { encoding: 'utf8', stdio: 'pipe' }).trim();
+                        dockerInstallOutput.appendLine(`Docker info: ${dockerInfo}`);
+                        
+                    } catch (envError: any) {
+                        dockerInstallOutput.appendLine(`Docker environment setup warning: ${envError.message}`);
+                        // Try alternative approach
+                        dockerInstallOutput.appendLine('Trying alternative Docker setup...');
+                        
+                        // Set DOCKER_HOST environment variable
+                        process.env.DOCKER_HOST = 'unix:///Users/${process.env.USER}/.colima/default/docker.sock';
+                        
+                        // Test Docker connection again
+                        try {
+                            const testResult = cp.execSync('docker ps', { encoding: 'utf8', stdio: 'pipe' }).trim();
+                            dockerInstallOutput.appendLine('Docker connection test successful');
+                        } catch (testError: any) {
+                            dockerInstallOutput.appendLine(`Docker connection test failed: ${testError.message}`);
+                        }
+                    }
                 } else if (platform === 'linux') {
                     progress.report({ message: 'Installing Docker CLI on Linux...' });
                     const distro = this.getLinuxDistro();
@@ -263,7 +317,7 @@ export class Installer {
                     progress.report({ message: 'Starting Docker service...' });
                     dockerInstallOutput.appendLine('Enabling Docker service...');
                     await run('sudo', ['systemctl', 'enable', 'docker']);
-                    
+
                     dockerInstallOutput.appendLine('Starting Docker service...');
                     await run('sudo', ['systemctl', 'start', 'docker']);
 
