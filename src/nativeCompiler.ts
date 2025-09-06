@@ -1457,6 +1457,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 let memoryExceeded = false;
                 let spaceExceeded = false;
                 let memoryCheckInterval: NodeJS.Timeout | null = null;
+                let terminated = false; // Flag to prevent race conditions
 
                 // Check disk space
                 const hasEnoughSpace = await this.checkDiskSpace(options.cwd);
@@ -1494,6 +1495,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     // TODO: Implement Windows Job Objects for native memory limit enforcement
                     // Current polling-based approach has limitations:
                     // 1. Race conditions: Process can exceed limits between checks
+                    //    (partially fixed with terminated flag)
                     // 2. Performance overhead: Continuous polling consumes CPU cycles
                     // 3. Reliability: PowerShell commands may fail or be slow
                     //
@@ -1504,9 +1506,16 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     // - Support for other resource limits (CPU, handles, etc.)
                     //
                     // Implementation requires:
-                    // - Native Node.js addon or Windows API binding
-                    // - CreateJobObjectW, AssignProcessToJobObjectW, SetInformationJobObjectW
+                    // - Native Node.js addon using node-addon-api or edge-js
+                    // - Windows API calls: CreateJobObjectW, AssignProcessToJobObjectW, SetInformationJobObjectW
                     // - Memory limit configuration via JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+                    // - Proper error handling and resource cleanup
+                    //
+                    // Suggested implementation approach:
+                    // 1. Create native addon with Windows API bindings
+                    // 2. Implement JobObject class with memory limit methods
+                    // 3. Integrate with executeWithTimeout as alternative to polling
+                    // 4. Add fallback to current polling method if Job Objects fail
                     if (options.memoryLimit && process.platform === 'win32') {
                         // Use a more efficient approach with cached process info and adaptive polling
                         let lastCheckTime = 0;
@@ -1528,6 +1537,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                                     `${child.pid} | Select-Object -ExpandProperty WorkingSet"`;
 
                                 exec(memoryCheckCommand, { timeout: 50 }, (error: any, stdout: string) => {
+                                    // Check if process has already been terminated
+                                    if (terminated) {
+                                        return;
+                                    }
+
                                     lastCheckTime = Date.now();
 
                                     if (!error && stdout) {
@@ -1543,6 +1557,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                                             if (memoryCheckInterval) {
                                                 clearInterval(memoryCheckInterval);
                                                 memoryCheckInterval = setInterval(() => {
+                                                    // Check if process has already been terminated
+                                                    if (terminated) {
+                                                        return;
+                                                    }
+
                                                     // Recreate the checking logic with shorter interval
                                                     const memoryCheckCommand =
                                                         `powershell -Command "Get-Process -Id ${child.pid} | ` +
@@ -1552,6 +1571,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                                                         memoryCheckCommand,
                                                         { timeout: 50 },
                                                         (error: any, stdout: string) => {
+                                                            // Check if process has already been terminated
+                                                            if (terminated) {
+                                                                return;
+                                                            }
+
                                                             if (!error && stdout) {
                                                                 const memoryBytes = parseInt(stdout.trim(), 10);
                                                                 const memoryMB = memoryBytes / (1024 * 1024);
@@ -1592,6 +1616,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                         // Clean up memory check timer
                         child.on('close', () => {
+                            terminated = true; // Set flag to prevent race conditions
                             if (memoryCheckInterval) {
                                 clearInterval(memoryCheckInterval);
                                 memoryCheckInterval = null;
@@ -1640,9 +1665,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                 child.on('error', (error: Error) => {
                     clearTimeout(timeout);
+                    terminated = true; // Set flag to prevent race conditions
                     // 清理内存检查定时器
                     if (memoryCheckInterval) {
                         clearInterval(memoryCheckInterval);
+                        memoryCheckInterval = null;
                     }
                     resolve({
                         exitCode: -1,
@@ -1959,20 +1986,49 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
     /**
      * Scan entire system for compilers (use with caution, may be slow)
+     * Optimized for Windows performance using targeted directory searches
      */
     private static async scanSystemForCompilers(compilerNames: string[]): Promise<string[]> {
         const foundCompilers: string[] = [];
         const output = this.getOutputChannel();
 
-        output.appendLine('Starting full system compiler scan (this may take some time)...');
+        output.appendLine('Starting optimized system compiler scan...');
 
         try {
-            // Build find command
-            const namePatterns = compilerNames.map(name => `-name "${name}"`).join(' -o ');
-            const searchCommand =
-                process.platform === 'win32'
-                    ? `where /R C:\\ ${compilerNames.join(' ')} 2>nul`
-                    : `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`; // Limit result count
+            let searchCommand: string;
+
+            if (process.platform === 'win32') {
+                // Optimized Windows search using PowerShell with targeted directories
+                // Common compiler installation paths on Windows
+                const searchPaths = [
+                    'C:\\Program Files\\*',
+                    'C:\\Program Files (x86)\\*',
+                    'C:\\MinGW\\*',
+                    'C:\\msys64\\*',
+                    'C:\\LLVM\\*',
+                    'C:\\tools\\*',
+                    'C:\\Strawberry\\*',
+                    `${process.env.LOCALAPPDATA}\\Programs\\*`,
+                    `${process.env.USERPROFILE}\\*`
+                ].filter(Boolean);
+
+                // Build PowerShell command for efficient searching
+                const filters = compilerNames.map(name => `"${name}"`).join(',');
+                const pathsString = searchPaths.join("','");
+                // Split long command into multiple lines for readability
+                const psScript =
+                    `$paths = @('${pathsString}'); $filters = @(${filters}); ` +
+                    '$results = @(); foreach ($path in $paths) { if (Test-Path $path) { ' +
+                    'Get-ChildItem -Path $path -Recurse -ErrorAction SilentlyContinue | ' +
+                    "Where-Object { $filters -contains \\$_.Name -and \\$_.Mode -like '*a*' } | " +
+                    'Select-Object -First 100 | ForEach-Object { $results += $_.FullName } } }; ' +
+                    '$results | Select-Object -First 50';
+                searchCommand = `powershell -Command '${psScript}'`;
+            } else {
+                // Unix systems - use existing approach but with better performance
+                const namePatterns = compilerNames.map(name => `-name "${name}"`).join(' -o ');
+                searchCommand = `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`;
+            }
 
             const { stdout } = await this.executeCommand(process.platform === 'win32' ? 'cmd' : 'sh', [
                 process.platform === 'win32' ? '/c' : '-c',
@@ -1983,6 +2039,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 .trim()
                 .split('\n')
                 .filter(line => line.length > 0);
+
             for (const line of lines) {
                 const compilerPath = line.trim();
                 if (await this.fileExists(compilerPath)) {
@@ -1991,9 +2048,35 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 }
             }
 
-            output.appendLine(`Full system scan completed, found ${foundCompilers.length} compilers`);
+            output.appendLine(`Optimized system scan completed, found ${foundCompilers.length} compilers`);
         } catch (error: any) {
-            output.appendLine(`Full system scan failed: ${error.message}`);
+            output.appendLine(`Optimized system scan failed: ${error.message}`);
+
+            // Fallback to original method if optimized search fails
+            if (process.platform === 'win32') {
+                output.appendLine('Falling back to standard search method...');
+                try {
+                    const fallbackCommand = `where /R C:\\ ${compilerNames.join(' ')} 2>nul`;
+                    const { stdout } = await this.executeCommand('cmd', ['/c', fallbackCommand]);
+
+                    const lines = stdout
+                        .trim()
+                        .split('\n')
+                        .filter(line => line.length > 0);
+
+                    for (const line of lines) {
+                        const compilerPath = line.trim();
+                        if (await this.fileExists(compilerPath)) {
+                            foundCompilers.push(compilerPath);
+                            output.appendLine(`Found compiler (fallback): ${compilerPath}`);
+                        }
+                    }
+
+                    output.appendLine(`Fallback scan completed, found ${foundCompilers.length} compilers`);
+                } catch (fallbackError: any) {
+                    output.appendLine(`Fallback search failed: ${fallbackError.message}`);
+                }
+            }
         }
 
         return foundCompilers;

@@ -8,7 +8,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as Diff from 'diff';
 import { NativeCompilerManager, CompilerInfo } from './nativeCompiler';
-import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
+import {
+    OI_CODE_TEST_BASE_PATH,
+    OI_CODE_TEST_TMP_PATH,
+    DEFAULT_PAIR_CHECK_TIME_LIMIT,
+    DEFAULT_PAIR_CHECK_MEMORY_LIMIT
+} from './constants';
 
 /**
  * Public function: Detect and select suitable compiler
@@ -282,7 +287,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                         file2Path,
                         langId,
                         message.input,
-                        { timeLimit: 20, memoryLimit: 512 }
+                        { timeLimit: DEFAULT_PAIR_CHECK_TIME_LIMIT, memoryLimit: DEFAULT_PAIR_CHECK_MEMORY_LIMIT }
                     );
                     const result1 = pairResult.result1;
                     const result2 = pairResult.result2;
