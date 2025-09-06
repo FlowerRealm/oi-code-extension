@@ -1,5 +1,22 @@
 # OI-Code Clang Toolchain Docker Images
 
+## Overview
+
+Docker images for OI-Code's Clang toolchain, now available on Docker Hub. These images contain complete C/C++ compilation toolchains optimized for competitive programming and OI contests.
+
+## Purpose and Use Cases
+
+**⚠️ Important Note**: With the migration to native compiler architecture in OI-Code, these Docker images are now primarily intended for:
+
+1. **Legacy Support**: For users who still prefer containerized environments
+2. **CI/CD Environments**: For automated testing in clean, isolated environments  
+3. **Cross-platform Testing**: Ensuring consistent behavior across different systems
+4. **Educational Purposes**: Learning about containerized compilation environments
+
+**For most users**, the native compiler system is recommended as it provides better performance and easier setup.
+
+---
+
 ## 概述
 
 OI-Code 专用的 Clang 工具链镜像，现已在 Docker Hub 上架。这些镜像包含完整的 C/C++ 编译工具链，专门为竞技编程和OI竞赛优化。

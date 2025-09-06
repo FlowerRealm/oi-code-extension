@@ -35,6 +35,9 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
         if (choice === 'Setup Compiler') {
             await vscode.commands.executeCommand('oicode.setupCompiler');
         }
+        NativeCompilerManager.getOutputChannel().appendLine(
+            `Compiler detection failed. Suggestions: ${compilerResult.suggestions.join(', ')}`
+        );
         throw new Error('No compilers available. Please set up a compiler first.');
     }
 

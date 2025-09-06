@@ -527,15 +527,19 @@ export class NativeCompilerManager {
                 return [];
             }
 
-            const { stdout } = await this.executeCommand(vswherePath, [
-                '-latest',
-                '-products',
-                '*',
-                '-requires',
-                'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
-                '-property',
-                'installationPath'
-            ]);
+            const { stdout } = await this.executeCommand(
+                vswherePath,
+                [
+                    '-latest',
+                    '-products',
+                    '*',
+                    '-requires',
+                    'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                    '-property',
+                    'installationPath'
+                ],
+                60000
+            ); // 60 second timeout for vswhich query
 
             const installPath = stdout.trim();
             if (!installPath) {
@@ -571,7 +575,8 @@ export class NativeCompilerManager {
             }
 
             return results;
-        } catch {
+        } catch (error) {
+            this.getOutputChannel().appendLine(`[CompilerScan] Failed to find MSVC compilers: ${error}`);
             return [];
         }
     }
@@ -1675,18 +1680,22 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
     /**
      * Execute command
      */
-    private static async executeCommand(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+    private static async executeCommand(
+        command: string,
+        args: string[],
+        timeoutMs: number = 30000
+    ): Promise<{ stdout: string; stderr: string }> {
         return new Promise((resolve, reject) => {
             const child = spawn(command, args, { stdio: 'pipe' });
             let stdout = '';
             let stderr = '';
 
-            // Set 30 second timeout to prevent command from hanging
-            // Increased timeout for better reliability on slow systems or under heavy load
+            // Set configurable timeout to prevent command from hanging
+            // Default 30 seconds, increased for better reliability on slow systems or under heavy load
             const timeout = setTimeout(() => {
                 child.kill('SIGKILL');
                 reject(new Error(`Command timed out: ${command} ${args.join(' ')}`));
-            }, 30000);
+            }, timeoutMs);
 
             child.stdout.on('data', data => {
                 stdout += data.toString();
@@ -1839,18 +1848,11 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
 
             for (const pattern of searchPatterns) {
                 try {
-                    const { stdout } = await this.executeCommand('find', [
-                        '/usr',
-                        '/opt',
-                        '/home',
-                        '-maxdepth',
-                        '3',
-                        '-name',
-                        pattern,
-                        '-type',
-                        'd',
-                        '2>/dev/null'
-                    ]);
+                    const { stdout } = await this.executeCommand(
+                        'find',
+                        ['/usr', '/opt', '/home', '-maxdepth', '3', '-name', pattern, '-type', 'd', '2>/dev/null'],
+                        120000
+                    ); // 120 second timeout for system-wide find
                     const dirs = stdout
                         .trim()
                         .split('\n')
@@ -1909,18 +1911,11 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
 
             for (const pattern of searchPatterns) {
                 try {
-                    const { stdout } = await this.executeCommand('find', [
-                        '/usr',
-                        '/opt',
-                        '/home',
-                        '-maxdepth',
-                        '3',
-                        '-name',
-                        pattern,
-                        '-type',
-                        'd',
-                        '2>/dev/null'
-                    ]);
+                    const { stdout } = await this.executeCommand(
+                        'find',
+                        ['/usr', '/opt', '/home', '-maxdepth', '3', '-name', pattern, '-type', 'd', '2>/dev/null'],
+                        120000
+                    ); // 120 second timeout for system-wide find
                     const dirs = stdout
                         .trim()
                         .split('\n')

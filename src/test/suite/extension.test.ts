@@ -197,7 +197,7 @@ suite('Extension Test Suite', () => {
     });
 
     test('Compiler initialization and code execution', async function () {
-        this.timeout(90000);
+        this.timeout(120000); // Increased timeout for better reliability on slow systems
 
         // Check if compilers are available before running the test
         const compilersAvailable = await areCompilersAvailable();
