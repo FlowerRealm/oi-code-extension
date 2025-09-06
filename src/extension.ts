@@ -249,7 +249,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'oicode.pairCheckView';
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _context: vscode.ExtensionContext) { }
+    constructor(private readonly _context: vscode.ExtensionContext) {}
 
     resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -377,7 +377,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                     function toSafeName(input: string): string {
                         const s = input || 'unnamed';
-                        return s.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
+                        return s.replace(/[^\w-.]+/g, '_').slice(0, 64);
                     }
 
                     async function pickProblemsBaseDir(): Promise<string> {
@@ -398,7 +398,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 if (choice.value === 'saved') {
                                     return saved;
                                 }
-                            } catch { }
+                            } catch {}
                         }
                         const pick = await vscode.window.showOpenDialog({
                             canSelectFolders: true,
@@ -506,7 +506,7 @@ export function activate(context: vscode.ExtensionContext) {
                         if (!name) {
                             return;
                         }
-                        const safe = name.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
+                        const safe = name.replace(/[^\w-.]+/g, '_').slice(0, 64);
 
                         let baseDir = payload?.baseDir || context.globalState.get<string>('oicode.lastProblemsBaseDir');
                         if (baseDir) {

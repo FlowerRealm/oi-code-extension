@@ -213,7 +213,7 @@ suite('Extension Test Suite', () => {
         // Compiler environment already initialized in before() hook, skip re-initialization to avoid conflicts
 
         // Test C code execution
-        const cCode = '#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }';
+        const cCode = '#include <stdio.h>\nint main() { printf("Hello, C!\\n"); return 0; }';
         const createdC = await createProblemAndOpen('UT-C-Hello', 'c', cCode);
         const resC: any = await vscode.commands.executeCommand('oicode.runCode', '');
         console.log('[Compiler Init Test] C execution result:', resC);
@@ -229,7 +229,7 @@ suite('Extension Test Suite', () => {
         await cleanupDir(path.dirname(createdC.sourcePath));
 
         // Test C++ code execution
-        const cppCode = '#include <iostream>\nint main() { std::cout << \"Hello, C++!\" << std::endl; return 0; }';
+        const cppCode = '#include <iostream>\nint main() { std::cout << "Hello, C++!" << std::endl; return 0; }';
         const createdCpp = await createProblemAndOpen('UT-CPP-Hello', 'cpp', cppCode);
         const resCpp: any = await vscode.commands.executeCommand('oicode.runCode', '');
         console.log('[Compiler Init Test] C++ execution result:', resCpp);

@@ -83,10 +83,7 @@ export class CompilerInstaller {
 
         try {
             // Check if LLVM is already installed
-            const llvmPaths = [
-                'C:\\Program Files\\LLVM\\bin',
-                'C:\\LLVM\\bin'
-            ];
+            const llvmPaths = ['C:\\Program Files\\LLVM\\bin', 'C:\\LLVM\\bin'];
 
             for (const llvmPath of llvmPaths) {
                 if (await ProcessRunner.fileExists(llvmPath)) {
@@ -102,8 +99,8 @@ export class CompilerInstaller {
 
             // Download LLVM installer
             output.appendLine('[CompilerInstaller] Downloading LLVM installer...');
-            const installerUrl = 'https://github.com/llvm/llvm-project/releases/download/' +
-                'llvmorg-16.0.0/LLVM-16.0.0-win64.exe';
+            const installerUrl =
+                'https://github.com/llvm/llvm-project/releases/download/' + 'llvmorg-16.0.0/LLVM-16.0.0-win64.exe';
             const installerPath = `${require('os').tmpdir()}/LLVM-16.0.0-win64.exe`;
 
             // Show download progress
@@ -120,22 +117,24 @@ export class CompilerInstaller {
 
                         return new Promise<void>((resolve, reject) => {
                             const file = fs.createWriteStream(installerPath);
-                            https.get(installerUrl, (response: any) => {
-                                const totalSize = parseInt(response.headers['content-length'] || '0');
-                                let downloadedSize = 0;
+                            https
+                                .get(installerUrl, (response: any) => {
+                                    const totalSize = parseInt(response.headers['content-length'] || '0');
+                                    let downloadedSize = 0;
 
-                                response.on('data', (chunk: any) => {
-                                    downloadedSize += chunk.length;
-                                    const percent = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
-                                    progress.report({ increment: percent, message: `${Math.round(percent)}%` });
-                                });
+                                    response.on('data', (chunk: any) => {
+                                        downloadedSize += chunk.length;
+                                        const percent = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
+                                        progress.report({ increment: percent, message: `${Math.round(percent)}%` });
+                                    });
 
-                                response.pipe(file);
-                                file.on('finish', () => {
-                                    file.close();
-                                    resolve();
-                                });
-                            }).on('error', reject);
+                                    response.pipe(file);
+                                    file.on('finish', () => {
+                                        file.close();
+                                        resolve();
+                                    });
+                                })
+                                .on('error', reject);
                         });
                     } catch (error: any) {
                         throw new Error(`Failed to download LLVM installer: ${error.message}`);
@@ -240,7 +239,7 @@ export class CompilerInstaller {
                 message: `Failed to install LLVM on macOS: ${error.message}`,
                 nextSteps: [
                     'Install Homebrew: /bin/bash -c "$(curl -fsSL ' +
-                'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+                        'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
                     'Install LLVM: brew install llvm',
                     'Add to PATH: export PATH="/usr/local/opt/llvm/bin:$PATH"'
                 ]
@@ -265,16 +264,16 @@ export class CompilerInstaller {
             if (aptCheck.exitCode === 0) {
                 packageManager = 'apt';
                 installCommand = ['sudo', 'apt', 'update', '&&', 'sudo', 'apt', 'install', '-y', 'clang', 'lld'];
-            } // Check for dnf (Fedora)
-            else if (await ProcessRunner.executeCommand('which', ['dnf']).then(r => r.exitCode === 0)) {
+                // Check for dnf (Fedora)
+            } else if (await ProcessRunner.executeCommand('which', ['dnf']).then(r => r.exitCode === 0)) {
                 packageManager = 'dnf';
                 installCommand = ['sudo', 'dnf', 'install', '-y', 'clang', 'lld'];
-            } // Check for pacman (Arch)
-            else if (await ProcessRunner.executeCommand('which', ['pacman']).then(r => r.exitCode === 0)) {
+                // Check for pacman (Arch)
+            } else if (await ProcessRunner.executeCommand('which', ['pacman']).then(r => r.exitCode === 0)) {
                 packageManager = 'pacman';
                 installCommand = ['sudo', 'pacman', '-S', '--noconfirm', 'clang', 'lld'];
-            } // Check for zypper (openSUSE)
-            else if (await ProcessRunner.executeCommand('which', ['zypper']).then(r => r.exitCode === 0)) {
+                // Check for zypper (openSUSE)
+            } else if (await ProcessRunner.executeCommand('which', ['zypper']).then(r => r.exitCode === 0)) {
                 packageManager = 'zypper';
                 installCommand = ['sudo', 'zypper', 'install', '-y', 'clang', 'lld'];
             } else {
@@ -290,7 +289,7 @@ export class CompilerInstaller {
                     title: `Installing LLVM with ${packageManager}...`,
                     cancellable: false
                 },
-                async (progress) => {
+                async progress => {
                     progress.report({ increment: 0, message: 'Updating package lists...' });
 
                     const installResult = await ProcessRunner.executeWithTimeout({
