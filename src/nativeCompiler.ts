@@ -49,6 +49,9 @@ export interface LLVMInstallResult {
  */
 export class NativeCompilerManager {
     private static outputChannel: vscode.OutputChannel | null = null;
+    private static cachedCompilers: CompilerDetectionResult | null = null;
+    private static readonly CACHE_KEY = 'oicode.cachedCompilers';
+    private static readonly CACHE_VERSION = '1.0';
 
     /**
      * 获取输出通道
@@ -61,10 +64,110 @@ export class NativeCompilerManager {
     }
 
     /**
+     * 从全局状态加载缓存的编译器信息
+     */
+    private static async loadCachedCompilers(context: vscode.ExtensionContext): Promise<CompilerDetectionResult | null> {
+        try {
+            const cached = context.globalState.get<string>(this.CACHE_KEY);
+            if (!cached) {
+                return null;
+            }
+
+            const parsed = JSON.parse(cached);
+            
+            // 检查缓存版本
+            if (parsed.version !== this.CACHE_VERSION) {
+                console.log('[CompilerCache] Cache version mismatch, ignoring');
+                return null;
+            }
+
+            // 检查缓存时间（24小时过期）
+            const cacheTime = new Date(parsed.timestamp);
+            const now = new Date();
+            const hoursDiff = (now.getTime() - cacheTime.getTime()) / (1000 * 60 * 60);
+            
+            if (hoursDiff > 24) {
+                console.log('[CompilerCache] Cache expired, ignoring');
+                return null;
+            }
+
+            console.log('[CompilerCache] Using cached compiler information from', cacheTime.toISOString());
+            return {
+                success: true,
+                compilers: parsed.compilers,
+                recommended: parsed.recommended,
+                suggestions: parsed.suggestions || []
+            };
+        } catch (error) {
+            console.log('[CompilerCache] Failed to load cached compilers:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 保存编译器信息到全局状态
+     */
+    private static async saveCachedCompilers(context: vscode.ExtensionContext, result: CompilerDetectionResult): Promise<void> {
+        try {
+            const cacheData = {
+                version: this.CACHE_VERSION,
+                timestamp: new Date().toISOString(),
+                compilers: result.compilers,
+                recommended: result.recommended,
+                suggestions: result.suggestions || []
+            };
+
+            await context.globalState.update(this.CACHE_KEY, JSON.stringify(cacheData));
+            console.log('[CompilerCache] Saved compiler information to cache');
+        } catch (error) {
+            console.log('[CompilerCache] Failed to save cached compilers:', error);
+        }
+    }
+
+    /**
+     * 清除编译器缓存
+     */
+    public static async clearCachedCompilers(context: vscode.ExtensionContext): Promise<void> {
+        try {
+            await context.globalState.update(this.CACHE_KEY, undefined);
+            this.cachedCompilers = null;
+            console.log('[CompilerCache] Cleared compiler cache');
+        } catch (error) {
+            console.log('[CompilerCache] Failed to clear compiler cache:', error);
+        }
+    }
+
+    /**
+     * 强制重新扫描编译器
+     */
+    public static async forceRescanCompilers(context: vscode.ExtensionContext): Promise<CompilerDetectionResult> {
+        console.log('[CompilerCache] Forcing compiler rescan...');
+        await this.clearCachedCompilers(context);
+        return await this.detectCompilers(context, true);
+    }
+
+    /**
      * 检测系统中可用的编译器
      */
-    public static async detectCompilers(): Promise<CompilerDetectionResult> {
+    public static async detectCompilers(context?: vscode.ExtensionContext, forceRescan: boolean = false): Promise<CompilerDetectionResult> {
         const output = this.getOutputChannel();
+        
+        // 如果有内存缓存且不是强制重新扫描，直接返回
+        if (!forceRescan && this.cachedCompilers) {
+            console.log('[CompilerCache] Using in-memory cached compiler information');
+            return this.cachedCompilers;
+        }
+
+        // 尝试从全局状态加载缓存
+        if (!forceRescan && context) {
+            const cached = await this.loadCachedCompilers(context);
+            if (cached) {
+                this.cachedCompilers = cached;
+                console.log('[CompilerCache] Using cached compiler information from global state');
+                return cached;
+            }
+        }
+
         output.clear();
         output.appendLine('=== 检测可用编译器 ===');
         output.show(true);
@@ -99,12 +202,20 @@ export class NativeCompilerManager {
                 output.appendLine(`推荐编译器: ${recommended.name}`);
             }
 
-            return {
+            const result = {
                 success: true,
                 compilers,
                 recommended,
                 suggestions
             };
+
+            // 缓存结果
+            this.cachedCompilers = result;
+            if (context) {
+                await this.saveCachedCompilers(context, result);
+            }
+
+            return result;
 
         } catch (error: any) {
             const errorMsg = `编译器检测失败: ${error.message}`;
@@ -454,12 +565,14 @@ export class NativeCompilerManager {
      */
     private static async testCompiler(compilerPath: string): Promise<CompilerInfo | null> {
         try {
+            const outputChannel = this.getOutputChannel();
+            outputChannel.appendLine(`Testing compiler: ${compilerPath}`);
             const { stdout, stderr } = await this.executeCommand(compilerPath, ['--version']);
-            const output = stdout + stderr;
+            const versionOutput = stdout + stderr;
             
             // 解析编译器信息
-            const type = this.determineCompilerType(compilerPath, output);
-            const version = this.parseVersion(output);
+            const type = this.determineCompilerType(compilerPath, versionOutput);
+            const version = this.parseVersion(versionOutput);
             const supportedStandards = this.getSupportedStandards(type, version);
             const is64Bit = await this.is64BitCompiler(compilerPath);
             
@@ -479,6 +592,8 @@ export class NativeCompilerManager {
                 priority
             };
         } catch (error) {
+            const outputChannel = this.getOutputChannel();
+            outputChannel.appendLine(`Compiler test failed for ${compilerPath}: ${error}`);
             return null;
         }
     }
@@ -1059,7 +1174,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 args: compileArgs,
                 cwd: tempDir,
                 timeout: options.timeLimit * 1000,
-                input: ''
+                input: '',
+                memoryLimit: options.memoryLimit
             });
 
             if (compileResult.exitCode !== 0) {
@@ -1102,7 +1218,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 args: [],
                 cwd: tempDir,
                 timeout: options.timeLimit * 1000,
-                input: options.input
+                input: options.input,
+                memoryLimit: options.memoryLimit
             });
             
             output.appendLine(`运行结果 - 退出码: ${runResult.exitCode}`);
@@ -1139,19 +1256,23 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
      * 获取编译器参数
      */
     private static getCompilerArgs(compiler: CompilerInfo, language: 'c' | 'cpp', sourcePath: string, outputPath: string): string[] {
+        const config = vscode.workspace.getConfiguration('oicode');
+        const optimizationLevel = config.get<string>('compile.opt', 'O2');
+        const languageStandard = config.get<string>('compile.std', 'c++17');
+
         const args = [];
 
         // 基础编译参数
         if (compiler.type === 'msvc') {
-            args.push('/O2');
+            args.push(`/${optimizationLevel}`);
             if (language === 'cpp') {
-                args.push('/std:c++17');
+                args.push(`/std:${languageStandard}`);
             }
             args.push('/Fe:' + outputPath);
         } else {
-            args.push('-O2');
+            args.push(`-${optimizationLevel}`);
             if (language === 'cpp') {
-                args.push('-std=c++17');
+                args.push(`-std=${languageStandard}`);
             }
             args.push('-o', outputPath);
         }
@@ -1169,12 +1290,45 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         cwd: string;
         timeout: number;
         input: string;
+        memoryLimit?: number; // 内存限制（MB）
     }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean }> {
         return new Promise((resolve) => {
-            const child = spawn(options.command, options.args, { 
-                cwd: options.cwd,
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
+            let child: any;
+            let memoryExceeded = false;
+            
+            // 如果有内存限制且在Unix系统上，使用ulimit
+            if (options.memoryLimit && process.platform !== 'win32') {
+                const memoryKB = options.memoryLimit * 1024; // 转换为KB
+                const shellCommand = `ulimit -v ${memoryKB} 2>/dev/null || ulimit -d ${memoryKB} 2>/dev/null; ${options.command} ${options.args.join(' ')}`;
+                
+                child = spawn('sh', ['-c', shellCommand], { 
+                    cwd: options.cwd,
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+            } else {
+                // Windows或无内存限制的情况
+                child = spawn(options.command, options.args, { 
+                    cwd: options.cwd,
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                // 对于Windows，使用轮询检查内存使用情况
+                if (options.memoryLimit && process.platform === 'win32') {
+                    const memoryCheckInterval = setInterval(() => {
+                        try {
+                            // 这里可以添加Windows特定的内存检查逻辑
+                            // 由于需要额外的库支持，暂时简化处理
+                        } catch (error) {
+                            // 忽略内存检查错误
+                        }
+                    }, 100);
+                    
+                    // 清理内存检查定时器
+                    child.on('close', () => {
+                        clearInterval(memoryCheckInterval);
+                    });
+                }
+            }
 
             let stdout = '';
             let stderr = '';
@@ -1185,31 +1339,42 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 child.kill('SIGKILL');
             }, options.timeout);
 
-            child.stdout?.on('data', (data) => {
+            child.stdout?.on('data', (data: Buffer | string) => {
                 stdout += data.toString();
             });
 
-            child.stderr?.on('data', (data) => {
+            child.stderr?.on('data', (data: Buffer | string) => {
                 stderr += data.toString();
             });
 
-            child.on('close', (code) => {
+            child.on('close', (code: number | null, signal: string | null) => {
                 clearTimeout(timeout);
+                
+                // 检查是否因为内存限制被终止
+                if (process.platform !== 'win32' && options.memoryLimit) {
+                    // 在Unix系统上，如果进程被SIGKILL杀死且没有超时，可能是内存限制
+                    if (signal === 'SIGKILL' && !timedOut) {
+                        memoryExceeded = true;
+                    }
+                }
+                
                 resolve({
                     exitCode: code !== null && code !== undefined ? code : -1,
                     stdout,
                     stderr,
-                    timedOut
+                    timedOut,
+                    memoryExceeded
                 });
             });
 
-            child.on('error', (error) => {
+            child.on('error', (error: Error) => {
                 clearTimeout(timeout);
                 resolve({
                     exitCode: -1,
                     stdout: '',
                     stderr: error.message,
-                    timedOut: false
+                    timedOut: false,
+                    memoryExceeded: false
                 });
             });
 
@@ -1229,6 +1394,12 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             let stdout = '';
             let stderr = '';
 
+            // 设置10秒超时，防止命令卡住
+            const timeout = setTimeout(() => {
+                child.kill('SIGKILL');
+                reject(new Error(`Command timed out: ${command} ${args.join(' ')}`));
+            }, 10000);
+
             child.stdout.on('data', (data) => {
                 stdout += data.toString();
             });
@@ -1238,6 +1409,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             });
 
             child.on('close', (code) => {
+                clearTimeout(timeout);
                 if (code === 0) {
                     resolve({ stdout, stderr });
                 } else {
@@ -1246,6 +1418,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             });
 
             child.on('error', (error) => {
+                clearTimeout(timeout);
                 reject(error);
             });
         });

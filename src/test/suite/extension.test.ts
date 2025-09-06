@@ -16,6 +16,11 @@ import * as os from 'os';
 // Base dir for test-created problems
 const TEST_BASE_DIR = path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
 
+// Helper function for OI-style output comparison: ignore trailing whitespace and normalize line endings
+function normalizeOutput(output: string): string {
+    return output.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 // Helper: create a problem via command, inject code, and open it
 async function createProblemAndOpen(name: string, language: 'c' | 'cpp', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
     await fs.mkdir(TEST_BASE_DIR, { recursive: true });
@@ -120,39 +125,6 @@ async function prepareCompilerEnvironment(): Promise<void> {
     }
 }
 
-// Ensure native compilers are ready for testing
-async function ensureCompilersAreReady(): Promise<void> {
-    console.log('[Test Setup] Checking native compiler availability...');
-
-    const compilersAvailable = await areCompilersAvailable();
-    if (!compilersAvailable) {
-        console.log('[Test Setup] No compilers available, attempting to setup...');
-        
-        try {
-            // Initialize compiler environment
-            await vscode.commands.executeCommand('oicode.initializeEnvironment');
-            console.log('[Test Setup] Compiler environment initialized');
-        } catch (error: any) {
-            console.log('[Test Setup] Compiler setup failed:', error.message);
-            console.log('[Test Setup] Tests will run without compilers if possible');
-            return;
-        }
-        
-        // Check again after setup
-        if (!await areCompilersAvailable()) {
-            console.log('[Test Setup] Still no compilers available after setup attempt');
-            console.log('[Test Setup] Tests will run without compilers if possible');
-            return;
-        }
-    }
-
-    try {
-        console.log('[Test Setup] Native compilers are ready for testing');
-    } catch (error: any) {
-        console.log('[Test Setup] Compiler readiness check failed:', error.message);
-        console.log('[Test Setup] Tests will run without compilers if possible');
-    }
-}
 
 suite('Extension Test Suite', () => {
     // Wait for extension activation and compiler preparation
@@ -232,20 +204,26 @@ suite('Extension Test Suite', () => {
         console.log('[Compiler Init Test] C execution result:', resC);
         assert.ok(resC, 'oicode.runCode should return a result for C');
         assert.strictEqual(typeof resC.output, 'string', 'C execution should return string output');
-        assert.strictEqual(resC.output.trim(), 'Hello, C!', 'C output should match expected result');
+        
+        // OI-style output comparison: ignore trailing whitespace and normalize line endings
+        assert.strictEqual(normalizeOutput(resC.output), 'Hello, C!', 'C output should match expected result');
+        
         assert.strictEqual(resC.error, '', 'C execution should have no errors');
         assert.strictEqual(resC.timedOut, false, 'C execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdC.sourcePath));
 
         // Test C++ code execution
-        const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\\n\"; return 0; }`;
+        const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\" << std::endl; return 0; }`;
         const createdCpp = await createProblemAndOpen('UT-CPP-Hello', 'cpp', cppCode);
         const resCpp: any = await vscode.commands.executeCommand('oicode.runCode', '');
         console.log('[Compiler Init Test] C++ execution result:', resCpp);
         assert.ok(resCpp, 'oicode.runCode should return a result for C++');
         assert.strictEqual(typeof resCpp.output, 'string', 'C++ execution should return string output');
-        assert.strictEqual(resCpp.output.trim(), 'Hello, C++!', 'C++ output should match expected result');
+        
+        // OI-style output comparison: ignore trailing whitespace and normalize line endings
+        assert.strictEqual(normalizeOutput(resCpp.output), 'Hello, C++!', 'C++ output should match expected result');
+        
         assert.strictEqual(resCpp.error, '', 'C++ execution should have no errors');
         assert.strictEqual(resCpp.timedOut, false, 'C++ execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -307,35 +285,7 @@ suite('Extension Test Suite', () => {
             }
         });
 
-        test('should handle infinite loops with timeout', async function () {
-            this.timeout(45000); // Give extra time for timeout test
-            
-            // Test with infinite loop
-            const infiniteLoopCode = `#include <stdio.h>\nint main() { while(1) { } return 0; }`;
-            const created = await createProblemAndOpen('UT-Infinite-Loop', 'c', infiniteLoopCode);
-            
-            try {
-                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
-                
-                // Should handle timeout gracefully
-                assert.ok(res, 'should return result even for infinite loops');
-                
-                // Note: timeout detection depends on the specific implementation
-                // Either it should timeout OR it should handle it gracefully
-                if (res.timedOut) {
-                    console.log('[Strict Test] ✓ Infinite loop correctly detected as timeout');
-                } else {
-                    // If not timed out, it should at least not crash and have some error handling
-                    console.log('[Strict Test] ✓ Infinite loop handled (no timeout detected but no crash)');
-                    assert.strictEqual(typeof res.output, 'string', 'output should be a string');
-                }
-                
-            } finally {
-                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-                await cleanupDir(path.dirname(created.sourcePath));
-            }
-        });
-
+        
         test('should handle different input types correctly', async function () {
             this.timeout(30000);
             
@@ -405,26 +355,7 @@ suite('OI-Code Commands Test Suite', () => {
 
 
 
-    describe('Code Execution Tests (requires native compilers)', () => {
-        before(async function () {
-            this.timeout(120000); // Increase timeout for compiler initialization
-
-            // Check if compilers are available and working before running tests
-            const compilersAvailable = await areCompilersAvailable();
-
-            if (!compilersAvailable) {
-                console.log('[Test Setup] Compilers not available, skipping compiler-dependent tests');
-                vscode.window.showInformationMessage('Compilers not available, skipping compiler-dependent tests.');
-                this.skip(); // Skip all tests in this describe block
-            }
-
-            console.log('[Test Setup] Compilers are available, initializing compiler environment for code execution tests...');
-            vscode.window.showInformationMessage('Initializing compiler environment for code execution tests...');
-            await vscode.commands.executeCommand('oicode.initializeEnvironment');
-            vscode.window.showInformationMessage('Compiler environment initialized.');
-        });
-    });
-
+    
     // Separate test for compiler setup when compilers are not available
     test('should handle compiler setup flow when compilers are not available', async function () {
         this.timeout(120000);

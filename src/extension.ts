@@ -37,7 +37,7 @@ function getTheme(kind: vscode.ColorThemeKind): string {
     return (kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast) ? 'dark' : 'light';
 }
 
-function getPairCheckWebviewContent(webview: vscode.Webview): string {
+function getPairCheckWebviewContent(): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,7 +102,7 @@ async function runPairWithNativeCompilers(
     result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
     result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
 }> {
-    // Check if we have compilers available
+    // Check if we have compilers available (without context for this function)
     const compilerResult = await NativeCompilerManager.detectCompilers();
     if (!compilerResult.success || compilerResult.compilers.length === 0) {
         throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
@@ -179,10 +179,10 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _context: vscode.ExtensionContext) { }
 
-    resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
+    resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._context.extensionUri] };
-        webviewView.webview.html = getPairCheckWebviewContent(webviewView.webview);
+        webviewView.webview.html = getPairCheckWebviewContent();
 
         webviewView.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'runPairCheck') {
@@ -250,44 +250,6 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     }
 }
 
-/**
- * Set up editor event listeners for container management
- */
-function setupEditorEventListeners(context: vscode.ExtensionContext): void {
-    console.log('[EditorEventListeners] Setting up editor event listeners for container management');
-
-    // Supported languages for container management
-    const supportedLanguages = ['c', 'cpp'];
-
-    // Helper function to check if document language is supported
-    const isSupportedLanguage = (languageId: string) => supportedLanguages.includes(languageId);
-
-    // Listen for document open events
-    const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument((document) => {
-        if (!document.isUntitled && isSupportedLanguage(document.languageId)) {
-            console.log(`[EditorEventListeners] Document opened with language: ${document.languageId}`);
-        }
-    });
-
-    // Listen for document close events
-    const onDidCloseTextDocument = vscode.workspace.onDidCloseTextDocument((document) => {
-        if (!document.isUntitled && isSupportedLanguage(document.languageId)) {
-            console.log(`[EditorEventListeners] Document closed with language: ${document.languageId}`);
-        }
-    });
-
-    // Listen for active editor changes
-    const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor && !editor.document.isUntitled && isSupportedLanguage(editor.document.languageId)) {
-            console.log(`[EditorEventListeners] Active editor changed to language: ${editor.document.languageId}`);
-        }
-    });
-
-    // Add all listeners to context subscriptions for proper cleanup
-    context.subscriptions.push(onDidOpenTextDocument, onDidCloseTextDocument, onDidChangeActiveTextEditor);
-
-    console.log('[EditorEventListeners] Editor event listeners setup completed');
-}
 
 export function activate(context: vscode.ExtensionContext) {
     try {
@@ -295,7 +257,7 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('Extension path:', context.extensionPath);
 
         // Initialize compiler manager
-        NativeCompilerManager.detectCompilers().then(result => {
+        NativeCompilerManager.detectCompilers(context).then(result => {
             if (result.success) {
                 console.log(`Detected ${result.compilers.length} compilers`);
                 if (result.recommended) {
@@ -502,9 +464,6 @@ export function activate(context: vscode.ExtensionContext) {
                 themeListener.dispose();
             });
 
-            panel.webview.onDidReceiveMessage(async message => {
-                // ... (omitted for brevity)
-            });
         }));
 
         context.subscriptions.push(vscode.commands.registerCommand('oi-code.showCompletionPage', () => {
@@ -648,7 +607,7 @@ export function activate(context: vscode.ExtensionContext) {
                 progress.report({ increment: 0, message: 'Detecting compilers...' });
                 try {
                     // Check if we have compilers available
-                    const compilerResult = await NativeCompilerManager.detectCompilers();
+                    const compilerResult = await NativeCompilerManager.detectCompilers(context);
                     if (!compilerResult.success || compilerResult.compilers.length === 0) {
                         throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
                     }
@@ -709,44 +668,73 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oicode.initializeEnvironment', async () => {
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: '检查编译器环境',
+                title: 'Check Compiler Environment',
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: '检测编译器...' });
+                progress.report({ message: 'Detecting compilers...' });
                 try {
-                    const result = await NativeCompilerManager.detectCompilers();
+                    const result = await NativeCompilerManager.detectCompilers(context);
                     
                     if (result.success && result.compilers.length > 0) {
-                        progress.report({ message: '编译器检测完成!', increment: 100 });
+                        progress.report({ message: 'Compiler detection complete!', increment: 100 });
                         vscode.window.showInformationMessage(
-                            `OI-Code环境已就绪！检测到 ${result.compilers.length} 个编译器，推荐使用: ${result.recommended?.name}`
+                            `OI-Code environment ready! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
                         );
                     } else {
-                        progress.report({ message: '需要安装编译器...' });
+                        progress.report({ message: 'Need to install compiler...' });
                         const choice = await vscode.window.showInformationMessage(
-                            '未检测到C/C++编译器。是否要安装LLVM？',
+                            'No C/C++ compilers detected. Would you like to install LLVM?',
                             { modal: true },
-                            '安装LLVM',
-                            '查看帮助'
+                            'Install LLVM',
+                            'View Help'
                         );
                         
-                        if (choice === '安装LLVM') {
+                        if (choice === 'Install LLVM') {
                             const installResult = await NativeCompilerManager.installLLVM();
                             if (installResult.success) {
-                                vscode.window.showInformationMessage('LLVM安装完成！请重启VS Code。');
+                                vscode.window.showInformationMessage('LLVM installation completed! Please restart VS Code.');
                             }
                         }
                     }
                 } catch (error: any) {
-                    progress.report({ message: '编译器检测失败。' });
-                    vscode.window.showErrorMessage(`编译器环境初始化失败: ${error.message}`);
+                    progress.report({ message: 'Compiler detection failed.' });
+                    vscode.window.showErrorMessage(`Compiler environment initialization failed: ${error.message}`);
                 }
             });
         }));
 
+        context.subscriptions.push(vscode.commands.registerCommand('oicode.rescanCompilers', async () => {
+            try {
+                vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: '重新扫描编译器...',
+                    cancellable: false
+                }, async (progress) => {
+                    progress.report({ message: '正在重新扫描编译器...' });
+                    try {
+                        const result = await NativeCompilerManager.forceRescanCompilers(context);
+                        progress.report({ message: '重新扫描完成!', increment: 100 });
+                        
+                        if (result.success && result.compilers.length > 0) {
+                            vscode.window.showInformationMessage(
+                                `编译器重新扫描完成！检测到 ${result.compilers.length} 个编译器，推荐使用: ${result.recommended?.name}`
+                            );
+                        } else {
+                            vscode.window.showWarningMessage('未检测到可用的编译器');
+                        }
+                    } catch (error: any) {
+                        progress.report({ message: '重新扫描失败' });
+                        vscode.window.showErrorMessage(`编译器重新扫描失败: ${error.message}`);
+                    }
+                });
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`编译器重新扫描失败: ${error.message}`);
+            }
+        }));
+
         context.subscriptions.push(vscode.commands.registerCommand('oicode.setupCompiler', async () => {
             try {
-                const result = await NativeCompilerManager.detectCompilers();
+                const result = await NativeCompilerManager.detectCompilers(context);
                 
                 if (result.success && result.compilers.length > 0) {
                     vscode.window.showInformationMessage(
