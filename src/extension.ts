@@ -41,7 +41,7 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
 }
 
 function htmlEscape(str: string): string {
-    return str.replace(/[&<>"'\/]/g, match => {
+    return str.replace(/[&<>"'/]/g, match => {
         const escape: { [key: string]: string } = {
             '&': '&amp;',
             '<': '&lt;',
@@ -829,8 +829,11 @@ export function activate(context: vscode.ExtensionContext) {
 
                             if (result.success && result.compilers.length > 0) {
                                 progress.report({ message: 'Compiler detection complete!', increment: 100 });
-                                const message = `OI-Code environment ready! Detected ${result.compilers.length} compilers, ` +
-                                    `recommended: ${result.recommended?.name}`;
+                                const compilerCount = result.compilers.length;
+                                const recommendedName = result.recommended?.name;
+                                const message =
+                                    'OI-Code environment ready! Detected ' +
+                                    `${compilerCount} compilers, recommended: ${recommendedName}`;
                                 vscode.window.showInformationMessage(message);
                             } else {
                                 progress.report({ message: 'Need to install compiler...' });
@@ -877,8 +880,11 @@ export function activate(context: vscode.ExtensionContext) {
                                 progress.report({ message: 'Rescan completed!', increment: 100 });
 
                                 if (result.success && result.compilers.length > 0) {
-                                    const rescanMessage = `Compiler rescan completed! Detected ${result.compilers.length} compilers, ` +
-                                        `recommended: ${result.recommended?.name}`;
+                                    const rescanCount = result.compilers.length;
+                                    const rescanRecommended = result.recommended?.name;
+                                    const rescanMessage =
+                                        'Compiler rescan completed! Detected ' +
+                                        `${rescanCount} compilers, recommended: ${rescanRecommended}`;
                                     vscode.window.showInformationMessage(rescanMessage);
                                 } else {
                                     vscode.window.showWarningMessage('No available compilers detected');
@@ -901,7 +907,8 @@ export function activate(context: vscode.ExtensionContext) {
                     const result = await NativeCompilerManager.detectCompilers(context);
 
                     if (result.success && result.compilers.length > 0) {
-                        const detectedMessage = `Detected ${result.compilers.length} compilers. ` +
+                        const detectedMessage =
+                            `Detected ${result.compilers.length} compilers. ` +
                             `Recommended: ${result.recommended?.name || 'first compiler'}`;
                         vscode.window.showInformationMessage(detectedMessage);
                     } else {

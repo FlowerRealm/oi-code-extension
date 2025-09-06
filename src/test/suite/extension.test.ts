@@ -488,9 +488,7 @@ int main() {
                 const compilersAvailableForTest = await areCompilersAvailable();
 
                 if (!compilersAvailableForTest) {
-                    console.log(
-                        `[PairCheck Test] Compilers not responding for ${lang}, skipping pair check tests`
-                    );
+                    console.log(`[PairCheck Test] Compilers not responding for ${lang}, skipping pair check tests`);
                     this.skip();
                     return;
                 }
@@ -503,12 +501,13 @@ int main() {
                         const input = inputs[i];
                         const expectedOutput = expectedOutputs[i];
 
-                        const testMessage = `\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`;
+                        const trimmedInput = input.trim();
+                        const testMessage =
+                            '\n[PairCheck Test] Testing ' +
+                            `${lang} with input: "${trimmedInput}" (expected: ${expectedOutput})`;
                         console.log(testMessage);
                         const inputBytes = [...input].map(c => c.charCodeAt(0)).join(',');
-                        console.log(
-                            `[PairCheck Test] Input length: ${input.length}, Input bytes: ${inputBytes}`
-                        );
+                        console.log(`[PairCheck Test] Input length: ${input.length}, Input bytes: ${inputBytes}`);
 
                         const res: any = await vscode.commands.executeCommand('oicode.runPairCheck', input);
                         console.log('[PairCheck Test] Result:', JSON.stringify(res, null, 2));
@@ -529,12 +528,10 @@ int main() {
                         assert.strictEqual(res.equal, true, `outputs should be equal for input=${input}`);
 
                         const actualOutput = res.output1.trim();
-                        const errorMessage = `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`;
-                        assert.strictEqual(
-                            actualOutput,
-                            expectedOutput,
-                            errorMessage
-                        );
+                        const errorMessage =
+                            `Expected output "${expectedOutput}" but got "${actualOutput}" ` +
+                            `for input "${input}" in ${lang}`;
+                        assert.strictEqual(actualOutput, expectedOutput, errorMessage);
 
                         console.log(
                             `[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}" → "${actualOutput}"`

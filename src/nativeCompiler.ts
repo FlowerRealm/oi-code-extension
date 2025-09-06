@@ -218,9 +218,7 @@ export class NativeCompilerManager {
             output.appendLine(`Detected ${compilers.length} 个编译器:`);
             compilers.forEach(compiler => {
                 const bitInfo = compiler.is64Bit ? '64-bit' : '32-bit';
-                output.appendLine(
-                    `  - ${compiler.name} (${compiler.type}) v${compiler.version} [${bitInfo}]`
-                );
+                output.appendLine(`  - ${compiler.name} (${compiler.type}) v${compiler.version} [${bitInfo}]`);
             });
 
             if (recommended) {
@@ -1068,11 +1066,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             async progress => {
                 progress.report({ message: 'Downloading and installing LLVM...' });
 
-                const powershellCommand = `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' -Verb RunAs -Wait`;
-                await this.executeCommand('powershell', [
-                    '-Command',
-                    powershellCommand
-                ]);
+                const powershellCommand =
+                    'Start-Process powershell ' +
+                    `-ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' ` +
+                    '-Verb RunAs -Wait';
+                await this.executeCommand('powershell', ['-Command', powershellCommand]);
             }
         );
 
@@ -1347,11 +1345,13 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
             if (majorVersion >= 20 && languageStandard === 'c++17') {
                 // Clang 20+ may have compatibility issues with c++17, downgrade to c++14
-                // This is a temporary workaround due to some changes in C++17 standard library implementation in Clang 20+
+                // This is a temporary workaround due to some changes in C++17 standard library
                 // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
                 // This temporary workaround ensures backward compatibility
                 this.getOutputChannel().appendLine(
-                    `[WARN] Forcing C++ standard to 'c++14' for Clang ${compiler.version} due to known compatibility issues with c++17. This can be overridden in settings.`
+                    "[WARN] Forcing C++ standard to 'c++14' for Clang " +
+                        `${compiler.version} due to known compatibility issues with c++17. ` +
+                        'This can be overridden in settings.'
                 );
                 languageStandard = 'c++14';
             }
@@ -1458,9 +1458,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 // If memory limit is set and on Unix system, use ulimit
                 if (options.memoryLimit && process.platform !== 'win32') {
                     const memoryKB = options.memoryLimit * 1024; // 转换为KB
-                    // The script first tries to set the limit. If it fails, the command will not be executed due to `&&`.
+                    // The script first tries to set the limit.
+                    // If it fails, the command will not be executed due to `&&`.
                     // This is safer than swallowing errors.
-                    const shellScript = `ulimit -v ${memoryKB} && ulimit -d ${memoryKB} && exec "$@"`;
+                    const shellScript = `ulimit -v ${memoryKB} && ulimit -d ${memoryKB} && ` + 'exec "$@"';
 
                     child = spawn('sh', ['-c', shellScript, 'sh', options.command, ...options.args], {
                         cwd: options.cwd,
@@ -1481,7 +1482,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         memoryCheckInterval = setInterval(async () => {
                             try {
                                 // Use wmic command to get process memory usage
-                                const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
+                                const memoryCheckCommand =
+                                    'wmic process where ProcessId=' + `${child.pid} get WorkingSetSize /value`;
 
                                 exec(memoryCheckCommand, (error: any, stdout: string) => {
                                     if (!error && stdout) {
@@ -1537,7 +1539,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                     // Check if terminated due to memory limit
                     if (process.platform !== 'win32' && options.memoryLimit) {
-                        // On Unix systems, if process is killed by SIGKILL and not timed out, it might be due to memory limit
+                        // On Unix systems, if process is killed by SIGKILL and not timed out,
                         if (signal === 'SIGKILL' && !timedOut) {
                             memoryExceeded = true;
                         }
