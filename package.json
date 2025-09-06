@@ -119,6 +119,11 @@
           "default": true,
           "description": "是否自动降级 Clang 20+ 的 C++17 标准到 C++14 以避免兼容性问题。设置为 false 可禁用此行为。"
         },
+        "oicode.compile.disableStackProtector": {
+          "type": "boolean",
+          "default": false,
+          "description": "在 Windows 上禁用堆栈保护器 (-fno-stack-protector)。这可能提供轻微的性能提升，但会降低安全性。仅在竞技编程环境中启用。"
+        },
         "oi-code.language.c.Command": {
           "type": "string",
           "description": "Path to the C compiler (e.g., /usr/bin/gcc)."

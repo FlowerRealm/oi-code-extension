@@ -4,20 +4,11 @@
  *-------------------------------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-// Interface definitions moved to nativeCompilerManager to avoid circular imports
-
-/**
- * LLVM installation result
- */
-export interface LLVMInstallResult {
-    success: boolean;
-    message: string;
-    installedPath?: string;
-    restartRequired?: boolean;
-    nextSteps?: string[];
-    suggestions?: string[];
-}
+import * as os from 'os';
+import * as https from 'https';
+import * as fs from 'fs';
 import { ProcessRunner } from './processRunner';
+import { LLVMInstallResult } from './types';
 
 /**
  * Handles automatic LLVM installation for different platforms
@@ -97,11 +88,12 @@ export class CompilerInstaller {
                 }
             }
 
-            // Download LLVM installer
-            output.appendLine('[CompilerInstaller] Downloading LLVM installer...');
-            const installerUrl =
-                'https://github.com/llvm/llvm-project/releases/download/' + 'llvmorg-16.0.0/LLVM-16.0.0-win64.exe';
-            const installerPath = `${require('os').tmpdir()}/LLVM-16.0.0-win64.exe`;
+            // Get latest LLVM version
+            output.appendLine('[CompilerInstaller] Getting latest LLVM version...');
+            const latestVersion = await this.getLatestLLVMVersion();
+            const baseUrl = 'https://github.com/llvm/llvm-project/releases/download';
+            const installerUrl = `${baseUrl}/llvmorg-${latestVersion}/LLVM-${latestVersion}-win64.exe`;
+            const installerPath = `${os.tmpdir()}/LLVM-${latestVersion}-win64.exe`;
 
             // Show download progress
             await vscode.window.withProgress(
@@ -112,8 +104,7 @@ export class CompilerInstaller {
                 },
                 async (progress, _token) => {
                     try {
-                        const https = require('https');
-                        const fs = require('fs');
+                        // Use imported https and fs modules
 
                         return new Promise<void>((resolve, reject) => {
                             const file = fs.createWriteStream(installerPath);
@@ -282,36 +273,36 @@ export class CompilerInstaller {
 
             output.appendLine(`[CompilerInstaller] Using package manager: ${packageManager}`);
 
-            // Show installation progress
-            await vscode.window.withProgress(
-                {
-                    location: vscode.ProgressLocation.Notification,
-                    title: `Installing LLVM with ${packageManager}...`,
-                    cancellable: false
-                },
-                async progress => {
-                    progress.report({ increment: 0, message: 'Updating package lists...' });
-
-                    const installResult = await ProcessRunner.executeWithTimeout({
-                        command: 'bash',
-                        args: ['-c', installCommand.join(' ')],
-                        timeout: 600000 // 10 minutes
-                    });
-
-                    if (installResult.exitCode === 0) {
-                        progress.report({ increment: 100, message: 'Installation completed!' });
-                    } else {
-                        throw new Error(`Installation failed with exit code: ${installResult.exitCode}`);
-                    }
-                }
+            // Instead of running sudo commands directly, show a dialog with the command
+            const command = installCommand.join(' ');
+            const choice = await vscode.window.showInformationMessage(
+                'To install LLVM, run this command in your terminal:',
+                { modal: true },
+                'Copy Command',
+                'Open Terminal',
+                'Cancel'
             );
 
-            output.appendLine('[CompilerInstaller] LLVM installation completed successfully');
+            if (choice === 'Copy Command') {
+                await vscode.env.clipboard.writeText(command);
+                await vscode.window.showInformationMessage(
+                    'Command copied to clipboard. Paste it in your terminal and run it.'
+                );
+            } else if (choice === 'Open Terminal') {
+                const terminal = vscode.window.createTerminal('LLVM Installation');
+                terminal.sendText(command);
+                terminal.show();
+            }
+
             return {
-                success: true,
-                message: `LLVM has been successfully installed using ${packageManager}.`,
-                installedPath: '/usr/bin',
-                nextSteps: ['Verify installation with: clang --version']
+                success: false,
+                message: `Please run the installation command manually: ${command}`,
+                restartRequired: true,
+                nextSteps: [
+                    'Run the command in your terminal',
+                    'After installation, restart VS Code',
+                    'Verify installation with: clang --version'
+                ]
             };
         } catch (error: any) {
             output.appendLine(`[CompilerInstaller] Linux installation failed: ${error.message}`);
@@ -454,5 +445,64 @@ Common installation methods:
             message: 'Please follow the installation guide in the opened document.',
             nextSteps: ['Follow the installation steps', 'Restart VS Code after installation']
         };
+    }
+
+    /**
+     * Get the latest stable LLVM version from GitHub API
+     */
+    private static async getLatestLLVMVersion(): Promise<string> {
+        try {
+            // Use imported https module
+
+            return new Promise<string>((resolve, reject) => {
+                const options = {
+                    hostname: 'api.github.com',
+                    path: '/repos/llvm/llvm-project/releases/latest',
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'OI-Code-VSCode-Extension',
+                        Accept: 'application/vnd.github.v3+json'
+                    }
+                };
+
+                const req = https.request(options, (res: any) => {
+                    let data = '';
+
+                    res.on('data', (chunk: any) => {
+                        data += chunk;
+                    });
+
+                    res.on('end', () => {
+                        if (res.statusCode === 200) {
+                            try {
+                                const release = JSON.parse(data);
+                                const tagName = release.tag_name;
+                                const version = tagName.replace('llvmorg-', '');
+                                resolve(version);
+                            } catch (error) {
+                                reject(new Error('Failed to parse GitHub API response'));
+                            }
+                        } else {
+                            reject(new Error(`GitHub API returned status ${res.statusCode}`));
+                        }
+                    });
+                });
+
+                req.on('error', (error: any) => {
+                    reject(error);
+                });
+
+                req.setTimeout(10000, () => {
+                    req.destroy();
+                    reject(new Error('GitHub API request timeout'));
+                });
+
+                req.end();
+            });
+        } catch (error) {
+            // Fallback to version 16.0.0 if API fails
+            console.warn('[CompilerInstaller] Failed to get latest LLVM version, using fallback:', error);
+            return '16.0.0';
+        }
     }
 }

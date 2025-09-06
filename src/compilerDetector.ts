@@ -6,31 +6,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-// Interface definitions moved to nativeCompilerManager to avoid circular imports
-
-/**
- * Compiler information interface
- */
-export interface CompilerInfo {
-    path: string;
-    name: string;
-    type: 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang';
-    version: string;
-    supportedStandards: string[];
-    is64Bit: boolean;
-    priority: number;
-}
-
-/**
- * Compiler detection result
- */
-export interface CompilerDetectionResult {
-    success: boolean;
-    compilers: CompilerInfo[];
-    recommended?: CompilerInfo;
-    error?: string;
-    suggestions: string[];
-}
+import { CompilerInfo, CompilerDetectionResult } from './types';
 
 import { ProcessRunner } from './processRunner';
 
@@ -109,7 +85,7 @@ export class CompilerDetector {
 
         // Search for common Windows compilers
         const searchPaths = [
-            process.env.PATH || '',
+            ...(process.env.PATH ? process.env.PATH.split(path.delimiter) : []),
             process.env['ProgramFiles'] || '',
             process.env['ProgramFiles(x86)'] || '',
             'C:\\LLVM\\bin',
@@ -211,11 +187,7 @@ export class CompilerDetector {
 
         // Look for Homebrew installations
         try {
-            const homebrewPaths = [
-                '/usr/local/bin',
-                '/opt/homebrew/bin',
-                '/opt/local/bin'
-            ];
+            const homebrewPaths = ['/usr/local/bin', '/opt/homebrew/bin', '/opt/local/bin'];
 
             for (const brewPath of homebrewPaths) {
                 if (await ProcessRunner.fileExists(brewPath)) {
@@ -274,13 +246,7 @@ export class CompilerDetector {
         }
 
         // Look for common Linux compiler paths
-        const commonPaths = [
-            '/usr/bin',
-            '/usr/local/bin',
-            '/opt/bin',
-            '/opt/local/bin',
-            '/bin'
-        ];
+        const commonPaths = ['/usr/bin', '/usr/local/bin', '/opt/bin', '/opt/local/bin', '/bin'];
 
         for (const searchPath of commonPaths) {
             if (await ProcessRunner.fileExists(searchPath)) {
@@ -443,15 +409,18 @@ export class CompilerDetector {
                 'vswhere.exe'
             );
 
-            if (!await ProcessRunner.fileExists(vswherePath)) {
+            if (!(await ProcessRunner.fileExists(vswherePath))) {
                 return compilers;
             }
 
             const result = await ProcessRunner.executeCommand(vswherePath, [
                 '-latest',
-                '-products', '*',
-                '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
-                '-property', 'installationPath'
+                '-products',
+                '*',
+                '-requires',
+                'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                '-property',
+                'installationPath'
             ]);
 
             const installPath = result.stdout.trim();
@@ -489,7 +458,7 @@ export class CompilerDetector {
             const result = await ProcessRunner.executeCommand('xcode-select', ['-p']);
             const xcodePath = result.stdout.trim();
 
-            if (xcodePath && await ProcessRunner.fileExists(xcodePath)) {
+            if (xcodePath && (await ProcessRunner.fileExists(xcodePath))) {
                 directories.push(
                     path.join(xcodePath, 'Toolchains', 'XcodeDefault.xctoolchain', 'usr', 'bin'),
                     path.join(xcodePath, 'usr', 'bin')
@@ -497,16 +466,20 @@ export class CompilerDetector {
             }
 
             // Look for Xcode installations
-            const xcodeApplications = [
-                '/Applications/Xcode.app',
-                '/Applications/Xcode-beta.app'
-            ];
+            const xcodeApplications = ['/Applications/Xcode.app', '/Applications/Xcode-beta.app'];
 
             for (const xcodeApp of xcodeApplications) {
                 if (await ProcessRunner.fileExists(xcodeApp)) {
                     directories.push(
-                        path.join(xcodeApp, 'Contents', 'Developer', 'Toolchains',
-                            'XcodeDefault.xctoolchain', 'usr', 'bin'),
+                        path.join(
+                            xcodeApp,
+                            'Contents',
+                            'Developer',
+                            'Toolchains',
+                            'XcodeDefault.xctoolchain',
+                            'usr',
+                            'bin'
+                        ),
                         path.join(xcodeApp, 'Contents', 'Developer', 'usr', 'bin')
                     );
                 }
@@ -526,11 +499,7 @@ export class CompilerDetector {
 
         try {
             // Look for version-specific LLVM installations
-            const commonPrefixes = [
-                '/usr/lib/llvm-',
-                '/opt/llvm-',
-                '/usr/local/llvm-'
-            ];
+            const commonPrefixes = ['/usr/lib/llvm-', '/opt/llvm-', '/usr/local/llvm-'];
 
             for (const prefix of commonPrefixes) {
                 const parentDir = path.dirname(prefix);
@@ -561,16 +530,12 @@ export class CompilerDetector {
 
         try {
             // Look for version-specific GCC installations
-            const gccPatterns = [
-                '/usr/bin/gcc-*',
-                '/usr/bin/g++-*',
-                '/usr/local/bin/gcc-*',
-                '/usr/local/bin/g++-*'
-            ];
+            const gccPatterns = ['/usr/bin/gcc-*', '/usr/bin/g++-*', '/usr/local/bin/gcc-*', '/usr/local/bin/g++-*'];
 
             for (const pattern of gccPatterns) {
-                const result = await ProcessRunner.executeCommand('find',
-                    ['/usr/bin', '-name', path.basename(pattern)]);
+                const searchDir = path.dirname(pattern);
+                const baseName = path.basename(pattern);
+                const result = await ProcessRunner.executeCommand('find', [searchDir, '-name', baseName]);
                 const lines = result.stdout.split('\n').filter(line => line.trim());
                 directories.push(...lines.map(line => path.dirname(line)));
             }
@@ -664,12 +629,7 @@ export class CompilerDetector {
      * Parse version from version output
      */
     private static parseVersion(versionOutput: string): string {
-        const patterns = [
-            /(\d+\.\d+\.\d+)/,
-            /version (\d+\.\d+\.\d+)/,
-            /(\d+\.\d+)/,
-            /version (\d+\.\d+)/
-        ];
+        const patterns = [/(\d+\.\d+\.\d+)/, /version (\d+\.\d+\.\d+)/, /(\d+\.\d+)/, /version (\d+\.\d+)/];
 
         for (const pattern of patterns) {
             const match = versionOutput.match(pattern);
@@ -723,12 +683,12 @@ export class CompilerDetector {
 
         // Type-based priority
         const typePriority: { [key: string]: number } = {
-            'clang': 100,
+            clang: 100,
             'clang++': 100,
             'apple-clang': 90,
-            'gcc': 80,
+            gcc: 80,
             'g++': 80,
-            'msvc': 70
+            msvc: 70
         };
 
         priority += typePriority[type] || 0;
@@ -740,7 +700,7 @@ export class CompilerDetector {
         }
 
         // Path-based priority (system paths get lower priority)
-        if (path.includes('/usr/bin') || path.includes('C:\\Windows')) {
+        if (_path.includes('/usr/bin') || _path.includes('C:\\Windows')) {
             priority -= 20;
         }
 

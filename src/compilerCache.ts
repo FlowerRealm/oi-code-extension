@@ -4,20 +4,7 @@
  *-------------------------------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-// Interface definitions moved to nativeCompilerManager to avoid circular imports
-
-/**
- * Compiler detection result
- */
-export interface CompilerDetectionResult {
-    success: boolean;
-    compilers: any[];
-    recommended?: any;
-    error?: string;
-    suggestions: string[];
-    cacheVersion?: string;
-    cachedAt?: number;
-}
+import { CompilerDetectionResult } from './types';
 
 /**
  * Manages caching of detected compilers

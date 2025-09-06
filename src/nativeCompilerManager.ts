@@ -7,42 +7,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-// Interface definitions moved here to avoid circular imports
-
-/**
- * Compiler information interface
- */
-export interface CompilerInfo {
-    path: string;
-    name: string;
-    type: 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang';
-    version: string;
-    supportedStandards: string[];
-    is64Bit: boolean;
-    priority: number;
-}
-
-/**
- * Compiler detection result
- */
-export interface CompilerDetectionResult {
-    success: boolean;
-    compilers: CompilerInfo[];
-    recommended?: CompilerInfo;
-    error?: string;
-    suggestions: string[];
-}
-
-/**
- * LLVM installation result
- */
-export interface LLVMInstallResult {
-    success: boolean;
-    message: string;
-    installedPath?: string;
-    restartRequired?: boolean;
-    nextSteps?: string[];
-}
+import { CompilerInfo, CompilerDetectionResult, LLVMInstallResult } from './types';
 
 import { CompilerCache } from './compilerCache';
 import { CompilerDetector } from './compilerDetector';
@@ -98,8 +63,8 @@ export class NativeCompilerManager {
     public static filterSuitableCompilers(languageId: 'c' | 'cpp', compilers: CompilerInfo[]): CompilerInfo[] {
         return compilers.filter(c =>
             languageId === 'c'
-                ? (c.type === 'clang' || c.type === 'gcc' || c.type === 'msvc' || c.type === 'apple-clang')
-                : (c.type === 'clang++' || c.type === 'g++' || c.type === 'msvc' || c.type === 'apple-clang')
+                ? c.type === 'clang' || c.type === 'gcc' || c.type === 'msvc' || c.type === 'apple-clang'
+                : c.type === 'clang++' || c.type === 'g++' || c.type === 'msvc' || c.type === 'apple-clang'
         );
     }
 
@@ -193,8 +158,10 @@ export class NativeCompilerManager {
             const tempDir = path.join(os.tmpdir(), 'oi-code');
             await fs.mkdir(tempDir, { recursive: true });
             const executableName = path.basename(sourcePath, path.extname(sourcePath));
-            const executablePath = path.join(tempDir,
-                `${executableName}-${Date.now()}${process.platform === 'win32' ? '.exe' : ''}`);
+            const executablePath = path.join(
+                tempDir,
+                `${executableName}-${Date.now()}${process.platform === 'win32' ? '.exe' : ''}`
+            );
 
             // Get compiler arguments
             const compilerArgs = this.getCompilerArgs(compiler, language, executablePath, optimizationLevel, standard);
@@ -320,7 +287,11 @@ export class NativeCompilerManager {
 
             // Platform-specific flags
             if (process.platform === 'win32') {
-                args.push('-fno-stack-protector');
+                const config = vscode.workspace.getConfiguration('oicode.compile');
+                const disableStackProtector = config.get<boolean>('disableStackProtector', false);
+                if (disableStackProtector) {
+                    args.push('-fno-stack-protector');
+                }
             }
         }
 
@@ -333,11 +304,7 @@ export class NativeCompilerManager {
     /**
      * Apply compiler-specific workarounds
      */
-    private static applyCompilerWorkarounds(
-        compiler: CompilerInfo,
-        language: 'c' | 'cpp',
-        args: string[]
-    ): string[] {
+    private static applyCompilerWorkarounds(compiler: CompilerInfo, language: 'c' | 'cpp', args: string[]): string[] {
         const config = vscode.workspace.getConfiguration('oicode.compile');
 
         // Handle Clang 20+ C++17 compatibility issue

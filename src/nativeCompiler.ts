@@ -4,30 +4,16 @@
  *-------------------------------------------------------------------------------------------- */
 
 // Re-export interfaces and the new modular NativeCompilerManager
-export {
-    CompilerInfo,
-    CompilerDetectionResult,
-    LLVMInstallResult,
-    CompilationOptions,
-    CompilationResult,
-    NativeCompilerManager
-} from './nativeCompilerManager';
+export { CompilationOptions, CompilationResult, NativeCompilerManager } from './nativeCompilerManager';
+
+// Re-export types from types.ts
+export { CompilerInfo, CompilerDetectionResult, LLVMInstallResult } from './types';
 
 // Re-export individual components for advanced usage
-export {
-    CompilerCache
-} from './compilerCache';
+export { CompilerCache } from './compilerCache';
 
-export {
-    CompilerDetector
-} from './compilerDetector';
+export { CompilerDetector } from './compilerDetector';
 
-export {
-    CompilerInstaller
-} from './compilerInstaller';
+export { CompilerInstaller } from './compilerInstaller';
 
-export {
-    ProcessRunner,
-    ProcessExecutionOptions,
-    ProcessExecutionResult
-} from './processRunner';
+export { ProcessRunner, ProcessExecutionOptions, ProcessExecutionResult } from './processRunner';

@@ -7,7 +7,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as Diff from 'diff';
-import { NativeCompilerManager, CompilerInfo } from './nativeCompiler';
+import { NativeCompilerManager } from './nativeCompiler';
+import { CompilerInfo } from './types';
 import {
     DEFAULT_MEMORY_LIMIT,
     DEFAULT_PAIR_CHECK_TIME_LIMIT,
@@ -764,7 +765,7 @@ export function activate(context: vscode.ExtensionContext) {
                         return vscode.window.showErrorMessage('Please open a file to run.');
                     }
                     const document = editor.document;
-                    const languageId = document.languageId as 'c' | 'cpp';
+                    const languageId = getLanguageIdFromEditor(editor);
                     const sourceFile = path.basename(document.fileName);
                     let input: string | undefined;
                     if (testInput !== undefined) {
@@ -950,6 +951,17 @@ export function activate(context: vscode.ExtensionContext) {
                             const installResult = await NativeCompilerManager.installLLVM();
                             if (installResult.success) {
                                 vscode.window.showInformationMessage(installResult.message);
+                                if (installResult.restartRequired) {
+                                    const restartChoice = await vscode.window.showInformationMessage(
+                                        'Compiler installation completed. Restart VS Code to detect the new compiler.',
+                                        { modal: true },
+                                        'Restart Now',
+                                        'Restart Later'
+                                    );
+                                    if (restartChoice === 'Restart Now') {
+                                        vscode.commands.executeCommand('workbench.action.reloadWindow');
+                                    }
+                                }
                             } else {
                                 vscode.window
                                     .showErrorMessage(installResult.message, 'View Details')
