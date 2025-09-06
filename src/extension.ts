@@ -792,6 +792,29 @@ export function activate(context: vscode.ExtensionContext) {
                         async progress => {
                             progress.report({ increment: 0, message: 'Detecting compilers...' });
                             try {
+                                const config = vscode.workspace.getConfiguration('oicode');
+                                const optimizationLevel = config.get<string>('compile.opt');
+                                let standard = config.get<string>('compile.std');
+
+                                // Adjust standard based on language type
+                                if (standard && standard.startsWith('c++') && languageId === 'c') {
+                                    // Convert C++ standard to C standard
+                                    const cppVersion = standard.replace('c++', '');
+                                    if (cppVersion === '17' || cppVersion === '14' || cppVersion === '11') {
+                                        standard = `c${cppVersion}`;
+                                    } else {
+                                        standard = 'c11'; // fallback
+                                    }
+                                } else if (standard && standard.startsWith('c') && languageId === 'cpp') {
+                                    // Convert C standard to C++ standard
+                                    const cVersion = standard.replace('c', '');
+                                    if (cVersion === '11' || cVersion === '14' || cVersion === '17') {
+                                        standard = `c++${cVersion}`;
+                                    } else {
+                                        standard = 'c++17'; // fallback
+                                    }
+                                }
+
                                 // Use public function to get suitable compiler
                                 const compiler = await getSuitableCompiler(context, languageId);
                                 progress.report({ increment: 50, message: `Compiling with ${compiler.type}...` });
@@ -803,7 +826,9 @@ export function activate(context: vscode.ExtensionContext) {
                                     compiler: compiler,
                                     input: input || '',
                                     timeLimit,
-                                    memoryLimit
+                                    memoryLimit,
+                                    optimizationLevel,
+                                    standard
                                 });
 
                                 progress.report({ increment: 100 });

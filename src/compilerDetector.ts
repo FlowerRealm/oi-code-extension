@@ -569,7 +569,13 @@ export class CompilerDetector {
         for (const searchDir of searchDirectories) {
             if (await ProcessRunner.fileExists(searchDir)) {
                 try {
-                    const result = await ProcessRunner.executeCommand('find', [searchDir, '-name', compilerNames[0]]);
+                    let result;
+                    if (process.platform === 'win32') {
+                        // Using 'where' on Windows. Note: This can be slow on large drives.
+                        result = await ProcessRunner.executeCommand('where', ['/r', searchDir, compilerNames[0]]);
+                    } else {
+                        result = await ProcessRunner.executeCommand('find', [searchDir, '-name', compilerNames[0]]);
+                    }
                     const lines = result.stdout.split('\n').filter(line => line.trim());
                     foundCompilers.push(...lines);
                 } catch (error) {

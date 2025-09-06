@@ -176,7 +176,7 @@ export class CompilerInstaller {
             if (homebrewCheck.exitCode !== 0) {
                 output.appendLine('[CompilerInstaller] Homebrew not found, installing Homebrew first...');
 
-                // Install Homebrew
+                // Install Homebrew automatically
                 const homebrewResult = await ProcessRunner.executeWithTimeout({
                     command: '/bin/bash',
                     args: ['-c', '$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)'],

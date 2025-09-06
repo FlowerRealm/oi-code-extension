@@ -7,6 +7,118 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
+
+/**
+ * Allowed safe commands for execution
+ */
+const ALLOWED_COMMANDS = new Set([
+    // Compilers
+    'clang',
+    'clang++',
+    'gcc',
+    'g++',
+    'cc',
+    'c++',
+    // System utilities
+    'which',
+    'where',
+    'find',
+    'ps',
+    'df',
+    'wmic',
+    // Package managers
+    'apt',
+    'apt-get',
+    'dnf',
+    'yum',
+    'pacman',
+    'zypper',
+    'brew',
+    // Build tools
+    'make',
+    'cmake',
+    'ninja',
+    // Windows specific
+    'vswhere',
+    'cmd',
+    'powershell',
+    // macOS specific
+    'xcode-select',
+    // Shell for testing
+    'sh',
+    'bash',
+    'zsh'
+]);
+
+/**
+ * Sanitizes a command argument to prevent command injection
+ */
+function sanitizeArgument(arg: string): string {
+    // Remove potentially dangerous characters
+    return (
+        arg
+            .replace(/[;&|`$(){}<>]/g, '') // Remove shell metacharacters
+            // eslint-disable-next-line no-control-regex
+            .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+            .trim()
+    );
+}
+
+/**
+ * Validates if a command is safe to execute
+ */
+function validateCommand(command: string): boolean {
+    const baseCommand = path.basename(command).toLowerCase();
+
+    // Check if it's an allowed command
+    if (ALLOWED_COMMANDS.has(baseCommand)) {
+        return true;
+    }
+
+    // Check if it's an absolute path to an executable (like installer)
+    if (path.isAbsolute(command)) {
+        // For absolute paths, we need to validate the extension
+        const ext = path.extname(command).toLowerCase();
+        const allowedExts = ['.exe', '.msi', '.bat', '.cmd', '.ps1', '.sh', '.dmg', '.pkg'];
+
+        // Check for safe path patterns
+        const normalizedPath = path.normalize(command);
+        const safePaths = [
+            process.env.TEMP,
+            process.env.TMP,
+            '/tmp',
+            '/var/tmp',
+            os.tmpdir(),
+            '/tmp/oi-code', // Test directory
+            `${os.tmpdir()}/oi-code` // Test directory on other platforms
+        ].filter(Boolean);
+
+        // Check if the path is in a safe directory
+        const isInSafeDir = safePaths.some(safePath => safePath && normalizedPath.startsWith(path.normalize(safePath)));
+
+        // Allow files with allowed extensions OR files without extensions in safe directories
+        // (for compiled executables in test directories)
+        const hasAllowedExt = allowedExts.includes(ext);
+        const hasNoExt = ext === '';
+
+        return (hasAllowedExt || (hasNoExt && isInSafeDir)) && isInSafeDir;
+    }
+
+    return false;
+}
+
+/**
+ * Validates and sanitizes command arguments
+ */
+function validateAndSanitizeArgs(args: string[]): string[] {
+    return args.map(arg => {
+        if (typeof arg !== 'string') {
+            throw new Error(`Invalid argument type: ${typeof arg}`);
+        }
+        return sanitizeArgument(arg);
+    });
+}
 
 /**
  * Execution options for process runner
@@ -43,6 +155,17 @@ export class ProcessRunner {
     public static async executeWithTimeout(options: ProcessExecutionOptions): Promise<ProcessExecutionResult> {
         const { command, args, cwd = process.cwd(), timeout = 30000, memoryLimit, input = '', outputChannel } = options;
 
+        // Validate and sanitize inputs
+        if (!command || typeof command !== 'string') {
+            throw new Error('Invalid command: command must be a non-empty string');
+        }
+
+        if (!validateCommand(command)) {
+            throw new Error(`Command not allowed for security reasons: ${command}`);
+        }
+
+        const sanitizedArgs = validateAndSanitizeArgs(args || []);
+
         return new Promise(resolve => {
             let stdout = '';
             let stderr = '';
@@ -61,9 +184,9 @@ export class ProcessRunner {
                     }, timeout)
                     : undefined;
 
-            // Memory monitoring for Linux/macOS
+            // Memory monitoring for all platforms
             let memoryMonitorInterval: NodeJS.Timeout | undefined;
-            if (memoryLimit && (process.platform === 'linux' || process.platform === 'darwin')) {
+            if (memoryLimit) {
                 memoryMonitorInterval = setInterval(async () => {
                     if (!killed) {
                         try {
@@ -87,7 +210,7 @@ export class ProcessRunner {
                 }, 100);
             }
 
-            const child = spawn(command, args, {
+            const child = spawn(command, sanitizedArgs, {
                 cwd,
                 stdio: ['pipe', 'pipe', 'pipe'],
                 env: { ...process.env },
@@ -164,6 +287,15 @@ export class ProcessRunner {
         cwd?: string,
         outputChannel?: vscode.OutputChannel
     ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+        // Validate inputs
+        if (!command || typeof command !== 'string') {
+            throw new Error('Invalid command: command must be a non-empty string');
+        }
+
+        if (!Array.isArray(args)) {
+            throw new Error('Invalid args: args must be an array');
+        }
+
         const result = await this.executeWithTimeout({
             command,
             args,
@@ -237,6 +369,13 @@ export class ProcessRunner {
                 const output = execSync(command, { encoding: 'utf-8' }).trim();
                 const rss = parseInt(output);
                 return rss / 1024;
+            } else if (process.platform === 'win32') {
+                // Use PowerShell to get memory usage on Windows
+                const { execSync } = require('child_process');
+                const command = `powershell "Get-Process -Id ${pid} | Select-Object -ExpandProperty WorkingSet"`;
+                const output = execSync(command, { encoding: 'utf-8' }).trim();
+                const workingSetBytes = parseInt(output);
+                return workingSetBytes / (1024 * 1024);
             }
             return 0;
         } catch (error) {
