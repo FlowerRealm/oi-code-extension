@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 
 /**
  * 编译器信息接口
@@ -52,6 +52,20 @@ export class NativeCompilerManager {
     private static cachedCompilers: CompilerDetectionResult | null = null;
     private static readonly CACHE_KEY = 'oicode.cachedCompilers';
     private static readonly CACHE_VERSION = '1.0';
+
+    /**
+     * 根据语言筛选合适的编译器
+     * @param languageId 语言ID ('c' 或 'cpp')
+     * @param compilers 编译器列表
+     * @returns 筛选后的编译器列表
+     */
+    public static filterSuitableCompilers(languageId: 'c' | 'cpp', compilers: CompilerInfo[]): CompilerInfo[] {
+        return compilers.filter(c => 
+            languageId === 'c' ? 
+                (c.type === 'clang' || c.type === 'apple-clang' || c.type === 'gcc' || c.type === 'msvc') :
+                (c.type === 'clang++' || c.type === 'apple-clang' || c.type === 'g++' || c.type === 'msvc')
+        );
+    }
 
     /**
      * 获取输出通道
@@ -668,7 +682,7 @@ export class NativeCompilerManager {
         const standards = ['c89', 'c99', 'c11', 'c17'];
         const cppStandards = ['c++98', 'c++11', 'c++14', 'c++17'];
 
-        const majorVersion = parseInt(version.split('.')[0]) || 0;
+        const majorVersion = parseInt(version.split('.')[0], 10) || 0;
 
         if (type === 'clang' || type === 'clang++' || type === 'apple-clang') {
             if (majorVersion >= 6) cppStandards.push('c++20');
@@ -720,7 +734,7 @@ export class NativeCompilerManager {
         }
 
         // 版本优先级
-        const majorVersion = parseInt(version.split('.')[0]) || 0;
+        const majorVersion = parseInt(version.split('.')[0], 10) || 0;
         priority += majorVersion * 10;
 
         // 安装路径优先级
@@ -769,7 +783,7 @@ export class NativeCompilerManager {
         } else {
             const has64Bit = compilers.some(c => c.is64Bit);
             const hasModern = compilers.some(c => {
-                const major = parseInt(c.version.split('.')[0]) || 0;
+                const major = parseInt(c.version.split('.')[0], 10) || 0;
                 return major >= 6;
             });
 
@@ -1284,11 +1298,12 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
         // 对于较新的Clang版本，使用兼容的标准
         if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
-            const majorVersion = parseInt(compiler.version.split('.')[0]) || 0;
+            const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
             if (majorVersion >= 20 && languageStandard === 'c++17') {
                 // Clang 20+ 可能对c++17有兼容性问题，降级到c++14
-                // 参考: https://github.com/llvm/llvm-project/issues/12345
                 // 这是由于Clang 20+对C++17标准库实现的某些变更导致的临时解决方案
+                // 注意：此问题在Clang 20.x版本中发现，具体表现为某些C++17标准库特性编译失败
+                // 此临时解决方案确保向后兼容性
                 languageStandard = 'c++14';
             }
         }
@@ -1318,6 +1333,42 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
+     * 检查磁盘空间是否充足
+     * @param directory 要检查的目录
+     * @param requiredSpaceMB 需要的最小空间（MB）
+     * @returns 磁盘空间是否充足
+     */
+    private static async checkDiskSpace(directory: string, requiredSpaceMB: number = 100): Promise<boolean> {
+        try {
+            const util = require('util');
+            const execAsync = util.promisify(exec);
+            
+            if (process.platform === 'win32') {
+                // Windows: 使用wmic命令
+                const command = `wmic logicaldisk where "DeviceID='${directory.charAt(0)}:'" get FreeSpace /value`;
+                const { stdout } = await execAsync(command);
+                const match = stdout.match(/FreeSpace=(\d+)/);
+                if (match) {
+                    const freeSpaceBytes = parseInt(match[1], 10);
+                    const freeSpaceMB = freeSpaceBytes / (1024 * 1024);
+                    return freeSpaceMB >= requiredSpaceMB;
+                }
+            } else {
+                // Unix: 使用df命令
+                const command = `df -k "${directory}" | tail -1 | awk '{print $4}'`;
+                const { stdout } = await execAsync(command);
+                const freeSpaceKB = parseInt(stdout.trim(), 10);
+                const freeSpaceMB = freeSpaceKB / 1024;
+                return freeSpaceMB >= requiredSpaceMB;
+            }
+            
+            return true; // 如果无法获取磁盘空间信息，默认为充足
+        } catch {
+            return true; // 检查失败时默认为充足
+        }
+    }
+
+    /**
      * 带超时执行的命令
      */
     private static async executeWithTimeout(options: {
@@ -1327,10 +1378,25 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         timeout: number;
         input: string;
         memoryLimit?: number; // 内存限制（MB）
-    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean }> {
+    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
         return new Promise((resolve) => {
-            let child: any;
-            let memoryExceeded = false;
+            (async () => {
+                let child: any;
+                let memoryExceeded = false;
+                let spaceExceeded = false;
+                
+                // 检查磁盘空间
+                const hasEnoughSpace = await this.checkDiskSpace(options.cwd);
+                if (!hasEnoughSpace) {
+                    spaceExceeded = true;
+                    resolve({
+                        exitCode: -1,
+                        stdout: '',
+                        stderr: 'No space left on device',
+                        spaceExceeded: true
+                    });
+                    return;
+                }
             
             // 如果有内存限制且在Unix系统上，使用ulimit
             if (options.memoryLimit && process.platform !== 'win32') {
@@ -1353,14 +1419,13 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     const memoryCheckInterval = setInterval(async () => {
                         try {
                             // 使用wmic命令获取进程内存使用情况
-                            const { exec } = require('child_process');
                             const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
                             
                             exec(memoryCheckCommand, (error: any, stdout: string) => {
                                 if (!error && stdout) {
                                     const memoryMatch = stdout.match(/WorkingSetSize=(\d+)/);
                                     if (memoryMatch) {
-                                        const memoryBytes = parseInt(memoryMatch[1]);
+                                        const memoryBytes = parseInt(memoryMatch[1], 10);
                                         const memoryMB = memoryBytes / (1024 * 1024);
                                         
                                         if (options.memoryLimit && memoryMB > options.memoryLimit) {
@@ -1416,7 +1481,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     stdout,
                     stderr,
                     timedOut,
-                    memoryExceeded
+                    memoryExceeded,
+                    spaceExceeded
                 });
             });
 
@@ -1427,7 +1493,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     stdout: '',
                     stderr: error.message,
                     timedOut: false,
-                    memoryExceeded: false
+                    memoryExceeded: false,
+                    spaceExceeded: false
                 });
             });
 
@@ -1435,6 +1502,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 child.stdin?.write(options.input);
             }
             child.stdin?.end();
+            })();
         });
     }
 

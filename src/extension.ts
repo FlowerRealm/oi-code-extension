@@ -116,10 +116,7 @@ async function runPairWithNativeCompilers(
     }
 
     // Select the best compiler for the language
-    const suitableCompilers = compilerResult.compilers.filter(c => 
-        languageId === 'c' ? (c.type === 'clang' || c.type === 'apple-clang' || c.type === 'gcc' || c.type === 'msvc') :
-        (c.type === 'clang++' || c.type === 'apple-clang' || c.type === 'g++' || c.type === 'msvc')
-    );
+    const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
     
     if (suitableCompilers.length === 0) {
         throw new Error(`No suitable compiler found for ${languageId}`);
@@ -627,10 +624,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
 
                     // Select the best compiler for the language
-                    const suitableCompilers = compilerResult.compilers.filter(c => 
-                        languageId === 'c' ? (c.type === 'clang' || c.type === 'apple-clang' || c.type === 'gcc' || c.type === 'msvc') :
-                        (c.type === 'clang++' || c.type === 'apple-clang' || c.type === 'g++' || c.type === 'msvc')
-                    );
+                    const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
                     
                     if (suitableCompilers.length === 0) {
                         throw new Error(`No suitable compiler found for ${languageId}`);
