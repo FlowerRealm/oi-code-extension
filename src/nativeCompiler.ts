@@ -1529,7 +1529,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                             try {
                                 // Use PowerShell for more reliable and faster memory queries
                                 const memoryCheckCommand =
-                                    `powershell -Command "(Get-Process -Id ${child.pid}).WorkingSet"`;
+                                    'powershell -Command "' + `(Get-Process -Id ${child.pid}).WorkingSet"`;
                                 exec(memoryCheckCommand, { timeout: 150 }, (error, stdout) => {
                                     if (terminated || child.killed || error) {
                                         if (!terminated && !child.killed) {
@@ -1544,7 +1544,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                                         child.kill('SIGKILL');
                                     } else {
                                         // Adaptive polling
-                                        currentCheckInterval = (memoryBytes / memoryLimitBytes > 0.8) ? 50 : 200;
+                                        currentCheckInterval = memoryBytes / memoryLimitBytes > 0.8 ? 50 : 200;
                                         if (!terminated && !child.killed) {
                                             memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
                                         }
