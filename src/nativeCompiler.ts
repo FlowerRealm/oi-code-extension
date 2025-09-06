@@ -216,7 +216,7 @@ export class NativeCompilerManager {
             // Generate suggestions
             const suggestions = this.generateSuggestions(compilers);
 
-            output.appendLine(`Detected ${compilers.length} 个编译器:`);
+            output.appendLine(`Detected ${compilers.length} compilers:`);
             compilers.forEach(compiler => {
                 const bitInfo = compiler.is64Bit ? '64-bit' : '32-bit';
                 output.appendLine(`  - ${compiler.name} (${compiler.type}) v${compiler.version} [${bitInfo}]`);
@@ -465,7 +465,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 3. 搜索LLVM版本化安装
+        // 3. Search for versioned LLVM installations
         const llvmVersions = await this.findLLVMVersionInstallations();
         for (const dir of llvmVersions) {
             const dirCompilers = await this.searchCompilersInDirectory(dir, ['clang', 'clang++']);
@@ -480,7 +480,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 4. 搜索GCC版本化安装
+        // 4. Search for versioned GCC installations
         const gccVersions = await this.findGCCVersionInstallations();
         for (const dir of gccVersions) {
             const dirCompilers = await this.searchCompilersInDirectory(dir, ['gcc', 'g++']);
@@ -495,7 +495,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 5. 如果没有找到编译器，扫描整个系统（仅在明确请求时）
+        // 5. If no compilers found, scan entire system (only when explicitly requested)
         if (performDeepScan && compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers(['clang', 'clang++', 'gcc', 'g++']);
             for (const compiler of systemCompilers) {
@@ -836,10 +836,10 @@ export class NativeCompilerManager {
             { modal: true },
             'Automatic Installation (Recommended)',
             'Show Installation Guide',
-            '跳过'
+            'Skip'
         );
 
-        if (!choice || choice === '跳过') {
+        if (!choice || choice === 'Skip') {
             return {
                 success: false,
                 message: 'User skipped LLVM installation',
@@ -872,10 +872,10 @@ export class NativeCompilerManager {
             guide = `# Windows LLVM Installation Guide
 
 ## Method 1: Official Installer (Recommended)
-1. 访问 https://releases.llvm.org/download.html
-2. 下载最新的LLVM二进制文件 (LLVM-X.Y.Z-win64.exe)
-3. 运行安装程序，使用默认设置
-4. 安装完成后重启VS Code
+1. Visit https://releases.llvm.org/download.html
+2. Download latest LLVM binary (LLVM-X.Y.Z-win64.exe)
+3. Run installer with default settings
+4. Restart VS Code after installation
 
 ## Method 2: Package Manager
 Using Chocolatey (requires administrator privileges):
@@ -884,9 +884,9 @@ choco install llvm
 \`\`\`
 
 ## Method 3: Manual Configuration
-1. 下载LLVM并解压到 C:\\LLVM
-2. 添加 C:\\LLVM\\bin 到系统PATH环境变量
-3. 重启VS Code
+1. Download LLVM and extract to C:\\LLVM
+2. Add C:\\LLVM\\bin to system PATH environment variable
+3. Restart VS Code
 
 ## Verify Installation
 Run in command line:
@@ -908,12 +908,12 @@ xcode-select --install
 \`\`\`
 
 ## Method 3: Official Installer
-1. 访问 https://releases.llvm.org/download.html
-2. 下载macOS版本的LLVM
-3. 按照说明进行安装
+1. Visit https://releases.llvm.org/download.html
+2. Download macOS version of LLVM
+3. Follow the installation instructions
 
-## 验证安装
-在终端中运行:
+## Verify Installation
+Run in terminal:
 \`\`\`bash
 clang --version
 clang++ --version
@@ -938,12 +938,12 @@ sudo pacman -S clang lldb
 \`\`\`
 
 ## Universal Binaries
-1. 访问 https://releases.llvm.org/download.html
-2. 下载对应发行版的预编译二进制文件
-3. 解压并添加到PATH
+1. Visit https://releases.llvm.org/download.html
+2. Download precompiled binaries for your distribution
+3. Extract and add to PATH
 
-## 验证安装
-在终端中运行:
+## Verify Installation
+Run in terminal:
 \`\`\`bash
 clang --version
 clang++ --version
@@ -1113,7 +1113,11 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
             success: true,
             message: 'LLVM installer started',
             restartRequired: true,
-            nextSteps: ['Please complete LLVM installation wizard', '重启VS Code', '运行编译器检测验证安装']
+            nextSteps: [
+                'Please complete LLVM installation wizard',
+                'Restart VS Code',
+                'Run compiler detection to verify installation'
+            ]
         };
     }
 
@@ -1156,7 +1160,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
             success: true,
             message: 'LLVM installation completed',
             restartRequired: true,
-            nextSteps: ['重启VS Code', '运行编译器检测验证安装']
+            nextSteps: ['Restart VS Code', 'Run compiler detection to verify installation']
         };
     }
 
@@ -1220,7 +1224,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
         return {
             success: true,
             message: 'LLVM installation completed',
-            nextSteps: ['重启VS Code', '运行编译器检测验证安装']
+            nextSteps: ['Restart VS Code', 'Run compiler detection to verify installation']
         };
     }
 
@@ -1504,7 +1508,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
 
                 // If memory limit is set and on Unix system, use ulimit
                 if (options.memoryLimit && process.platform !== 'win32') {
-                    const memoryKB = options.memoryLimit * 1024; // 转换为KB
+                    const memoryKB = options.memoryLimit * 1024; // Convert to KB
                     // The script first tries to set the limit.
                     // If it fails, the command will not be executed due to `&&`.
                     // This is safer than swallowing errors.
@@ -1645,7 +1649,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                 child.on('error', (error: Error) => {
                     clearTimeout(timeout);
                     terminated = true; // Set flag to prevent race conditions
-                    // 清理内存检查定时器
+                    // Clean up memory check timer
                     if (memoryCheckInterval) {
                         clearInterval(memoryCheckInterval);
                         memoryCheckInterval = null;
@@ -1669,7 +1673,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
     }
 
     /**
-     * 执行命令
+     * Execute command
      */
     private static async executeCommand(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
         return new Promise((resolve, reject) => {
@@ -1884,7 +1888,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                     }
                 }
             } catch {
-                // 忽略find命令错误
+                // Ignore find command errors
             }
         } catch {
             // Ignore LLVM search errors
@@ -1954,7 +1958,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                     }
                 }
             } catch {
-                // 忽略find命令错误
+                // Ignore find command errors
             }
         } catch {
             // Ignore GCC search errors
