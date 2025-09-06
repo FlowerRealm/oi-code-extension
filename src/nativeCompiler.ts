@@ -10,7 +10,7 @@ import * as os from 'os';
 import { spawn, exec } from 'child_process';
 
 /**
- * 编译器信息接口
+ * Compiler information interface
  */
 export interface CompilerInfo {
     path: string;
@@ -23,7 +23,7 @@ export interface CompilerInfo {
 }
 
 /**
- * 编译检测结果
+ * Compiler detection result
  */
 export interface CompilerDetectionResult {
     success: boolean;
@@ -34,7 +34,7 @@ export interface CompilerDetectionResult {
 }
 
 /**
- * LLVM安装结果
+ * LLVM installation result
  */
 export interface LLVMInstallResult {
     success: boolean;
@@ -45,7 +45,7 @@ export interface LLVMInstallResult {
 }
 
 /**
- * 本地编译执行引擎
+ * Native compilation execution engine
  */
 export class NativeCompilerManager {
     private static outputChannel: vscode.OutputChannel | null = null;
@@ -54,10 +54,10 @@ export class NativeCompilerManager {
     private static readonly CACHE_VERSION = '1.0';
 
     /**
-     * 根据语言筛选合适的编译器
-     * @param languageId 语言ID ('c' 或 'cpp')
-     * @param compilers 编译器列表
-     * @returns 筛选后的编译器列表
+     * Filter suitable compilers based on language
+     * @param languageId Language ID ('c' or 'cpp')
+     * @param compilers Compiler list
+     * @returns Filtered compiler list
      */
     public static filterSuitableCompilers(languageId: 'c' | 'cpp', compilers: CompilerInfo[]): CompilerInfo[] {
         return compilers.filter(c => 
@@ -68,7 +68,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 获取输出通道
+     * Get output channel
      */
     public static getOutputChannel(): vscode.OutputChannel {
         if (!this.outputChannel) {
@@ -250,13 +250,13 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 检测Windows平台的编译器
+     * Detect Windows platform compilers
      */
     private static async detectWindowsCompilers(): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
-        // 1. 首先搜索系统PATH中的编译器
+        // 1. First search for compilers in system PATH
         const pathCompilers = await this.searchCompilersInPATH(['clang', 'clang++', 'gcc', 'g++', 'cc', 'c++']);
         for (const compiler of pathCompilers) {
             if (!checked.has(compiler.toLowerCase())) {
@@ -268,7 +268,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 2. 搜索常见的安装目录
+        // 2. Search common installation directories
         const searchDirs = [
             'C:\\Program Files\\LLVM\\bin',
             'C:\\Program Files (x86)\\LLVM\\bin',
@@ -297,7 +297,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 3. 搜索MSVC编译器
+        // 3. Search for MSVC compilers
         const msvcCompilers = await this.findMSVCCompilers();
         for (const compiler of msvcCompilers) {
             if (!checked.has(compiler.toLowerCase())) {
@@ -309,7 +309,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 4. 扫描整个系统驱动器（可选，可能会很慢）
+        // 4. Scan entire system drive (optional, may be slow)
         if (compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers(['clang.exe', 'clang++.exe', 'gcc.exe', 'g++.exe']);
             for (const compiler of systemCompilers) {
@@ -327,13 +327,13 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 检测macOS平台的编译器
+     * Detect macOS platform compilers
      */
     private static async detectMacOSCompilers(): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
-        // 1. 首先搜索系统PATH中的编译器
+        // 1. First search for compilers in system PATH
         const pathCompilers = await this.searchCompilersInPATH(['clang', 'clang++', 'gcc', 'g++', 'cc', 'c++']);
         for (const compiler of pathCompilers) {
             if (!checked.has(compiler.toLowerCase())) {
@@ -345,7 +345,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 2. 搜索常见的安装目录
+        // 2. Search common installation directories
         const searchDirs = [
             '/usr/bin',
             '/usr/local/bin',
@@ -372,7 +372,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 3. 搜索Xcode安装的编译器
+        // 3. Search for Xcode installed compilers
         const xcodeDirs = await this.findXcodeCompilerDirectories();
         for (const dir of xcodeDirs) {
             const dirCompilers = await this.searchCompilersInDirectory(dir, ['clang', 'clang++']);
@@ -387,7 +387,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 4. 如果没有找到编译器，扫描整个系统（谨慎使用）
+        // 4. If no compilers found, scan entire system (use with caution)
         if (compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers(['clang', 'clang++', 'gcc', 'g++']);
             for (const compiler of systemCompilers) {
@@ -405,13 +405,13 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 检测Linux平台的编译器
+     * Detect Linux platform compilers
      */
     private static async detectLinuxCompilers(): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
-        // 1. 首先搜索系统PATH中的编译器
+        // 1. First search for compilers in system PATH
         const pathCompilers = await this.searchCompilersInPATH(['clang', 'clang++', 'gcc', 'g++', 'cc', 'c++']);
         for (const compiler of pathCompilers) {
             if (!checked.has(compiler.toLowerCase())) {
@@ -423,7 +423,7 @@ export class NativeCompilerManager {
             }
         }
 
-        // 2. 搜索常见的安装目录
+        // 2. Search common installation directories
         const searchDirs = [
             '/usr/bin',
             '/bin',
@@ -499,11 +499,11 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 查找MSVC编译器
+     * Find MSVC compilers
      */
     private static async findMSVCCompilers(): Promise<string[]> {
         try {
-            // 使用vswhere查找Visual Studio安装
+            // Use vswhere to find Visual Studio installation
             const vswherePath = path.join(
                 process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
                 'Microsoft Visual Studio\\Installer\\vswhere.exe'
@@ -525,16 +525,16 @@ export class NativeCompilerManager {
                 return [];
             }
 
-            // MSVC编译器通常在安装路径的VC/Tools/MSVC目录下
+            // MSVC compilers are usually in the VC/Tools/MSVC directory under the installation path
             const msvcBasePath = path.join(installPath, 'VC', 'Tools', 'MSVC');
             const results: string[] = [];
             
             try {
-                // 首先读取MSVC版本目录
+                // First read MSVC version directories
                 const versions = await fs.readdir(msvcBasePath);
                 
                 for (const version of versions) {
-                    // 检查每个版本目录下的编译器路径
+                    // Check compiler paths in each version directory
                     const hostPaths = [
                         path.join(msvcBasePath, version, 'bin', 'Hostx64', 'x64', 'cl.exe'),
                         path.join(msvcBasePath, version, 'bin', 'Hostx86', 'x86', 'cl.exe')
@@ -545,12 +545,12 @@ export class NativeCompilerManager {
                             await fs.access(compilerPath);
                             results.push(compilerPath);
                         } catch {
-                            // 编译器不存在，跳过
+                            // Compiler does not exist, skip
                         }
                     }
                 }
             } catch {
-                // MSVC目录不存在，跳过
+                // MSVC directory does not exist, skip
             }
 
             return results;
@@ -560,7 +560,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 解析完整路径
+     * Resolve full path
      */
     private static async resolveFullPath(command: string): Promise<string | null> {
         try {
@@ -568,7 +568,7 @@ export class NativeCompilerManager {
                 return await this.fileExists(command) ? command : null;
             }
 
-            // 在PATH中搜索
+            // Search in PATH
             const { stdout } = await this.executeCommand(
                 process.platform === 'win32' ? 'where' : 'which',
                 [command]
@@ -580,7 +580,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 测试编译器
+     * Test compiler
      */
     private static async testCompiler(compilerPath: string): Promise<CompilerInfo | null> {
         try {
@@ -589,16 +589,16 @@ export class NativeCompilerManager {
             const { stdout, stderr } = await this.executeCommand(compilerPath, ['--version']);
             const versionOutput = stdout + stderr;
             
-            // 解析编译器信息
+            // Parse compiler information
             const type = this.determineCompilerType(compilerPath, versionOutput);
             const version = this.parseVersion(versionOutput);
             const supportedStandards = this.getSupportedStandards(type, version);
             const is64Bit = await this.is64BitCompiler(compilerPath);
             
-            // 计算优先级
+            // Calculate priority
             const priority = this.calculatePriority(type, version, compilerPath);
             
-            // 生成友好的名称
+            // Generate friendly name
             const name = this.generateCompilerName(type, version, compilerPath);
 
             return {
@@ -618,7 +618,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 确定编译器类型
+     * Determine compiler type
      */
     private static determineCompilerType(compilerPath: string, versionOutput: string): 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang' {
         const path = compilerPath.toLowerCase();
@@ -632,7 +632,7 @@ export class NativeCompilerManager {
             return 'apple-clang';
         }
 
-        // 检查C++编译器
+        // Check C++ compiler
         if (path.includes('clang++') || (path.includes('clang') && path.includes('++'))) {
             return 'clang++';
         }
@@ -641,7 +641,7 @@ export class NativeCompilerManager {
             return 'g++';
         }
 
-        // 检查C编译器
+        // Check C compiler
         if (path.includes('clang') || output.includes('clang')) {
             return 'clang';
         }
@@ -650,14 +650,14 @@ export class NativeCompilerManager {
             return 'gcc';
         }
 
-        return 'clang'; // 默认
+        return 'clang'; // default
     }
 
     /**
-     * 解析版本号
+     * Parse version number
      */
     private static parseVersion(versionOutput: string): string {
-        // 匹配版本号模式
+        // Match version number patterns
         const patterns = [
             /(\d+\.\d+\.\d+)/,  // x.y.z
             /(\d+\.\d+)/,       // x.y
@@ -676,7 +676,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 获取支持的C++标准
+     * Get supported C++ standards
      */
     private static getSupportedStandards(type: string, version: string): string[] {
         const standards = ['c89', 'c99', 'c11', 'c17'];
@@ -699,25 +699,25 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 检查是否为64位编译器
+     * Check if compiler is 64-bit
      */
     private static async is64BitCompiler(compilerPath: string): Promise<boolean> {
         try {
             const { stdout } = await this.executeCommand(compilerPath, ['-dumpmachine']);
             return stdout.includes('64') || stdout.includes('x86_64') || stdout.includes('amd64');
         } catch {
-            // 默认返回true，现代系统基本都是64位
+            // Return true by default, modern systems are mostly 64-bit
             return true;
         }
     }
 
     /**
-     * 计算编译器优先级
+     * Calculate compiler priority
      */
     private static calculatePriority(type: string, version: string, path: string): number {
         let priority = 0;
 
-        // 编译器类型优先级
+        // Compiler type priority
         switch (type) {
             case 'clang':
                 priority += 100;
@@ -733,20 +733,20 @@ export class NativeCompilerManager {
                 break;
         }
 
-        // 版本优先级
+        // Version priority
         const majorVersion = parseInt(version.split('.')[0], 10) || 0;
         priority += majorVersion * 10;
 
-        // 安装路径优先级
+        // Installation path priority
         if (path.includes('Program Files')) {
-            priority += 5; // 官方安装
+            priority += 5; // Official installation
         }
 
         return priority;
     }
 
     /**
-     * 生成编译器友好名称
+     * Generate compiler friendly name
      */
     private static generateCompilerName(type: string, version: string, path: string): string {
         const nameMap: { [key: string]: string } = {
@@ -761,7 +761,7 @@ export class NativeCompilerManager {
         const baseName = nameMap[type] || type.toUpperCase();
         const versionStr = version !== 'unknown' ? ` ${version}` : '';
 
-        // 添加特殊标识
+        // Add special identifiers
         let suffix = '';
         if (path.includes('mingw')) suffix = ' (MinGW)';
         else if (path.includes('msys')) suffix = ' (MSYS)';
@@ -771,15 +771,15 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 生成建议
+     * Generate suggestions
      */
     private static generateSuggestions(compilers: CompilerInfo[]): string[] {
         const suggestions: string[] = [];
 
         if (compilers.length === 0) {
-            suggestions.push('未检测到C/C++编译器');
-            suggestions.push('请安装LLVM、GCC或MSVC编译器');
-            suggestions.push('Windows用户推荐安装LLVM: https://llvm.org/');
+            suggestions.push('No C/C++ compilers detected');
+            suggestions.push('Please install LLVM, GCC, or MSVC compilers');
+            suggestions.push('Windows users recommend installing LLVM: https://llvm.org/');
         } else {
             const has64Bit = compilers.some(c => c.is64Bit);
             const hasModern = compilers.some(c => {
@@ -788,16 +788,16 @@ export class NativeCompilerManager {
             });
 
             if (!has64Bit) {
-                suggestions.push('建议使用64位编译器以获得更好的性能');
+                suggestions.push('Recommend using 64-bit compiler for better performance');
             }
 
             if (!hasModern) {
-                suggestions.push('建议使用较新版本的编译器以支持C++17/20标准');
+                suggestions.push('Recommend using newer compiler versions to support C++17/20 standards');
             }
 
             const clangCompilers = compilers.filter(c => c.type === 'clang' || c.type === 'apple-clang');
             if (clangCompilers.length > 0) {
-                suggestions.push('推荐使用Clang编译器，兼容性更好');
+                suggestions.push('Recommend using Clang compiler for better compatibility');
             }
         }
 
@@ -805,92 +805,92 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 安装LLVM
+     * Install LLVM
      */
     public static async installLLVM(): Promise<LLVMInstallResult> {
         const output = this.getOutputChannel();
         output.clear();
-        output.appendLine('=== LLVM安装向导 ===');
+        output.appendLine('=== LLVM Installation Wizard ===');
         output.show(true);
 
         const platform = process.platform;
         const choice = await vscode.window.showInformationMessage(
-            '检测到需要安装LLVM编译器，选择安装方式:',
+            'LLVM compiler installation detected, select installation method:',
             { modal: true },
-            '自动安装 (推荐)',
-            '显示安装指南',
+            'Automatic Installation (Recommended)',
+            'Show Installation Guide',
             '跳过'
         );
 
         if (!choice || choice === '跳过') {
             return {
                 success: false,
-                message: '用户跳过了LLVM安装',
-                nextSteps: ['稍后可以手动安装编译器']
+                message: 'User skipped LLVM installation',
+                nextSteps: ['Can manually install compiler later']
             };
         }
 
-        if (choice === '显示安装指南') {
+        if (choice === 'Show Installation Guide') {
             return this.showInstallationGuide();
         }
 
-        if (choice === '自动安装 (推荐)') {
+        if (choice === 'Automatic Installation (Recommended)') {
             return this.installLLVMAutomatically(platform);
         }
 
         return {
             success: false,
-            message: '未选择安装方式'
+            message: 'No installation method selected'
         };
     }
 
     /**
-     * 显示安装指南
+     * Show installation guide
      */
     private static async showInstallationGuide(): Promise<LLVMInstallResult> {
         const platform = process.platform;
         let guide = '';
 
         if (platform === 'win32') {
-            guide = `# Windows LLVM安装指南
+            guide = `# Windows LLVM Installation Guide
 
-## 方法1: 官方安装程序 (推荐)
+## Method 1: Official Installer (Recommended)
 1. 访问 https://releases.llvm.org/download.html
 2. 下载最新的LLVM二进制文件 (LLVM-X.Y.Z-win64.exe)
 3. 运行安装程序，使用默认设置
 4. 安装完成后重启VS Code
 
-## 方法2: 包管理器
-使用Chocolatey (需要管理员权限):
+## Method 2: Package Manager
+Using Chocolatey (requires administrator privileges):
 \`\`\`bash
 choco install llvm
 \`\`\`
 
-## 方法3: 手动配置
+## Method 3: Manual Configuration
 1. 下载LLVM并解压到 C:\\LLVM
 2. 添加 C:\\LLVM\\bin 到系统PATH环境变量
 3. 重启VS Code
 
-## 验证安装
-在命令行中运行:
+## Verify Installation
+Run in command line:
 \`\`\`bash
 clang --version
 clang++ --version
 \`\`\``;
         } else if (platform === 'darwin') {
-            guide = `# macOS LLVM安装指南
+            guide = `# macOS LLVM Installation Guide
 
-## 方法1: Homebrew (推荐)
+## Method 1: Homebrew (Recommended)
 \`\`\`bash
 brew install llvm
 \`\`\`
 
-## 方法2: Xcode Command Line Tools
+## Method 2: Xcode Command Line Tools
 \`\`\`bash
 xcode-select --install
 \`\`\`
 
-## 方法3: 官方安装程序
+## Method 3: Official Installer
 1. 访问 https://releases.llvm.org/download.html
 2. 下载macOS版本的LLVM
 3. 按照说明进行安装
@@ -902,7 +902,7 @@ clang --version
 clang++ --version
 \`\`\``;
         } else {
-            guide = `# Linux LLVM安装指南
+            guide = `# Linux LLVM Installation Guide
 
 ## Ubuntu/Debian
 \`\`\`bash
@@ -920,7 +920,7 @@ sudo dnf install clang clang++ lldb
 sudo pacman -S clang lldb
 \`\`\`
 
-## 通用二进制文件
+## Universal Binaries
 1. 访问 https://releases.llvm.org/download.html
 2. 下载对应发行版的预编译二进制文件
 3. 解压并添加到PATH
@@ -933,7 +933,7 @@ clang++ --version
 \`\`\``;
         }
 
-        // 在新文档中显示指南
+        // Show guide in new document
         const doc = await vscode.workspace.openTextDocument({
             content: guide,
             language: 'markdown'
@@ -942,17 +942,17 @@ clang++ --version
 
         return {
             success: false,
-            message: '安装指南已显示',
+            message: 'Installation guide displayed',
             nextSteps: [
-                '按照指南中的步骤安装LLVM',
-                '安装完成后重启VS Code',
-                '运行编译器检测命令验证安装'
+                'Follow the steps in the guide to install LLVM',
+                'Restart VS Code after installation',
+                'Run compiler detection command to verify installation'
             ]
         };
     }
 
     /**
-     * 自动安装LLVM
+     * Automatically install LLVM
      */
     private static async installLLVMAutomatically(platform: string): Promise<LLVMInstallResult> {
         try {
@@ -966,35 +966,35 @@ clang++ --version
         } catch (error: any) {
             return {
                 success: false,
-                message: `自动安装失败: ${error.message}`,
-                nextSteps: ['请尝试手动安装或查看安装指南']
+                message: `Automatic installation failed: ${error.message}`,
+                nextSteps: ['Please try manual installation or view installation guide']
             };
         }
     }
 
     /**
-     * Windows LLVM自动安装
+     * Windows LLVM automatic installation
      */
     private static async installLLVMWindows(): Promise<LLVMInstallResult> {
         const output = this.getOutputChannel();
-        output.appendLine('开始Windows LLVM自动安装...');
+        output.appendLine('Starting Windows LLVM automatic installation...');
 
-        // 检查是否已有LLVM
+        // Check if LLVM already exists
         const existing = await this.detectWindowsCompilers();
         if (existing.some(c => c.type === 'clang')) {
             return {
                 success: true,
-                message: 'LLVM已经安装',
-                nextSteps: ['可以直接使用现有的LLVM编译器']
+                message: 'LLVM already installed',
+                nextSteps: ['Can use existing LLVM compiler directly']
             };
         }
 
-        // 创建PowerShell安装脚本
+        // Create PowerShell installation script
         const installScript = `
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-Write-Host "正在下载LLVM安装程序..."
+Write-Host "Downloading LLVM installer..."
 
 $Version = "18.1.8"
 $Url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$Version/LLVM-$Version-win64.exe"
@@ -1002,7 +1002,7 @@ $Installer = "$env:TEMP\\llvm-installer.exe"
 
 Invoke-WebRequest -Uri $Url -OutFile $Installer -UseBasicParsing
 
-Write-Host "正在安装LLVM..."
+Write-Host "Installing LLVM..."
 Start-Process -FilePath $Installer -ArgumentList '/S' -Wait
 
 # Add LLVM to system PATH
@@ -1020,24 +1020,24 @@ try {
     Write-Warning "Failed to add LLVM to PATH. Please add C:\\Program Files\\LLVM\\bin to your PATH manually."
 }
 
-Write-Host "LLVM安装完成!"
-Write-Host "请重启VS Code以使用LLVM编译器"
+Write-Host "LLVM installation completed!"
+Write-Host "Please restart VS Code to use LLVM compiler"
 
-# 清理
+# Cleanup
 Remove-Item $Installer -ErrorAction SilentlyContinue
 `;
 
-        // 保存脚本到临时文件
+        // Save script to temporary file
         const scriptPath = path.join(os.tmpdir(), 'install-llvm.ps1');
         await fs.writeFile(scriptPath, installScript, 'utf8');
 
-        // 以管理员权限运行
+        // Run with administrator privileges
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: '正在安装LLVM...',
+            title: 'Installing LLVM...',
             cancellable: false
         }, async (progress) => {
-            progress.report({ message: '下载并安装LLVM...' });
+            progress.report({ message: 'Downloading and installing LLVM...' });
 
             await this.executeCommand('powershell', [
                 '-Command',
@@ -1045,19 +1045,19 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             ]);
         });
 
-        // 清理脚本文件
+        // Clean up script file
         try {
             await fs.unlink(scriptPath);
         } catch {
-            // 忽略清理错误
+            // Ignore cleanup errors
         }
 
         return {
             success: true,
-            message: 'LLVM安装程序已启动',
+            message: 'LLVM installer started',
             restartRequired: true,
             nextSteps: [
-                '请完成LLVM安装向导',
+                'Please complete LLVM installation wizard',
                 '重启VS Code',
                 '运行编译器检测验证安装'
             ]
@@ -1065,39 +1065,39 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * macOS LLVM自动安装
+     * macOS LLVM automatic installation
      */
     private static async installLLVMMacOS(): Promise<LLVMInstallResult> {
         const output = this.getOutputChannel();
-        output.appendLine('开始macOS LLVM自动安装...');
+        output.appendLine('Starting macOS LLVM automatic installation...');
 
-        // 检查Homebrew
+        // Check Homebrew
         try {
             await this.executeCommand('brew', ['--version']);
         } catch {
             return {
                 success: false,
-                message: '需要Homebrew来安装LLVM',
+                message: 'Homebrew is required to install LLVM',
                 nextSteps: [
-                    '请先安装Homebrew: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-                    '然后重新运行LLVM安装'
+                    'Please install Homebrew first: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+                    'Then run LLVM installation again'
                 ]
             };
         }
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: '正在安装LLVM...',
+            title: 'Installing LLVM...',
             cancellable: false
         }, async (progress) => {
-            progress.report({ message: '通过Homebrew安装LLVM...' });
+            progress.report({ message: 'Installing LLVM via Homebrew...' });
 
             await this.executeCommand('brew', ['install', 'llvm']);
         });
 
         return {
             success: true,
-            message: 'LLVM安装完成',
+            message: 'LLVM installation completed',
             restartRequired: true,
             nextSteps: [
                 '重启VS Code',
@@ -1107,13 +1107,13 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * Linux LLVM自动安装
+     * Linux LLVM automatic installation
      */
     private static async installLLVMLinux(): Promise<LLVMInstallResult> {
         const output = this.getOutputChannel();
-        output.appendLine('开始Linux LLVM自动安装...');
+        output.appendLine('Starting Linux LLVM automatic installation...');
 
-        // 检测包管理器
+        // Detect package manager
         let packageManager = '';
         try {
             await this.executeCommand('apt', ['--version']);
@@ -1129,10 +1129,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 } catch {
                     return {
                         success: false,
-                        message: '无法检测到支持的包管理器',
+                        message: 'Unable to detect supported package manager',
                         nextSteps: [
-                            '请手动安装LLVM: sudo apt install clang clang++ lldb (Ubuntu/Debian)',
-                            '或参考安装指南进行安装'
+                            'Please manually install LLVM: sudo apt install clang clang++ lldb (Ubuntu/Debian)',
+                            'Or refer to installation guide for installation'
                         ]
                     };
                 }
@@ -1141,10 +1141,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: '正在安装LLVM...',
+            title: 'Installing LLVM...',
             cancellable: false
         }, async (progress) => {
-            progress.report({ message: `使用${packageManager}安装LLVM...` });
+            progress.report({ message: `Installing LLVM using ${packageManager}...` });
 
             switch (packageManager) {
                 case 'apt':
@@ -1162,7 +1162,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
         return {
             success: true,
-            message: 'LLVM安装完成',
+            message: 'LLVM installation completed',
             nextSteps: [
                 '重启VS Code',
                 '运行编译器检测验证安装'
@@ -1171,7 +1171,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * 编译并运行代码
+     * Compile and run code
      */
     public static async compileAndRun(options: {
         sourcePath: string;
@@ -1182,27 +1182,27 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         memoryLimit: number;
     }): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean }> {
         const output = this.getOutputChannel();
-        output.appendLine(`=== 编译并运行 ${options.language} 代码 ===`);
-        output.appendLine(`源文件: ${options.sourcePath}`);
-        output.appendLine(`编译器: ${options.compiler.name}`);
+        output.appendLine(`=== Compiling and running ${options.language} code ===`);
+        output.appendLine(`Source file: ${options.sourcePath}`);
+        output.appendLine(`Compiler: ${options.compiler.name}`);
 
         try {
-            // 创建临时目录
+            // Create temporary directory
             const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'oi-code-compile-'));
             const sourceFileName = path.basename(options.sourcePath);
             const tempSourcePath = path.join(tempDir, sourceFileName);
             const executableName = process.platform === 'win32' ? 'program.exe' : 'program';
             const executablePath = path.join(tempDir, executableName);
 
-            // 复制源文件到临时目录
+            // Copy source file to temporary directory
             await fs.copyFile(options.sourcePath, tempSourcePath);
 
-            // 构建编译命令
+            // Build compilation command
             const compileArgs = this.getCompilerArgs(options.compiler, options.language, tempSourcePath, executablePath);
             
-            output.appendLine(`编译命令: ${options.compiler.path} ${compileArgs.join(' ')}`);
+            output.appendLine(`Compilation command: ${options.compiler.path} ${compileArgs.join(' ')}`);
 
-            // 编译
+            // Compile
             const compileResult = await this.executeWithTimeout({
                 command: options.compiler.path,
                 args: compileArgs,
@@ -1213,7 +1213,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             });
 
             if (compileResult.exitCode !== 0) {
-                output.appendLine(`编译失败: ${compileResult.stderr}`);
+                output.appendLine(`Compilation failed: ${compileResult.stderr}`);
                 return {
                     stdout: '',
                     stderr: compileResult.stderr,
@@ -1221,31 +1221,31 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 };
             }
 
-            output.appendLine('编译成功，开始运行...');
-            output.appendLine(`编译输出: ${compileResult.stdout}`);
-            output.appendLine(`编译错误: ${compileResult.stderr}`);
+            output.appendLine('Compilation successful, starting execution...');
+            output.appendLine(`Compilation output: ${compileResult.stdout}`);
+            output.appendLine(`Compilation errors: ${compileResult.stderr}`);
 
-            // 确保可执行文件有执行权限
+            // Ensure executable file has execute permissions
             if (process.platform !== 'win32') {
                 try {
                     await fs.chmod(executablePath, '755');
-                    output.appendLine(`已设置执行权限: ${executablePath}`);
+                    output.appendLine(`Execute permissions set: ${executablePath}`);
                 } catch (error) {
-                    output.appendLine(`设置执行权限失败: ${error}`);
+                    output.appendLine(`Failed to set execute permissions: ${error}`);
                 }
             }
 
-            // 检查可执行文件是否存在
+            // Check if executable file exists
             try {
                 await fs.access(executablePath, fs.constants.F_OK | fs.constants.X_OK);
-                output.appendLine(`可执行文件验证成功: ${executablePath}`);
+                output.appendLine(`Executable file verification successful: ${executablePath}`);
             } catch (error) {
-                output.appendLine(`可执行文件验证失败: ${error}`);
+                output.appendLine(`Executable file verification failed: ${error}`);
             }
 
-            // 运行程序
-            output.appendLine(`运行命令: ${executablePath}`);
-            output.appendLine(`运行输入: "${options.input}"`);
+            // Run program
+            output.appendLine(`Execution command: ${executablePath}`);
+            output.appendLine(`Execution input: "${options.input}"`);
             
             const runResult = await this.executeWithTimeout({
                 command: executablePath,
@@ -1256,18 +1256,18 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 memoryLimit: options.memoryLimit
             });
             
-            output.appendLine(`运行结果 - 退出码: ${runResult.exitCode}`);
-            output.appendLine(`运行结果 - 标准输出: "${runResult.stdout}"`);
-            output.appendLine(`运行结果 - 标准错误: "${runResult.stderr}"`);
+            output.appendLine(`Execution result - Exit code: ${runResult.exitCode}`);
+            output.appendLine(`Execution result - Standard output: "${runResult.stdout}"`);
+            output.appendLine(`Execution result - Standard error: "${runResult.stderr}"`);
 
-            // 清理临时文件
+            // Clean up temporary files
             try {
                 await fs.rm(tempDir, { recursive: true, force: true });
             } catch (error) {
-                output.appendLine(`清理临时文件失败: ${error}`);
+                output.appendLine(`Failed to clean up temporary files: ${error}`);
             }
 
-            output.appendLine('运行完成');
+            output.appendLine('Execution completed');
             return {
                 stdout: runResult.stdout,
                 stderr: runResult.stderr,
@@ -1276,7 +1276,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             };
 
         } catch (error: any) {
-            output.appendLine(`编译运行失败: ${error.message}`);
+            output.appendLine(`Compilation and execution failed: ${error.message}`);
             return {
                 stdout: '',
                 stderr: error.message,
@@ -1287,7 +1287,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * 获取编译器参数
+     * Get compiler arguments
      */
     private static getCompilerArgs(compiler: CompilerInfo, language: 'c' | 'cpp', sourcePath: string, outputPath: string): string[] {
         const config = vscode.workspace.getConfiguration('oicode');
@@ -1296,19 +1296,19 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
         const args = [];
 
-        // 对于较新的Clang版本，使用兼容的标准
+        // For newer Clang versions, use compatible standards
         if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
             const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
             if (majorVersion >= 20 && languageStandard === 'c++17') {
-                // Clang 20+ 可能对c++17有兼容性问题，降级到c++14
-                // 这是由于Clang 20+对C++17标准库实现的某些变更导致的临时解决方案
-                // 注意：此问题在Clang 20.x版本中发现，具体表现为某些C++17标准库特性编译失败
-                // 此临时解决方案确保向后兼容性
+                // Clang 20+ may have compatibility issues with c++17, downgrade to c++14
+                // This is a temporary workaround due to some changes in C++17 standard library implementation in Clang 20+
+                // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
+                // This temporary workaround ensures backward compatibility
                 languageStandard = 'c++14';
             }
         }
 
-        // 基础编译参数
+        // Basic compilation parameters
         if (compiler.type === 'msvc') {
             args.push(`/${optimizationLevel}`);
             if (language === 'cpp') {
@@ -1322,7 +1322,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             }
             args.push('-o', outputPath);
             
-            // 对于Apple Clang，需要显式链接C++标准库
+            // For Apple Clang, need to explicitly link C++ standard library
             if (compiler.type === 'apple-clang' && language === 'cpp') {
                 args.push('-lc++');
             }
@@ -1333,10 +1333,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * 检查磁盘空间是否充足
-     * @param directory 要检查的目录
-     * @param requiredSpaceMB 需要的最小空间（MB）
-     * @returns 磁盘空间是否充足
+     * Check if disk space is sufficient
+     * @param directory Directory to check
+     * @param requiredSpaceMB Minimum required space (MB)
+     * @returns Whether disk space is sufficient
      */
     private static async checkDiskSpace(directory: string, requiredSpaceMB: number = 100): Promise<boolean> {
         try {
@@ -1344,7 +1344,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             const execAsync = util.promisify(exec);
             
             if (process.platform === 'win32') {
-                // Windows: 使用wmic命令
+                // Windows: Use wmic command
                 const command = `wmic logicaldisk where "DeviceID='${directory.charAt(0)}:'" get FreeSpace /value`;
                 const { stdout } = await execAsync(command);
                 const match = stdout.match(/FreeSpace=(\d+)/);
@@ -1354,7 +1354,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     return freeSpaceMB >= requiredSpaceMB;
                 }
             } else {
-                // Unix: 使用df命令
+                // Unix: Use df command
                 const command = `df -k "${directory}" | tail -1 | awk '{print $4}'`;
                 const { stdout } = await execAsync(command);
                 const freeSpaceKB = parseInt(stdout.trim(), 10);
@@ -1362,14 +1362,14 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 return freeSpaceMB >= requiredSpaceMB;
             }
             
-            return true; // 如果无法获取磁盘空间信息，默认为充足
+            return true; // If unable to get disk space information, default to sufficient
         } catch {
-            return true; // 检查失败时默认为充足
+            return true; // Default to sufficient when check fails
         }
     }
 
     /**
-     * 带超时执行的命令
+     * Execute command with timeout
      */
     private static async executeWithTimeout(options: {
         command: string;
@@ -1377,15 +1377,16 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         cwd: string;
         timeout: number;
         input: string;
-        memoryLimit?: number; // 内存限制（MB）
+        memoryLimit?: number; // Memory limit (MB)
     }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
         return new Promise((resolve) => {
             (async () => {
                 let child: any;
                 let memoryExceeded = false;
                 let spaceExceeded = false;
+                let memoryCheckInterval: NodeJS.Timeout | null = null;
                 
-                // 检查磁盘空间
+                // Check disk space
                 const hasEnoughSpace = await this.checkDiskSpace(options.cwd);
                 if (!hasEnoughSpace) {
                     spaceExceeded = true;
@@ -1398,7 +1399,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     return;
                 }
             
-            // 如果有内存限制且在Unix系统上，使用ulimit
+            // If memory limit is set and on Unix system, use ulimit
             if (options.memoryLimit && process.platform !== 'win32') {
                 const memoryKB = options.memoryLimit * 1024; // 转换为KB
                 const shellCommand = `ulimit -v ${memoryKB} 2>/dev/null || ulimit -d ${memoryKB} 2>/dev/null; "${options.command}" ${options.args.map(arg => `"${arg}"`).join(' ')}`;
@@ -1408,17 +1409,17 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
             } else {
-                // Windows或无内存限制的情况
+                // Windows or no memory limit case
                 child = spawn(options.command, options.args, { 
                     cwd: options.cwd,
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
                 
-                // 对于Windows，使用轮询检查内存使用情况
+                // For Windows, use polling to check memory usage
                 if (options.memoryLimit && process.platform === 'win32') {
-                    const memoryCheckInterval = setInterval(async () => {
+                    memoryCheckInterval = setInterval(async () => {
                         try {
-                            // 使用wmic命令获取进程内存使用情况
+                            // Use wmic command to get process memory usage
                             const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
                             
                             exec(memoryCheckCommand, (error: any, stdout: string) => {
@@ -1431,19 +1432,24 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                                         if (options.memoryLimit && memoryMB > options.memoryLimit) {
                                             memoryExceeded = true;
                                             child.kill('SIGKILL');
-                                            clearInterval(memoryCheckInterval);
+                                            if (memoryCheckInterval) {
+                                                clearInterval(memoryCheckInterval);
+                                                memoryCheckInterval = null;
+                                            }
                                         }
                                     }
                                 }
                             });
                         } catch (error) {
-                            // 忽略内存检查错误，继续轮询
+                            // Ignore memory check errors, continue polling
                         }
-                    }, 200); // 每200ms检查一次
+                    }, 200); // Check every 200ms
                     
-                    // 清理内存检查定时器
+                    // Clean up memory check timer
                     child.on('close', () => {
-                        clearInterval(memoryCheckInterval);
+                        if (memoryCheckInterval) {
+                            clearInterval(memoryCheckInterval);
+                        }
                     });
                 }
             }
@@ -1468,9 +1474,9 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             child.on('close', (code: number | null, signal: string | null) => {
                 clearTimeout(timeout);
                 
-                // 检查是否因为内存限制被终止
+                // Check if terminated due to memory limit
                 if (process.platform !== 'win32' && options.memoryLimit) {
-                    // 在Unix系统上，如果进程被SIGKILL杀死且没有超时，可能是内存限制
+                    // On Unix systems, if process is killed by SIGKILL and not timed out, it might be due to memory limit
                     if (signal === 'SIGKILL' && !timedOut) {
                         memoryExceeded = true;
                     }
@@ -1488,6 +1494,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
             child.on('error', (error: Error) => {
                 clearTimeout(timeout);
+                // 清理内存检查定时器
+                if (memoryCheckInterval) {
+                    clearInterval(memoryCheckInterval);
+                }
                 resolve({
                     exitCode: -1,
                     stdout: '',
@@ -1515,7 +1525,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             let stdout = '';
             let stderr = '';
 
-            // 设置10秒超时，防止命令卡住
+            // Set 10 second timeout to prevent command from hanging
             const timeout = setTimeout(() => {
                 child.kill('SIGKILL');
                 reject(new Error(`Command timed out: ${command} ${args.join(' ')}`));
@@ -1546,7 +1556,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * 在系统PATH中搜索编译器
+     * Search for compilers in system PATH
      */
     private static async searchCompilersInPATH(compilerNames: string[]): Promise<string[]> {
         const foundCompilers: string[] = [];
@@ -1559,7 +1569,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 const compilerPath = path.join(searchPath, compilerName + (process.platform === 'win32' ? '.exe' : ''));
                 if (await this.fileExists(compilerPath)) {
                     foundCompilers.push(compilerPath);
-                    break; // 找到一个就停止搜索这个编译器
+                    break; // Stop searching this compiler once found
                 }
             }
         }
@@ -1568,7 +1578,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
-     * 在指定目录中搜索编译器
+     * Search for compilers in specified directory
      */
     private static async searchCompilersInDirectory(directory: string, compilerNames: string[]): Promise<string[]> {
         const foundCompilers: string[] = [];
@@ -1580,7 +1590,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 try {
                     const stat = await fs.stat(entryPath);
                     if (stat.isFile()) {
-                        // 检查是否是我们要找的编译器
+                        // Check if it's the compiler we're looking for
                         const entryName = entry.toLowerCase();
                         for (const compilerName of compilerNames) {
                             const targetName = compilerName.toLowerCase() + (process.platform === 'win32' ? '.exe' : '');
@@ -1591,24 +1601,24 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         }
                     }
                 } catch {
-                    // 忽略无法访问的文件
+                    // Ignore inaccessible files
                 }
             }
         } catch {
-            // 忽略无法访问的目录
+            // Ignore inaccessible directories
         }
 
         return foundCompilers;
     }
 
     /**
-     * 查找Xcode编译器目录
+     * Find Xcode compiler directories
      */
     private static async findXcodeCompilerDirectories(): Promise<string[]> {
         const directories: string[] = [];
 
         try {
-            // 查找Xcode应用
+            // Find Xcode applications
             const xcodePaths = [
                 '/Applications/Xcode.app',
                 '/Applications/Xcode-beta.app',
@@ -1627,7 +1637,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     directories.push(developerPath);
                 }
 
-                // 搜索不同平台的编译器
+                // Search for compilers on different platforms
                 if (await this.fileExists(platformsPath)) {
                     try {
                         const platforms = await fs.readdir(platformsPath);
@@ -1638,25 +1648,25 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                             }
                         }
                     } catch {
-                        // 忽略无法访问的平台目录
+                        // Ignore inaccessible platform directories
                     }
                 }
             }
         } catch {
-            // 忽略Xcode查找错误
+            // Ignore Xcode search errors
         }
 
         return directories;
     }
 
     /**
-     * 查找LLVM版本化安装
+     * Find LLVM versioned installations
      */
     private static async findLLVMVersionInstallations(): Promise<string[]> {
         const directories: string[] = [];
 
         try {
-            // 搜索常见的LLVM安装位置
+            // Search for common LLVM installation locations
             const searchPatterns = [
                 '/usr/lib/llvm-*',
                 '/opt/llvm-*',
@@ -1677,11 +1687,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         }
                     }
                 } catch {
-                    // 忽略find命令错误
+                    // Ignore find command errors
                 }
             }
 
-            // 搜索 /usr/bin 中的版本化编译器
+            // Search for versioned compilers in /usr/bin
             try {
                 const { stdout } = await this.executeCommand('find', ['/usr/bin', '-name', 'clang-[0-9]*', '-o', '-name', 'clang++-[0-9]*', '2>/dev/null']);
                 const compilers = stdout.trim().split('\n').filter(compiler => compiler.length > 0);
@@ -1695,20 +1705,20 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 // 忽略find命令错误
             }
         } catch {
-            // 忽略LLVM查找错误
+            // Ignore LLVM search errors
         }
 
         return directories;
     }
 
     /**
-     * 查找GCC版本化安装
+     * Find GCC versioned installations
      */
     private static async findGCCVersionInstallations(): Promise<string[]> {
         const directories: string[] = [];
 
         try {
-            // 搜索常见的GCC安装位置
+            // Search for common GCC installation locations
             const searchPatterns = [
                 '/usr/gcc-*',
                 '/opt/gcc-*',
@@ -1727,11 +1737,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         }
                     }
                 } catch {
-                    // 忽略find命令错误
+                    // Ignore find command errors
                 }
             }
 
-            // 搜索 /usr/bin 中的版本化编译器
+            // Search for versioned compilers in /usr/bin
             try {
                 const { stdout } = await this.executeCommand('find', ['/usr/bin', '-name', 'gcc-[0-9]*', '-o', '-name', 'g++-[0-9]*', '2>/dev/null']);
                 const compilers = stdout.trim().split('\n').filter(compiler => compiler.length > 0);
@@ -1745,27 +1755,27 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 // 忽略find命令错误
             }
         } catch {
-            // 忽略GCC查找错误
+            // Ignore GCC search errors
         }
 
         return directories;
     }
 
     /**
-     * 扫描整个系统查找编译器（谨慎使用，可能会很慢）
+     * Scan entire system for compilers (use with caution, may be slow)
      */
     private static async scanSystemForCompilers(compilerNames: string[]): Promise<string[]> {
         const foundCompilers: string[] = [];
         const output = this.getOutputChannel();
         
-        output.appendLine('开始全系统编译器扫描（这可能需要一些时间）...');
+        output.appendLine('Starting full system compiler scan (this may take some time)...');
 
         try {
-            // 构建find命令
+            // Build find command
             const namePatterns = compilerNames.map(name => `-name "${name}"`).join(' -o ');
             const searchCommand = process.platform === 'win32' 
                 ? `where /R C:\\ ${compilerNames.join(' ')} 2>nul`
-                : `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`; // 限制结果数量
+                : `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`; // Limit result count
 
             const { stdout } = await this.executeCommand(process.platform === 'win32' ? 'cmd' : 'sh', [
                 process.platform === 'win32' ? '/c' : '-c',
@@ -1777,20 +1787,20 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 const compilerPath = line.trim();
                 if (await this.fileExists(compilerPath)) {
                     foundCompilers.push(compilerPath);
-                    output.appendLine(`发现编译器: ${compilerPath}`);
+                    output.appendLine(`Found compiler: ${compilerPath}`);
                 }
             }
 
-            output.appendLine(`全系统扫描完成，发现 ${foundCompilers.length} 个编译器`);
+            output.appendLine(`Full system scan completed, found ${foundCompilers.length} compilers`);
         } catch (error: any) {
-            output.appendLine(`全系统扫描失败: ${error.message}`);
+            output.appendLine(`Full system scan failed: ${error.message}`);
         }
 
         return foundCompilers;
     }
 
     /**
-     * 检查文件是否存在
+     * Check if file exists
      */
     private static async fileExists(filePath: string): Promise<boolean> {
         try {

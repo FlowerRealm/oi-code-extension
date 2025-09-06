@@ -93,6 +93,7 @@ function getPairCheckWebviewContent(): string {
 
 
 async function runPairWithNativeCompilers(
+    context: vscode.ExtensionContext,
     sourcePath1: string,
     sourcePath2: string,
     languageId: 'c' | 'cpp',
@@ -102,8 +103,8 @@ async function runPairWithNativeCompilers(
     result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
     result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
 }> {
-    // Check if we have compilers available (without context for this function)
-    const compilerResult = await NativeCompilerManager.detectCompilers();
+    // Check if we have compilers available (with context for caching)
+    const compilerResult = await NativeCompilerManager.detectCompilers(context);
     if (!compilerResult.success || compilerResult.compilers.length === 0) {
         const choice = await vscode.window.showErrorMessage(
             'No C/C++ compilers found. Please set up a compiler to proceed.',
@@ -215,6 +216,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 
                     // Use native compilers for pair check
                     const pairResult = await runPairWithNativeCompilers(
+                        this._context,
                         file1Path,
                         file2Path,
                         langId,
@@ -549,6 +551,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // Use native compilers for pair check
                 const pairResult = await runPairWithNativeCompilers(
+                    context,
                     file1Path,
                     file2Path,
                     langId,
