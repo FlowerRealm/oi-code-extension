@@ -503,11 +503,11 @@ int main() {
                         const input = inputs[i];
                         const expectedOutput = expectedOutputs[i];
 
+                        const testMessage = `\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`;
+                        console.log(testMessage);
+                        const inputBytes = [...input].map(c => c.charCodeAt(0)).join(',');
                         console.log(
-                            `\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`
-                        );
-                        console.log(
-                            `[PairCheck Test] Input length: ${input.length}, Input bytes: ${[...input].map(c => c.charCodeAt(0)).join(',')}`
+                            `[PairCheck Test] Input length: ${input.length}, Input bytes: ${inputBytes}`
                         );
 
                         const res: any = await vscode.commands.executeCommand('oicode.runPairCheck', input);
@@ -529,10 +529,11 @@ int main() {
                         assert.strictEqual(res.equal, true, `outputs should be equal for input=${input}`);
 
                         const actualOutput = res.output1.trim();
+                        const errorMessage = `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`;
                         assert.strictEqual(
                             actualOutput,
                             expectedOutput,
-                            `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`
+                            errorMessage
                         );
 
                         console.log(

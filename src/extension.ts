@@ -829,9 +829,9 @@ export function activate(context: vscode.ExtensionContext) {
 
                             if (result.success && result.compilers.length > 0) {
                                 progress.report({ message: 'Compiler detection complete!', increment: 100 });
-                                vscode.window.showInformationMessage(
-                                    `OI-Code environment ready! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
-                                );
+                                const message = `OI-Code environment ready! Detected ${result.compilers.length} compilers, ` +
+                                    `recommended: ${result.recommended?.name}`;
+                                vscode.window.showInformationMessage(message);
                             } else {
                                 progress.report({ message: 'Need to install compiler...' });
                                 const choice = await vscode.window.showInformationMessage(
@@ -877,9 +877,9 @@ export function activate(context: vscode.ExtensionContext) {
                                 progress.report({ message: 'Rescan completed!', increment: 100 });
 
                                 if (result.success && result.compilers.length > 0) {
-                                    vscode.window.showInformationMessage(
-                                        `Compiler rescan completed! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
-                                    );
+                                    const rescanMessage = `Compiler rescan completed! Detected ${result.compilers.length} compilers, ` +
+                                        `recommended: ${result.recommended?.name}`;
+                                    vscode.window.showInformationMessage(rescanMessage);
                                 } else {
                                     vscode.window.showWarningMessage('No available compilers detected');
                                 }
@@ -901,9 +901,9 @@ export function activate(context: vscode.ExtensionContext) {
                     const result = await NativeCompilerManager.detectCompilers(context);
 
                     if (result.success && result.compilers.length > 0) {
-                        vscode.window.showInformationMessage(
-                            `Detected ${result.compilers.length} compilers. Recommended: ${result.recommended?.name || 'first compiler'}`
-                        );
+                        const detectedMessage = `Detected ${result.compilers.length} compilers. ` +
+                            `Recommended: ${result.recommended?.name || 'first compiler'}`;
+                        vscode.window.showInformationMessage(detectedMessage);
                     } else {
                         const choice = await vscode.window.showInformationMessage(
                             'No C/C++ compilers detected. Do you want to install LLVM?',

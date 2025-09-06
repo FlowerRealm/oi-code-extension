@@ -1068,9 +1068,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             async progress => {
                 progress.report({ message: 'Downloading and installing LLVM...' });
 
+                const powershellCommand = `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' -Verb RunAs -Wait`;
                 await this.executeCommand('powershell', [
                     '-Command',
-                    `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' -Verb RunAs -Wait`
+                    powershellCommand
                 ]);
             }
         );
@@ -1105,7 +1106,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 success: false,
                 message: 'Homebrew is required to install LLVM',
                 nextSteps: [
-                    'Please install Homebrew first: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+                    'Please install Homebrew first:',
+                    '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
                     'Then run LLVM installation again'
                 ]
             };
