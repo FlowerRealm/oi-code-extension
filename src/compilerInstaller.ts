@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as https from 'https';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { ProcessRunner } from './processRunner';
 import { LLVMInstallResult } from './types';
 
@@ -95,6 +96,10 @@ export class CompilerInstaller {
             const installerUrl = `${baseUrl}/llvmorg-${latestVersion}/LLVM-${latestVersion}-win64.exe`;
             const installerPath = `${os.tmpdir()}/LLVM-${latestVersion}-win64.exe`;
 
+            // Download checksum first
+            output.appendLine('[CompilerInstaller] Downloading checksum for verification...');
+            const expectedChecksum = await this.getLLVMChecksum(latestVersion);
+
             // Show download progress
             await vscode.window.withProgress(
                 {
@@ -104,8 +109,6 @@ export class CompilerInstaller {
                 },
                 async (progress, _token) => {
                     try {
-                        // Use imported https and fs modules
-
                         return new Promise<void>((resolve, reject) => {
                             const file = fs.createWriteStream(installerPath);
                             https
@@ -132,6 +135,22 @@ export class CompilerInstaller {
                     }
                 }
             );
+
+            // Verify checksum
+            output.appendLine('[CompilerInstaller] Verifying installer integrity...');
+            const isValid = await this.verifyFileChecksum(installerPath, expectedChecksum);
+
+            if (!isValid) {
+                // Clean up the corrupted file
+                if (fs.existsSync(installerPath)) {
+                    fs.unlinkSync(installerPath);
+                }
+                throw new Error(
+                    'Installer integrity check failed. The downloaded file may be corrupted or tampered with.'
+                );
+            }
+
+            output.appendLine('[CompilerInstaller] Installer integrity verified successfully.');
 
             // Run installer
             output.appendLine('[CompilerInstaller] Running LLVM installer...');
@@ -445,6 +464,77 @@ Common installation methods:
             message: 'Please follow the installation guide in the opened document.',
             nextSteps: ['Follow the installation steps', 'Restart VS Code after installation']
         };
+    }
+
+    /**
+     * Get SHA256 checksum for LLVM installer
+     */
+    private static async getLLVMChecksum(version: string): Promise<string> {
+        try {
+            return new Promise<string>((resolve, reject) => {
+                const options = {
+                    hostname: 'github.com',
+                    path: `/llvm/llvm-project/releases/download/llvmorg-${version}/LLVM-${version}-win64.exe.sha256`,
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'OI-Code-VSCode-Extension'
+                    }
+                };
+
+                const req = https.request(options, (res: any) => {
+                    let data = '';
+
+                    res.on('data', (chunk: any) => {
+                        data += chunk;
+                    });
+
+                    res.on('end', () => {
+                        if (res.statusCode === 200) {
+                            const checksum = data.trim().split(' ')[0];
+                            resolve(checksum);
+                        } else {
+                            reject(new Error(`Failed to download checksum: ${res.statusCode}`));
+                        }
+                    });
+                });
+
+                req.on('error', (error: any) => {
+                    reject(error);
+                });
+
+                req.setTimeout(10000, () => {
+                    req.destroy();
+                    reject(new Error('Checksum download timeout'));
+                });
+
+                req.end();
+            });
+        } catch (error) {
+            throw new Error(`Failed to get LLVM checksum: ${error}`);
+        }
+    }
+
+    /**
+     * Verify file checksum
+     */
+    private static async verifyFileChecksum(filePath: string, expectedChecksum: string): Promise<boolean> {
+        return new Promise<boolean>((resolve, reject) => {
+            const hash = crypto.createHash('sha256');
+            const stream = fs.createReadStream(filePath);
+
+            stream.on('data', (chunk: any) => {
+                hash.update(chunk);
+            });
+
+            stream.on('end', () => {
+                const actualChecksum = hash.digest('hex');
+                resolve(actualChecksum.toLowerCase() === expectedChecksum.toLowerCase());
+            });
+
+            stream.on('error', (error: any) => {
+                reject(error);
+            });
+        });
     }
 
     /**

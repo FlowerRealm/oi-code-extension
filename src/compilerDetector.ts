@@ -653,16 +653,23 @@ export class CompilerDetector {
     private static getSupportedStandards(type: string, version: string): string[] {
         const standards = ['c89', 'c99', 'c11', 'c17'];
         const cppStandards = ['c++98', 'c++11', 'c++14', 'c++17'];
+        const majorVersion = parseInt(version.split('.')[0]);
 
-        if (type === 'clang' || type === 'apple-clang') {
-            const majorVersion = parseInt(version.split('.')[0]);
+        if (type.includes('clang')) {
+            // Covers clang, clang++, apple-clang
             if (majorVersion >= 9) {
                 cppStandards.push('c++20');
             }
-        } else if (type === 'gcc') {
-            const majorVersion = parseInt(version.split('.')[0]);
+            if (majorVersion >= 17) {
+                cppStandards.push('c++23');
+            }
+        } else if (type.includes('gcc')) {
+            // Covers gcc, g++
             if (majorVersion >= 11) {
                 cppStandards.push('c++20');
+            }
+            if (majorVersion >= 13) {
+                cppStandards.push('c++23');
             }
         }
 

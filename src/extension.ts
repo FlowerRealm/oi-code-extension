@@ -797,21 +797,16 @@ export function activate(context: vscode.ExtensionContext) {
                                 let standard = config.get<string>('compile.std');
 
                                 // Adjust standard based on language type
-                                if (standard && standard.startsWith('c++') && languageId === 'c') {
-                                    // Convert C++ standard to C standard
-                                    const cppVersion = standard.replace('c++', '');
-                                    if (cppVersion === '17' || cppVersion === '14' || cppVersion === '11') {
-                                        standard = `c${cppVersion}`;
-                                    } else {
-                                        standard = 'c11'; // fallback
-                                    }
-                                } else if (standard && standard.startsWith('c') && languageId === 'cpp') {
-                                    // Convert C standard to C++ standard
-                                    const cVersion = standard.replace('c', '');
-                                    if (cVersion === '11' || cVersion === '14' || cVersion === '17') {
-                                        standard = `c++${cVersion}`;
-                                    } else {
-                                        standard = 'c++17'; // fallback
+                                if (standard) {
+                                    const isCppStandard = standard.startsWith('c++');
+                                    const isCStandard = standard.startsWith('c') && !isCppStandard;
+
+                                    if (languageId === 'c' && isCppStandard) {
+                                        // Fallback to a default C standard if a C++ standard is configured
+                                        standard = 'c17';
+                                    } else if (languageId === 'cpp' && isCStandard) {
+                                        // Fallback to a default C++ standard if a C standard is configured
+                                        standard = 'c++17';
                                     }
                                 }
 
