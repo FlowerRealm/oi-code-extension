@@ -996,7 +996,16 @@ $ProgressPreference = 'SilentlyContinue'
 
 Write-Host "Downloading LLVM installer..."
 
-$Version = "18.1.8"
+# Get latest LLVM version from GitHub API
+try {
+    $Response = Invoke-RestMethod -Uri "https://api.github.com/repos/llvm/llvm-project/releases/latest" -UseBasicParsing
+    $Version = $Response.tag_name -replace 'llvmorg-', ''
+    Write-Host "Latest LLVM version: $Version"
+} catch {
+    Write-Host "Failed to fetch latest version, using fallback version 18.1.8"
+    $Version = "18.1.8"
+}
+
 $Url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$Version/LLVM-$Version-win64.exe"
 $Installer = "$env:TEMP\\llvm-installer.exe"
 
@@ -1304,6 +1313,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 // This is a temporary workaround due to some changes in C++17 standard library implementation in Clang 20+
                 // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
                 // This temporary workaround ensures backward compatibility
+                this.getOutputChannel().appendLine(`[WARN] Forcing C++ standard to 'c++14' for Clang ${compiler.version} due to known compatibility issues with c++17. This can be overridden in settings.`);
                 languageStandard = 'c++14';
             }
         }
@@ -1416,6 +1426,9 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 });
                 
                 // For Windows, use polling to check memory usage
+                // TODO: Future improvement - Use Windows Job Objects for more efficient memory limit enforcement
+                // Job Objects provide OS-level resource management without polling overhead
+                // See design document LLVM_NATIVE_ANALYSIS.md for implementation details
                 if (options.memoryLimit && process.platform === 'win32') {
                     memoryCheckInterval = setInterval(async () => {
                         try {
@@ -1443,7 +1456,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         } catch (error) {
                             // Ignore memory check errors, continue polling
                         }
-                    }, 200); // Check every 200ms
+                    }, 200); // Check every 200ms - balance between responsiveness and performance
                     
                     // Clean up memory check timer
                     child.on('close', () => {
