@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG TARGETARCH
 ENV TARGETARCH=${TARGETARCH}
 
-# Update package lists and install core system packages
+# Update package lists and install all required packages in a single layer
 RUN apt-get update --quiet && \
     apt-get install -y --no-install-recommends \
     # Core system utilities
@@ -17,14 +17,6 @@ RUN apt-get update --quiet && \
     wget \
     curl \
     git \
-    && \
-    # Clean up package cache
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Clang development tools and runtime libraries
-RUN apt-get update --quiet && \
-    apt-get install -y --no-install-recommends \
     # Core C/C++ development tools (Clang-only for consistency)
     clang-18 \
     clang++-18 \
@@ -35,17 +27,6 @@ RUN apt-get update --quiet && \
     libstdc++-13-dev \
     # Memory debugging tool
     valgrind \
-    && \
-    # Create essential symlinks only
-    ln -sf /usr/bin/clang-18 /usr/bin/clang && \
-    ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
-    # Clean up package cache
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install competitive programming libraries and debugging tools
-RUN apt-get update --quiet && \
-    apt-get install -y --no-install-recommends \
     # Essential libraries for competitive coding
     libboost-dev \
     libgmp-dev \
@@ -53,6 +34,9 @@ RUN apt-get update --quiet && \
     # LLVM debugging tools for all architectures
     lldb-18 \
     && \
+    # Create essential symlinks only
+    ln -sf /usr/bin/clang-18 /usr/bin/clang && \
+    ln -sf /usr/bin/clang++-18 /usr/bin/clang++ && \
     # Clean up package cache
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

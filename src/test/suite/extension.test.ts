@@ -119,10 +119,8 @@ async function ensureDockerImageIsReady(): Promise<void> {
 
     console.log(`[Test Setup] Checking if image ${imageName} is available...`);
 
-    const execAsync = (cmd: string) => new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    const execAsync = (command: string, args: string[]) => new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
         const { spawn } = require('child_process');
-        const args = cmd.split(' ');
-        const command = args.shift();
         
         const child = spawn(command, args, { maxBuffer: 10 * 1024 * 1024 });
         
@@ -152,7 +150,7 @@ async function ensureDockerImageIsReady(): Promise<void> {
 
     async function imageExistsLocally(): Promise<boolean> {
         try {
-            await execAsync(`docker inspect ${imageName}`);
+            await execAsync('docker', ['inspect', imageName]);
             return true;
         } catch {
             return false;
@@ -170,7 +168,7 @@ async function ensureDockerImageIsReady(): Promise<void> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             console.log(`[Test Setup] docker pull attempt ${attempt}/${maxAttempts}...`);
-            await execAsync(`docker pull ${imageName}`);
+            await execAsync('docker', ['pull', imageName]);
             // verify
             if (await imageExistsLocally()) {
                 console.log('[Test Setup] Image pulled and verified');

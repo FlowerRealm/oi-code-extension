@@ -209,9 +209,9 @@ export class Installer {
                         dockerInstallOutput.appendLine('Installing Homebrew...');
                         await run('/bin/bash', ['-c', '"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"']);
 
-                        // Add Homebrew to PATH for Apple Silicon Macs
+                        // Add Homebrew to PATH for both Apple Silicon and Intel Macs
                         try {
-                            const homebrewPath = cp.execSync('echo $(/opt/homebrew/bin/brew --prefix)/bin', { encoding: 'utf8' }).trim();
+                            const homebrewPath = cp.execSync('echo "$(brew --prefix)/bin"', { encoding: 'utf8' }).trim();
                             process.env.PATH = `${homebrewPath}:${process.env.PATH}`;
                             dockerInstallOutput.appendLine(`Added Homebrew to PATH: ${homebrewPath}`);
                         } catch (pathError) {

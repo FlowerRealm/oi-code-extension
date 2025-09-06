@@ -137,26 +137,22 @@ export class DockerManager {
     private static async ensureCriticalImagesAreAvailable(): Promise<void> {
         const platform = os.platform();
         const arch = os.arch();
-        let criticalImages = ['flowerrealm/oi-code-clang:latest'];
+        const criticalImages: string[] = [];
 
-        // Add Windows-specific image for Windows platform
         if (platform === 'win32') {
+            // For Windows, the Windows-specific image is always needed.
             criticalImages.push('flowerrealm/oi-code-clang:latest-win');
-        }
-
-        // For ARM64 architecture, use specific image tag
-        if (arch === 'arm64') {
-            criticalImages = ['flowerrealm/oi-code-clang:latest'];
-            // Add Windows image if on Windows
-            if (platform === 'win32') {
-                criticalImages.push('flowerrealm/oi-code-clang:latest-win');
+            // On non-x64 Windows (e.g., ARM64), we also check for the Linux container
+            // as it might be used via WSL2. The original logic for x64 only pulled the Windows image.
+            if (arch !== 'x64') {
+                criticalImages.push('flowerrealm/oi-code-clang:latest');
             }
-        } else if (platform === 'win32' && arch === 'x64') {
-            // For Windows x64, only use Windows-specific image
-            criticalImages = ['flowerrealm/oi-code-clang:latest-win'];
+        } else {
+            // For Linux and macOS, the multi-arch 'latest' image is sufficient.
+            criticalImages.push('flowerrealm/oi-code-clang:latest');
         }
 
-        console.log('[DockerManager] Checking critical Docker images...');
+        console.log(`[DockerManager] Checking critical Docker images: ${criticalImages.join(', ')}`);
 
         for (const image of criticalImages) {
             // Delegate to unified image ensuring logic to avoid duplication
