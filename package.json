@@ -45,8 +45,12 @@
         "title": "OI-Code: 初始化编译环境"
       },
       {
-        "command": "oicode.downloadDocker",
-        "title": "OI-Code: 安装Docker"
+        "command": "oicode.rescanCompilers",
+        "title": "OI-Code: 重新扫描编译器"
+      },
+      {
+        "command": "oicode.deepScanCompilers",
+        "title": "OI-Code: 深度扫描编译器"
       }
     ],
     "menus": {},
@@ -99,6 +103,8 @@
         "oicode.compile.std": {
           "type": "string",
           "enum": [
+            "c++23",
+            "c++20",
             "c++17",
             "c++14",
             "c++11",
@@ -108,10 +114,15 @@
           "default": "c++17",
           "description": "默认语言标准，会在 C/C++ 编译命令中注入/覆盖 -std=...。"
         },
-        "oicode.docker.compilers": {
-          "type": "object",
-          "description": "为不同语言自定义 Docker 镜像 (例如: { \"cpp\": \"my-custom-gcc:latest\" })。",
-          "default": {}
+        "oicode.compile.autoDowngradeClang20": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否自动降级 Clang 20+ 的 C++17 标准到 C++14 以避免兼容性问题。设置为 false 可禁用此行为。"
+        },
+        "oicode.compile.disableStackProtector": {
+          "type": "boolean",
+          "default": false,
+          "description": "在 Windows 上禁用堆栈保护器 (-fno-stack-protector)。这可能提供轻微的性能提升，但会降低安全性。仅在竞技编程环境中启用。"
         },
         "oi-code.language.c.Command": {
           "type": "string",
@@ -134,17 +145,6 @@
             "type": "string"
           },
           "description": "Arguments for the C++ compiler (e.g., -Wall -O2 -std=c++17)."
-        },
-        "oi-code.language.python.Command": {
-          "type": "string",
-          "description": "Path to the Python interpreter (e.g., /usr/bin/python3)."
-        },
-        "oi-code.language.python.Args": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Arguments for the Python interpreter (e.g., -u)."
         }
       }
     }
@@ -154,9 +154,13 @@
     "compile": "webpack --mode development",
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write 'src/**/*.{ts,js}'",
+    "format:check": "prettier --check 'src/**/*.{ts,js}'",
     "test": "npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
-    "test:log": "npm test > test-output.log 2>&1"
+    "test:log": "npm test > test-output.log 2>&1",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/diff": "^5.0.9",
@@ -170,12 +174,23 @@
     "copy-webpack-plugin": "^13.0.0",
     "diff": "^5.2.0",
     "eslint": "^8.47.0",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-prettier": "^5.5.4",
     "glob": "^11.0.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "mocha": "^11.7.1",
+    "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,js}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   }
 }

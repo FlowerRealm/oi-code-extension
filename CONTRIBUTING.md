@@ -10,7 +10,7 @@ Thank you for your interest in the OI-Code extension! We welcome contributions o
 ### Prerequisites
 - Node.js 16+
 - VS Code
-- Docker (for testing)
+- C/C++ Compiler (LLVM/Clang or GCC)
 - Git
 
 ### Setup Steps
@@ -73,15 +73,15 @@ npm run test:log
 3. **End-to-End Tests**: Test complete user workflows
 
 ### Cross-Platform Testing
-- Windows: Test file cleanup and Docker installation
+- Windows: Test file cleanup and compiler detection
 - Linux: Test core functionality
-- macOS: Test Docker installation and functionality
+- macOS: Test compiler detection and functionality
 
 ## Feature Development
 
 ### Adding New Language Support
 1. Add language configuration in `package.json`
-2. Add image configuration in `dockerManager.ts`
+2. Add compiler support in `nativeCompiler.ts`
 3. Update test cases
 4. Update documentation
 
@@ -100,9 +100,9 @@ npm run test:log
 ## Troubleshooting
 
 ### Common Issues
-1. **Test Failures**: Check if Docker is available, review `test-output.log`
+1. **Test Failures**: Check if C/C++ compilers are available, review test output
 2. **Compilation Errors**: Ensure TypeScript compilation passes
-3. **Docker Issues**: Run `oicode.downloadDocker` to install Docker
+3. **Compiler Issues**: Run `OI-Code: Setup Compiler` to detect and install compilers
 
 ### Debugging Tips
 - Use VS Code debugger

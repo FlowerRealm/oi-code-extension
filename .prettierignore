@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+out/
+dist/
+build/
+*.vsix
+
+# Test outputs
+*.log
+test-output.log
+coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git files
+.git/
+.gitignore
+
+# NPM files
+package-lock.json
+yarn.lock
+
+# TypeScript files that are auto-generated
+*.d.ts
+
+# Configuration files that might have specific formatting
+webpack.config.js
+tsconfig.json
+*.json
+
+# Documentation files
+*.md
+*.txt
+
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Temp files
+*.tmp
+*.temp
+.temp/

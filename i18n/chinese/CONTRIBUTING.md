@@ -9,7 +9,7 @@
 ### 先决条件
 - Node.js 16+
 - VS Code
-- Docker（用于测试）
+- C/C++ 编译器（LLVM/Clang 或 GCC）
 - Git
 
 ### 设置步骤
@@ -72,15 +72,15 @@ npm run test:log
 3. **端到端测试**：测试完整的用户流程
 
 ### 跨平台测试
-- Windows：测试文件清理和 Docker 安装
+- Windows：测试文件清理和编译器检测
 - Linux：测试核心功能
-- macOS：测试 Docker 安装和功能
+- macOS：测试编译器检测和功能
 
 ## 功能开发
 
 ### 添加新语言支持
 1. 在 `package.json` 中添加语言配置
-2. 在 `dockerManager.ts` 中添加镜像配置
+2. 在 `nativeCompiler.ts` 中添加编译器支持
 3. 更新测试用例
 4. 更新文档
 
@@ -99,9 +99,9 @@ npm run test:log
 ## 问题排查
 
 ### 常见问题
-1. **测试失败**：检查 Docker 是否可用，查看 `test-output.log`
+1. **测试失败**：检查 C/C++ 编译器是否可用，查看 `test-output.log`
 2. **编译错误**：确保 TypeScript 编译通过
-3. **Docker 问题**：运行 `oicode.downloadDocker` 安装 Docker
+3. **编译器问题**：运行 `OI-Code: Setup Compiler` 来检测和安装编译器
 
 ### 调试技巧
 - 使用 VS Code 调试器
