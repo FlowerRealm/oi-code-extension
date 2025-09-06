@@ -56,7 +56,6 @@ export class CompilerDetector {
     public static async detectCompilers(performDeepScan: boolean = false): Promise<CompilerDetectionResult> {
         const platform = process.platform;
         const compilers: CompilerInfo[] = [];
-        const checked = new Set<string>();
 
         this.getOutputChannel().appendLine(`[CompilerDetector] Detecting compilers for platform: ${platform}`);
 
@@ -236,6 +235,20 @@ export class CompilerDetector {
             this.getOutputChannel().appendLine(`[CompilerDetector] Homebrew detection failed: ${error}`);
         }
 
+        // Deep scan if requested
+        if (performDeepScan) {
+            const deepScanCompilers = await this.scanSystemForCompilers(compilerNames);
+            for (const compilerPath of deepScanCompilers) {
+                if (!checked.has(compilerPath)) {
+                    checked.add(compilerPath);
+                    const compiler = await this.testCompiler(compilerPath);
+                    if (compiler) {
+                        compilers.push(compiler);
+                    }
+                }
+            }
+        }
+
         return compilers;
     }
 
@@ -305,6 +318,20 @@ export class CompilerDetector {
             }
         } catch (error) {
             this.getOutputChannel().appendLine(`[CompilerDetector] Version-specific detection failed: ${error}`);
+        }
+
+        // Deep scan if requested
+        if (performDeepScan) {
+            const deepScanCompilers = await this.scanSystemForCompilers(compilerNames);
+            for (const compilerPath of deepScanCompilers) {
+                if (!checked.has(compilerPath)) {
+                    checked.add(compilerPath);
+                    const compiler = await this.testCompiler(compilerPath);
+                    if (compiler) {
+                        compilers.push(compiler);
+                    }
+                }
+            }
         }
 
         return compilers;
@@ -478,7 +505,8 @@ export class CompilerDetector {
             for (const xcodeApp of xcodeApplications) {
                 if (await ProcessRunner.fileExists(xcodeApp)) {
                     directories.push(
-                        path.join(xcodeApp, 'Contents', 'Developer', 'Toolchains', 'XcodeDefault.xctoolchain', 'usr', 'bin'),
+                        path.join(xcodeApp, 'Contents', 'Developer', 'Toolchains',
+                            'XcodeDefault.xctoolchain', 'usr', 'bin'),
                         path.join(xcodeApp, 'Contents', 'Developer', 'usr', 'bin')
                     );
                 }
@@ -541,7 +569,8 @@ export class CompilerDetector {
             ];
 
             for (const pattern of gccPatterns) {
-                const result = await ProcessRunner.executeCommand('find', ['/usr/bin', '-name', path.basename(pattern)]);
+                const result = await ProcessRunner.executeCommand('find',
+                    ['/usr/bin', '-name', path.basename(pattern)]);
                 const lines = result.stdout.split('\n').filter(line => line.trim());
                 directories.push(...lines.map(line => path.dirname(line)));
             }
@@ -590,7 +619,10 @@ export class CompilerDetector {
     /**
      * Determine compiler type from path and version output
      */
-    private static determineCompilerType(compilerPath: string, versionOutput: string): 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang' {
+    private static determineCompilerType(
+        compilerPath: string,
+        versionOutput: string
+    ): 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang' {
         const filename = path.basename(compilerPath).toLowerCase();
 
         if (filename.includes('cl.exe')) {
@@ -686,7 +718,7 @@ export class CompilerDetector {
     /**
      * Calculate priority for compiler selection
      */
-    private static calculatePriority(type: string, version: string, path: string): number {
+    private static calculatePriority(type: string, version: string, _path: string): number {
         let priority = 0;
 
         // Type-based priority
@@ -718,7 +750,7 @@ export class CompilerDetector {
     /**
      * Generate compiler name
      */
-    private static generateCompilerName(type: string, version: string, path: string): string {
+    private static generateCompilerName(type: string, version: string, _path: string): string {
         const nameMap: { [key: string]: string } = {
             clang: 'Clang',
             'clang++': 'Clang++',

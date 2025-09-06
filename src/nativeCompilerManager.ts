@@ -193,7 +193,8 @@ export class NativeCompilerManager {
             const tempDir = path.join(os.tmpdir(), 'oi-code');
             await fs.mkdir(tempDir, { recursive: true });
             const executableName = path.basename(sourcePath, path.extname(sourcePath));
-            const executablePath = path.join(tempDir, `${executableName}-${Date.now()}${process.platform === 'win32' ? '.exe' : ''}`);
+            const executablePath = path.join(tempDir,
+                `${executableName}-${Date.now()}${process.platform === 'win32' ? '.exe' : ''}`);
 
             // Get compiler arguments
             const compilerArgs = this.getCompilerArgs(compiler, language, executablePath, optimizationLevel, standard);

@@ -249,7 +249,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'oicode.pairCheckView';
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _context: vscode.ExtensionContext) {}
+    constructor(private readonly _context: vscode.ExtensionContext) { }
 
     resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -398,7 +398,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 if (choice.value === 'saved') {
                                     return saved;
                                 }
-                            } catch {}
+                            } catch { }
                         }
                         const pick = await vscode.window.showOpenDialog({
                             canSelectFolders: true,

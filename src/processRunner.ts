@@ -94,7 +94,8 @@ export class ProcessRunner {
                 }
 
                 const executionTime = Date.now() - startTime;
-                outputChannel?.appendLine(`[ProcessRunner] Process completed in ${executionTime}ms with exit code: ${exitCode}`);
+                outputChannel?.appendLine(`[ProcessRunner] Process completed in ${executionTime}ms ` +
+                    `with exit code: ${exitCode}`);
 
                 resolve({
                     stdout: stdout.trim(),
@@ -158,7 +159,8 @@ export class ProcessRunner {
 
             let command: string;
             if (process.platform === 'win32') {
-                command = `wmic logicaldisk where "DeviceID='${path.parse(directory).root.replace('\\', '')}'" get FreeSpace`;
+                command = `wmic logicaldisk where 'DeviceID='${path.parse(directory).root.replace('\\', '')}'' ` +
+                    'get FreeSpace';
             } else {
                 command = `df -k "${directory}"`;
             }
