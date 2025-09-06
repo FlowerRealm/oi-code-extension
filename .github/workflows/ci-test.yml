@@ -31,6 +31,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-13, ubuntu-24.04-arm, windows-arm64]
     runs-on: ${{ matrix.os }}
     environment: check
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,28 +68,28 @@ jobs:
           elif [[ "${{ matrix.os }}" == *"windows"* ]]; then
             echo "删除Windows系统编译器..."
             # 删除Visual Studio
-            $vsPaths = @(
-              "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools",
-              "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community",
-              "${env:ProgramFiles}\Microsoft Visual Studio\2022\BuildTools"
+            vs_paths=(
+              "/c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools"
+              "/c/Program Files/Microsoft Visual Studio/2022/Community"
+              "/c/Program Files/Microsoft Visual Studio/2022/BuildTools"
             )
-            foreach ($path in $vsPaths) {
-              if (Test-Path $path) {
-                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
-              }
-            }
+            for path in "${vs_paths[@]}"; do
+              if [ -d "$path" ]; then
+                rm -rf "$path" 2>/dev/null || true
+              fi
+            done
             # 删除LLVM
-            $llvmPaths = @(
-              "${env:ProgramFiles}\LLVM",
-              "${env:ProgramFiles(x86)}\LLVM"
+            llvm_paths=(
+              "/c/Program Files/LLVM"
+              "/c/Program Files (x86)/LLVM"
             )
-            foreach ($path in $llvmPaths) {
-              if (Test-Path $path) {
-                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
-              }
-            }
+            for path in "${llvm_paths[@]}"; do
+              if [ -d "$path" ]; then
+                rm -rf "$path" 2>/dev/null || true
+              fi
+            done
             echo "验证删除："
-            Get-Command clang,gcc -ErrorAction SilentlyContinue || echo "✅ 编译器已删除"
+            command -v clang gcc 2>/dev/null || echo "✅ 编译器已删除"
           fi
           
           echo "============================="
