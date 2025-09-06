@@ -34,7 +34,7 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
         if (choice === 'Setup Compiler') {
             await vscode.commands.executeCommand('oicode.setupCompiler');
             // After setup, re-detect compilers to see if installation was successful
-            compilerResult = await NativeCompilerManager.detectCompilers(context);
+            compilerResult = await NativeCompilerManager.forceRescanCompilers(context);
         }
 
         if (!compilerResult.success || compilerResult.compilers.length === 0) {

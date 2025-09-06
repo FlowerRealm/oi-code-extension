@@ -5,13 +5,13 @@
 
 ## 项目认识与技术要点
 
-本扩展旨在为 OI 选手提供一致、可靠的本地开发体验：通过容器将编译与运行彻底与宿主机隔离，避免"装编译器/环境不一致/路径权限"等问题，侧边栏聚焦题目信息管理与操作流，测试体系保障核心功能的稳定性。
+本扩展旨在为 OI 选手提供一致、可靠的本地开发体验：通过原生编译器将编译与运行彻底与宿主机环境隔离，避免"环境不一致/路径权限"等问题，侧边栏聚焦题目信息管理与操作流，测试体系保障核心功能的稳定性。
 
 ## 架构概览
 
 - **extension.ts**：
   - 激活扩展、注册命令与视图
-  - 统一调用 runSingleInDocker，将运行入口（单测/对拍）都指向容器
+  - 统一调用原生编译器，将运行入口（单测/对拍）都指向原生执行
   - 侧边栏 OI-Code 的 WebviewViewProvider：题目信息、限制与操作（运行/对拍）
   - 命令注册：`oicode.runCode`、`oicode.runPairCheck`、`oicode.createProblem` 等
 
@@ -19,7 +19,7 @@
   - 跨平台原生编译器检测和管理（Windows/macOS/Linux）
   - 自动编译器优先级和回退机制
   - 支持 Clang、GCC、MSVC 和 Apple Clang 编译器
-  - **性能优化**：原生编译比容器化解决方案提供 3-5 倍的性能提升
+  - **性能优化**：原生编译比传统解决方案提供 3-5 倍的性能提升
 
 - **编译器安装**：
   - 当未检测到编译器时自动安装 LLVM
@@ -65,7 +65,7 @@
 ## 最新改进
 
 ### 原生编译器架构
-1. **性能提升**：原生编译比容器化解决方案提供 3-5 倍的性能提升
+1. **性能提升**：原生编译比传统解决方案提供 3-5 倍的性能提升
 2. **资源管理**：实现智能编译器检测、缓存和优先级管理
 3. **自动安装**：一键 LLVM 安装，支持所有主要平台
 4. **兼容性**：支持 Clang、GCC、MSVC 和 Apple Clang 编译器
@@ -91,44 +91,68 @@
 2. **目录结构规范**：确保构建文件在正确位置（out/目录）
 3. **代码组织**：优化文件结构和常量定义
 
+### 模块化重构
+1. **CompilerCache**：独立的编译器缓存管理模块
+2. **CompilerDetector**：专门的跨平台编译器检测模块
+3. **CompilerInstaller**：LLVM 自动安装模块
+4. **ProcessRunner**：带资源限制的进程执行模块
+5. **NativeCompilerManager**：重构后的主要协调器
+
 ## 技术实现细节
 
-### 容器池架构
+### 模块化架构
 ```typescript
-interface DockerContainer {
-    containerId: string;
-    languageId: string;
-    image: string;
-    isReady: boolean;
-    lastUsed: number;
+// 编译器缓存管理
+class CompilerCache {
+    static async loadCachedCompilers(): Promise<CompilerDetectionResult>
+    static async saveCachedCompilers(): Promise<void>
+    static async clearCachedCompilers(): Promise<void>
 }
 
-interface ContainerPool {
-    containers: Map<string, DockerContainer>;
-    isActive: boolean;
+// 跨平台编译器检测
+class CompilerDetector {
+    static async detectCompilers(): Promise<CompilerDetectionResult>
+    static async detectWindowsCompilers(): Promise<CompilerInfo[]>
+    static async detectMacOSCompilers(): Promise<CompilerInfo[]>
+    static async detectLinuxCompilers(): Promise<CompilerInfo[]>
+}
+
+// 自动安装管理
+class CompilerInstaller {
+    static async installLLVM(): Promise<LLVMInstallResult>
+    static async installLLVMWindows(): Promise<LLVMInstallResult>
+    static async installLLVMMacOS(): Promise<LLVMInstallResult>
+    static async installLLVMLinux(): Promise<LLVMInstallResult>
+}
+
+// 进程执行管理
+class ProcessRunner {
+    static async executeWithTimeout(): Promise<ProcessExecutionResult>
+    static async executeCommand(): Promise<{stdout: string, stderr: string}>
+    static async checkDiskSpace(): Promise<boolean>
 }
 ```
-
-容器池通过以下方式工作：
-1. 在扩展激活时预启动容器
-2. 为每种语言维护一个活动容器
-3. 实现健康检查和超时清理
-4. 支持自动回退到非池模式
 
 ### 安全输入处理
 ```typescript
 // 使用安全的 stdin 方式传递输入
-if (input) {
-    dockerProcess.stdin.write(input);
-    dockerProcess.stdin.end();
-}
+const execResult = await ProcessRunner.executeWithTimeout({
+    command: executablePath,
+    args: [],
+    input: userInput,
+    timeout: timeLimit * 1000,
+    memoryLimit: memoryLimit * 1024 * 1024
+});
 ```
 
 ### 资源清理优化
 ```typescript
-// 批量停止和删除容器
-private static async _stopContainers(containerIds: string[]): Promise<void>
-private static async _removeContainers(containerIds: string[]): Promise<void>
+// 自动清理临时文件
+try {
+    await fs.unlink(executablePath);
+} catch (error) {
+    outputChannel.appendLine(`[NativeCompilerManager] Failed to cleanup temporary file: ${error}`);
+}
 ```
 
 ## 后续可拓展点

@@ -7,7 +7,7 @@ OI-Code is a Visual Studio Code extension designed for competitive programmers a
 
 ## Features
 
-- **Native LLVM Compiler Support**: High-performance local compilation using system LLVM/GCC compilers (3-5x faster than Docker).
+- **Native LLVM Compiler Support**: High-performance local compilation using system LLVM/GCC compilers (3-5x faster performance improvement).
 - **Automatic Compiler Detection**: Intelligently discovers and prioritizes available compilers on your system.
 - **Cross-Platform Support**: Works seamlessly on Windows, macOS, and Linux with automatic compiler installation.
 - **Language Support**: Efficient support for C and C++ compilation and execution.
@@ -62,16 +62,15 @@ This extension provides the following settings:
 
 - `oicode.compile.opt`: Default optimization level for C/C++ compilation (O0-O3).
 - `oicode.compile.std`: Default C++ standard for compilation (c++17, c++14, c++11, c11, c99).
-- `oicode.docker.compilers`: Legacy setting for custom compiler images (deprecated in favor of native compilation).
 
 ## Architecture
 
 ### Native Compiler System
-The extension has been completely redesigned to use native LLVM/GCC compilers instead of Docker containers:
+The extension has been completely redesigned to use native LLVM/GCC compilers with a modular architecture:
 
 - **Compiler Detection**: Scans system PATH and common installation directories for available compilers
 - **Multi-Platform Support**: Automatic detection and configuration for Windows (MSVC/MinGW/LLVM), macOS (Xcode/LLVM), and Linux (GCC/LLVM)
-- **Performance**: 3-5x faster execution compared to Docker-based solutions
+- **Performance**: 3-5x faster execution compared to traditional solutions
 - **Resource Efficiency**: Lower memory usage and faster startup times
 - **Fallback Mechanism**: Graceful handling of missing compilers with automatic installation
 
@@ -84,7 +83,7 @@ The extension has been completely redesigned to use native LLVM/GCC compilers in
 ## Version Notes
 
 ### 0.0.3 - Native LLVM Implementation
-- **Complete Architecture Overhaul**: Replaced Docker-based execution with native LLVM/GCC compilation
+- **Complete Architecture Overhaul**: Implemented modular compiler management system
 - **Performance Improvement**: 3-5x faster execution and reduced resource usage
 - **Automatic Compiler Detection**: Intelligent discovery and prioritization of system compilers
 - **Cross-Platform Support**: Enhanced Windows, macOS, and Linux compatibility
@@ -99,7 +98,7 @@ The extension has been completely redesigned to use native LLVM/GCC compilers in
 - **Build System Improvements**: Clean build artifacts and optimize .gitignore configuration
 
 ### 0.0.1
-- Initial version of OI-Code with Docker-based execution.
+- Initial version of OI-Code with basic functionality.
 
 ## Contributing
 

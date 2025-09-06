@@ -50,9 +50,6 @@ tsconfig.json
 *.md
 *.txt
 
-# Docker files
-Dockerfile*
-.dockerignore
 
 # CI/CD files
 .github/
