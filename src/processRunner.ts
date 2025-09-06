@@ -43,7 +43,7 @@ export class ProcessRunner {
     public static async executeWithTimeout(options: ProcessExecutionOptions): Promise<ProcessExecutionResult> {
         const { command, args, cwd = process.cwd(), timeout = 30000, memoryLimit, input = '', outputChannel } = options;
 
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             let stdout = '';
             let stderr = '';
             let timedOut = false;
@@ -51,12 +51,41 @@ export class ProcessRunner {
             let killed = false;
 
             const startTime = Date.now();
-            const timeoutId = timeout > 0 ? setTimeout(() => {
-                timedOut = true;
-                killed = true;
-                child.kill('SIGKILL');
-                outputChannel?.appendLine(`[ProcessRunner] Process timed out after ${timeout}ms`);
-            }, timeout) : undefined;
+            const timeoutId =
+                timeout > 0
+                    ? setTimeout(() => {
+                        timedOut = true;
+                        killed = true;
+                        child.kill('SIGKILL');
+                        outputChannel?.appendLine(`[ProcessRunner] Process timed out after ${timeout}ms`);
+                    }, timeout)
+                    : undefined;
+
+            // Memory monitoring for Linux/macOS
+            let memoryMonitorInterval: NodeJS.Timeout | undefined;
+            if (memoryLimit && (process.platform === 'linux' || process.platform === 'darwin')) {
+                memoryMonitorInterval = setInterval(async () => {
+                    if (!killed) {
+                        try {
+                            if (child.pid) {
+                                const memoryUsageMB = await this.getProcessMemoryUsage(child.pid);
+                                if (memoryUsageMB > memoryLimit) {
+                                    memoryExceeded = true;
+                                    killed = true;
+                                    child.kill('SIGKILL');
+                                    outputChannel?.appendLine(
+                                        `[ProcessRunner] Process exceeded memory limit: ${memoryLimit}MB ` +
+                                            `(used: ${memoryUsageMB.toFixed(2)}MB)`
+                                    );
+                                }
+                            }
+                        } catch (error) {
+                            // If we can't get memory usage, continue without monitoring
+                            outputChannel?.appendLine(`[ProcessRunner] Failed to get memory usage: ${error}`);
+                        }
+                    }
+                }, 100);
+            }
 
             const child = spawn(command, args, {
                 cwd,
@@ -72,18 +101,12 @@ export class ProcessRunner {
             }
 
             // Handle stdout
-            child.stdout?.on('data', (data) => {
+            child.stdout?.on('data', data => {
                 stdout += data.toString();
-                if (memoryLimit && stdout.length > memoryLimit * 1024 * 1024) {
-                    memoryExceeded = true;
-                    killed = true;
-                    child.kill('SIGKILL');
-                    outputChannel?.appendLine(`[ProcessRunner] Process exceeded memory limit: ${memoryLimit}MB`);
-                }
             });
 
             // Handle stderr
-            child.stderr?.on('data', (data) => {
+            child.stderr?.on('data', data => {
                 stderr += data.toString();
             });
 
@@ -92,10 +115,14 @@ export class ProcessRunner {
                 if (timeoutId) {
                     clearTimeout(timeoutId);
                 }
+                if (memoryMonitorInterval) {
+                    clearInterval(memoryMonitorInterval);
+                }
 
                 const executionTime = Date.now() - startTime;
-                outputChannel?.appendLine(`[ProcessRunner] Process completed in ${executionTime}ms ` +
-                    `with exit code: ${exitCode}`);
+                outputChannel?.appendLine(
+                    `[ProcessRunner] Process completed in ${executionTime}ms ` + `with exit code: ${exitCode}`
+                );
 
                 resolve({
                     stdout: stdout.trim(),
@@ -108,9 +135,12 @@ export class ProcessRunner {
             });
 
             // Handle process error
-            child.on('error', (error) => {
+            child.on('error', error => {
                 if (timeoutId) {
                     clearTimeout(timeoutId);
+                }
+                if (memoryMonitorInterval) {
+                    clearInterval(memoryMonitorInterval);
                 }
                 outputChannel?.appendLine(`[ProcessRunner] Process error: ${error.message}`);
                 resolve({
@@ -159,7 +189,8 @@ export class ProcessRunner {
 
             let command: string;
             if (process.platform === 'win32') {
-                command = `wmic logicaldisk where 'DeviceID='${path.parse(directory).root.replace('\\', '')}'' ` +
+                command =
+                    `wmic logicaldisk where 'DeviceID='${path.parse(directory).root.replace(/\\/g, '')}'' ` +
                     'get FreeSpace';
             } else {
                 command = `df -k "${directory}"`;
@@ -188,6 +219,28 @@ export class ProcessRunner {
         } catch (error) {
             console.warn('[ProcessRunner] Failed to check disk space:', error);
             return true;
+        }
+    }
+
+    /**
+     * Get process memory usage in MB
+     */
+    private static async getProcessMemoryUsage(pid: number): Promise<number> {
+        try {
+            if (process.platform === 'linux') {
+                const stats = await fs.readFile(`/proc/${pid}/statm`, 'utf-8');
+                const rss = parseInt(stats.split(' ')[1]) * 4096; // Standard page size is 4KB
+                return rss / (1024 * 1024);
+            } else if (process.platform === 'darwin') {
+                const { execSync } = require('child_process');
+                const command = `ps -p ${pid} -o rss=`;
+                const output = execSync(command, { encoding: 'utf-8' }).trim();
+                const rss = parseInt(output);
+                return rss / 1024;
+            }
+            return 0;
+        } catch (error) {
+            throw new Error(`Failed to get memory usage for PID ${pid}: ${error}`);
         }
     }
 
