@@ -47,6 +47,10 @@
       {
         "command": "oicode.rescanCompilers",
         "title": "OI-Code: 重新扫描编译器"
+      },
+      {
+        "command": "oicode.deepScanCompilers",
+        "title": "OI-Code: 深度扫描编译器"
       }
     ],
     "menus": {},

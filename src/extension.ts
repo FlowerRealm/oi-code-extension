@@ -935,7 +935,8 @@ export function activate(context: vscode.ExtensionContext) {
                             'No C/C++ compilers detected. Do you want to install LLVM?',
                             { modal: true },
                             'Install LLVM',
-                            'View Detection Details'
+                            'View Detection Details',
+                            'Deep Scan'
                         );
 
                         if (choice === 'Install LLVM') {
@@ -953,10 +954,52 @@ export function activate(context: vscode.ExtensionContext) {
                             }
                         } else if (choice === 'View Detection Details') {
                             NativeCompilerManager.getOutputChannel().show(true);
+                        } else if (choice === 'Deep Scan') {
+                            await vscode.commands.executeCommand('oicode.deepScanCompilers');
                         }
                     }
                 } catch (error: any) {
                     vscode.window.showErrorMessage(`Compiler setup failed: ${error.message}`);
+                }
+            })
+        );
+
+        // Register deep scan command
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oicode.deepScanCompilers', async () => {
+                try {
+                    await vscode.window.withProgress(
+                        {
+                            location: vscode.ProgressLocation.Notification,
+                            title: 'Deep Scanning for Compilers...',
+                            cancellable: true
+                        },
+                        async (progress, token) => {
+                            progress.report({ message: 'Performing deep system scan for compilers...' });
+
+                            const result = await NativeCompilerManager.detectCompilers(context, true, true);
+
+                            if (token.isCancellationRequested) {
+                                return;
+                            }
+
+                            if (result.success && result.compilers.length > 0) {
+                                const detectedMessage =
+                                    `Deep scan found ${result.compilers.length} compilers. ` +
+                                    `Recommended: ${result.recommended?.name || 'first compiler'}`;
+                                vscode.window.showInformationMessage(detectedMessage);
+                            } else {
+                                vscode.window.showInformationMessage(
+                                    'Deep scan completed. No additional compilers found.'
+                                );
+                            }
+
+                            // Show detection details
+                            NativeCompilerManager.getOutputChannel().show(true);
+                        }
+                    );
+                } catch (error: any) {
+                    vscode.window.showErrorMessage(`Deep scan failed: ${error.message}`);
                 }
             })
         );

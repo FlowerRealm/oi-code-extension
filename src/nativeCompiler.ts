@@ -170,7 +170,8 @@ export class NativeCompilerManager {
      */
     public static async detectCompilers(
         context?: vscode.ExtensionContext,
-        forceRescan: boolean = false
+        forceRescan: boolean = false,
+        performDeepScan: boolean = false
     ): Promise<CompilerDetectionResult> {
         const output = this.getOutputChannel();
 
@@ -199,11 +200,11 @@ export class NativeCompilerManager {
 
             // Detect compilers based on platform
             if (process.platform === 'win32') {
-                compilers.push(...(await this.detectWindowsCompilers()));
+                compilers.push(...(await this.detectWindowsCompilers(performDeepScan)));
             } else if (process.platform === 'darwin') {
-                compilers.push(...(await this.detectMacOSCompilers()));
+                compilers.push(...(await this.detectMacOSCompilers(performDeepScan)));
             } else if (process.platform === 'linux') {
-                compilers.push(...(await this.detectLinuxCompilers()));
+                compilers.push(...(await this.detectLinuxCompilers(performDeepScan)));
             }
 
             // Sort by priority
@@ -260,7 +261,7 @@ export class NativeCompilerManager {
     /**
      * Detect Windows platform compilers
      */
-    private static async detectWindowsCompilers(): Promise<CompilerInfo[]> {
+    private static async detectWindowsCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
@@ -317,8 +318,8 @@ export class NativeCompilerManager {
             }
         }
 
-        // 4. Scan entire system drive (optional, may be slow)
-        if (compilers.length === 0) {
+        // 4. Scan entire system drive (only when explicitly requested)
+        if (performDeepScan && compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers([
                 'clang.exe',
                 'clang++.exe',
@@ -342,7 +343,7 @@ export class NativeCompilerManager {
     /**
      * Detect macOS platform compilers
      */
-    private static async detectMacOSCompilers(): Promise<CompilerInfo[]> {
+    private static async detectMacOSCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
@@ -400,8 +401,8 @@ export class NativeCompilerManager {
             }
         }
 
-        // 4. If no compilers found, scan entire system (use with caution)
-        if (compilers.length === 0) {
+        // 4. If no compilers found, scan entire system (only when explicitly requested)
+        if (performDeepScan && compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers(['clang', 'clang++', 'gcc', 'g++']);
             for (const compiler of systemCompilers) {
                 if (!checked.has(compiler.toLowerCase())) {
@@ -420,7 +421,7 @@ export class NativeCompilerManager {
     /**
      * Detect Linux platform compilers
      */
-    private static async detectLinuxCompilers(): Promise<CompilerInfo[]> {
+    private static async detectLinuxCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
 
@@ -494,8 +495,8 @@ export class NativeCompilerManager {
             }
         }
 
-        // 5. 如果没有找到编译器，扫描整个系统（谨慎使用）
-        if (compilers.length === 0) {
+        // 5. 如果没有找到编译器，扫描整个系统（仅在明确请求时）
+        if (performDeepScan && compilers.length === 0) {
             const systemCompilers = await this.scanSystemForCompilers(['clang', 'clang++', 'gcc', 'g++']);
             for (const compiler of systemCompilers) {
                 if (!checked.has(compiler.toLowerCase())) {
@@ -1023,9 +1024,35 @@ try {
 }
 
 $Url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$Version/LLVM-$Version-win64.exe"
+$Sha256Url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$Version/LLVM-$Version-win64.exe.sha256"
 $Installer = "$env:TEMP\\llvm-installer.exe"
+$Sha256File = "$env:TEMP\\llvm-installer.sha256"
 
+Write-Host "Downloading LLVM installer..."
 Invoke-WebRequest -Uri $Url -OutFile $Installer -UseBasicParsing
+
+Write-Host "Downloading checksum for verification..."
+Invoke-WebRequest -Uri $Sha256Url -OutFile $Sha256File -UseBasicParsing
+
+# Verify checksum
+try {
+    $ExpectedHash = Get-Content $Sha256File -Raw | Trim
+    $ActualHash = Get-FileHash -Path $Installer -Algorithm SHA256 | Select-Object -ExpandProperty Hash
+    
+    if ($ExpectedHash -eq $ActualHash) {
+        Write-Host "Checksum verification passed: $ActualHash"
+    } else {
+        Write-Host "SECURITY WARNING: Checksum verification failed!"
+        Write-Host "Expected: $ExpectedHash"
+        Write-Host "Actual: $ActualHash"
+        Remove-Item $Installer -ErrorAction SilentlyContinue
+        Remove-Item $Sha256File -ErrorAction SilentlyContinue
+        throw "Installer integrity check failed. Download may be corrupted or tampered with."
+    }
+} catch {
+    Write-Host "Warning: Could not verify checksum: $_"
+    Write-Host "Continuing with installation, but verification is recommended for security."
+}
 
 Write-Host "Installing LLVM..."
 Start-Process -FilePath $Installer -ArgumentList '/S' -Wait
@@ -1050,6 +1077,7 @@ Write-Host "Please restart VS Code to use LLVM compiler"
 
 # Cleanup
 Remove-Item $Installer -ErrorAction SilentlyContinue
+Remove-Item $Sha256File -ErrorAction SilentlyContinue
 `;
 
         // Save script to temporary file
@@ -1495,9 +1523,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                     // For Windows, use improved polling to check memory usage
                     // TODO: Implement Windows Job Objects for native memory limit enforcement
-                    // CRITICAL: Current polling-based approach has serious limitations:
-                    // 1. RACE CONDITIONS: Process can exceed memory limits between polling checks
-                    //    This can lead to incorrect verdicts in competitive programming
+                    // SECURITY CRITICAL: Current polling-based approach has CRITICAL flaws:
+                    // 1. DANGEROUS RACE CONDITIONS: Process can exceed memory limits between checks
+                    //    This leads to INCORRECT COMPETITIVE PROGRAMMING VERDICTS
+                    //    Example: Program allocates 2GB memory and crashes system, but polling misses it
                     // 2. Performance overhead: Continuous polling consumes CPU resources
                     // 3. Reliability: PowerShell commands may fail or be slow under load
                     // 4. Accuracy: WorkingSet includes shared memory, not accurate for limits
