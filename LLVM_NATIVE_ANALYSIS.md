@@ -78,7 +78,7 @@ export class CompilerManager {
             'C:\\mingw64\\bin\\gcc.exe',
             'C:\\mingw64\\bin\\g++.exe',
             'C:\\msys64\\mingw64\\bin\\gcc.exe',
-            'C:\\msys64\\mingw64\\bin\\g++..exe',
+            'C:\\msys64\\mingw64\\bin\\g++.exe',
             
             // TDM-GCC
             'C:\\TDM-GCC-64\\bin\\gcc.exe',

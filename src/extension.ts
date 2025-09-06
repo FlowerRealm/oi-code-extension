@@ -105,7 +105,14 @@ async function runPairWithNativeCompilers(
     // Check if we have compilers available (without context for this function)
     const compilerResult = await NativeCompilerManager.detectCompilers();
     if (!compilerResult.success || compilerResult.compilers.length === 0) {
-        throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
+        const choice = await vscode.window.showErrorMessage(
+            'No C/C++ compilers found. Please set up a compiler to proceed.',
+            'Setup Compiler'
+        );
+        if (choice === 'Setup Compiler') {
+            await vscode.commands.executeCommand('oicode.setupCompiler');
+        }
+        throw new Error('No compilers available. Please set up a compiler first.');
     }
 
     // Select the best compiler for the language
@@ -609,7 +616,14 @@ export function activate(context: vscode.ExtensionContext) {
                     // Check if we have compilers available
                     const compilerResult = await NativeCompilerManager.detectCompilers(context);
                     if (!compilerResult.success || compilerResult.compilers.length === 0) {
-                        throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
+                        const choice = await vscode.window.showErrorMessage(
+                            'No C/C++ compilers found. Please set up a compiler to proceed.',
+                            'Setup Compiler'
+                        );
+                        if (choice === 'Setup Compiler') {
+                            await vscode.commands.executeCommand('oicode.setupCompiler');
+                        }
+                        return; // Stop execution if no compilers are available
                     }
 
                     // Select the best compiler for the language

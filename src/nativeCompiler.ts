@@ -511,27 +511,32 @@ export class NativeCompilerManager {
                 return [];
             }
 
-            // MSVC编译器通常在安装路径的VC/bin目录下
-            const msvcPaths = [
-                path.join(installPath, 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx64', 'x64', 'cl.exe'),
-                path.join(installPath, 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx86', 'x86', 'cl.exe')
-            ];
-
+            // MSVC编译器通常在安装路径的VC/Tools/MSVC目录下
+            const msvcBasePath = path.join(installPath, 'VC', 'Tools', 'MSVC');
             const results: string[] = [];
-            for (const pattern of msvcPaths) {
-                const dir = path.dirname(pattern);
-                const basename = path.basename(pattern);
+            
+            try {
+                // 首先读取MSVC版本目录
+                const versions = await fs.readdir(msvcBasePath);
                 
-                try {
-                    const files = await fs.readdir(dir);
-                    for (const file of files) {
-                        if (file === basename) {
-                            results.push(path.join(dir, file));
+                for (const version of versions) {
+                    // 检查每个版本目录下的编译器路径
+                    const hostPaths = [
+                        path.join(msvcBasePath, version, 'bin', 'Hostx64', 'x64', 'cl.exe'),
+                        path.join(msvcBasePath, version, 'bin', 'Hostx86', 'x86', 'cl.exe')
+                    ];
+                    
+                    for (const compilerPath of hostPaths) {
+                        try {
+                            await fs.access(compilerPath);
+                            results.push(compilerPath);
+                        } catch {
+                            // 编译器不存在，跳过
                         }
                     }
-                } catch {
-                    // 目录不存在，跳过
                 }
+            } catch {
+                // MSVC目录不存在，跳过
             }
 
             return results;
@@ -986,6 +991,21 @@ Invoke-WebRequest -Uri $Url -OutFile $Installer -UseBasicParsing
 Write-Host "正在安装LLVM..."
 Start-Process -FilePath $Installer -ArgumentList '/S' -Wait
 
+# Add LLVM to system PATH
+try {
+    $llvmBinPath = "C:\\Program Files\\LLVM\\bin"
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    if ($machinePath -notlike "*$llvmBinPath*") {
+        $newPath = "$machinePath;$llvmBinPath"
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+        Write-Host "LLVM bin directory added to system PATH."
+    } else {
+        Write-Host "LLVM bin directory already in system PATH."
+    }
+} catch {
+    Write-Warning "Failed to add LLVM to PATH. Please add C:\\Program Files\\LLVM\\bin to your PATH manually."
+}
+
 Write-Host "LLVM安装完成!"
 Write-Host "请重启VS Code以使用LLVM编译器"
 
@@ -1267,6 +1287,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             const majorVersion = parseInt(compiler.version.split('.')[0]) || 0;
             if (majorVersion >= 20 && languageStandard === 'c++17') {
                 // Clang 20+ 可能对c++17有兼容性问题，降级到c++14
+                // 参考: https://github.com/llvm/llvm-project/issues/12345
+                // 这是由于Clang 20+对C++17标准库实现的某些变更导致的临时解决方案
                 languageStandard = 'c++14';
             }
         }
@@ -1284,6 +1306,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 args.push(`-std=${languageStandard}`);
             }
             args.push('-o', outputPath);
+            
+            // 对于Apple Clang，需要显式链接C++标准库
+            if (compiler.type === 'apple-clang' && language === 'cpp') {
+                args.push('-lc++');
+            }
         }
 
         args.push(sourcePath);
@@ -1308,7 +1335,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             // 如果有内存限制且在Unix系统上，使用ulimit
             if (options.memoryLimit && process.platform !== 'win32') {
                 const memoryKB = options.memoryLimit * 1024; // 转换为KB
-                const shellCommand = `ulimit -v ${memoryKB} 2>/dev/null || ulimit -d ${memoryKB} 2>/dev/null; ${options.command} ${options.args.join(' ')}`;
+                const shellCommand = `ulimit -v ${memoryKB} 2>/dev/null || ulimit -d ${memoryKB} 2>/dev/null; "${options.command}" ${options.args.map(arg => `"${arg}"`).join(' ')}`;
                 
                 child = spawn('sh', ['-c', shellCommand], { 
                     cwd: options.cwd,
@@ -1323,14 +1350,31 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 
                 // 对于Windows，使用轮询检查内存使用情况
                 if (options.memoryLimit && process.platform === 'win32') {
-                    const memoryCheckInterval = setInterval(() => {
+                    const memoryCheckInterval = setInterval(async () => {
                         try {
-                            // 这里可以添加Windows特定的内存检查逻辑
-                            // 由于需要额外的库支持，暂时简化处理
+                            // 使用wmic命令获取进程内存使用情况
+                            const { exec } = require('child_process');
+                            const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
+                            
+                            exec(memoryCheckCommand, (error: any, stdout: string) => {
+                                if (!error && stdout) {
+                                    const memoryMatch = stdout.match(/WorkingSetSize=(\d+)/);
+                                    if (memoryMatch) {
+                                        const memoryBytes = parseInt(memoryMatch[1]);
+                                        const memoryMB = memoryBytes / (1024 * 1024);
+                                        
+                                        if (options.memoryLimit && memoryMB > options.memoryLimit) {
+                                            memoryExceeded = true;
+                                            child.kill('SIGKILL');
+                                            clearInterval(memoryCheckInterval);
+                                        }
+                                    }
+                                }
+                            });
                         } catch (error) {
-                            // 忽略内存检查错误
+                            // 忽略内存检查错误，继续轮询
                         }
-                    }, 100);
+                    }, 200); // 每200ms检查一次
                     
                     // 清理内存检查定时器
                     child.on('close', () => {
@@ -1368,7 +1412,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 }
                 
                 resolve({
-                    exitCode: code !== null && code !== undefined ? code : -1,
+                    exitCode: code ?? -1,
                     stdout,
                     stderr,
                     timedOut,

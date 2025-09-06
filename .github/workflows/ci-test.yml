@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-13, ubuntu-24.04-arm]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-13, ubuntu-24.04-arm, windows-arm64]
     runs-on: ${{ matrix.os }}
     environment: check
     steps:
@@ -42,6 +42,56 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: 删除系统自带编译器
+        run: |
+          echo "=== 删除系统自带编译器 ==="
+          
+          if [[ "${{ matrix.os }}" == *"ubuntu"* ]]; then
+            echo "删除Ubuntu系统编译器..."
+            sudo apt-get remove -y gcc g++ clang clang++ build-essential || true
+            sudo apt-get autoremove -y
+            echo "验证删除："
+            which gcc g++ clang clang++ || echo "✅ 编译器已删除"
+            
+          elif [[ "${{ matrix.os }}" == *"macos"* ]]; then
+            echo "删除macOS系统编译器..."
+            # 删除Xcode命令行工具
+            sudo rm -rf /Library/Developer/CommandLineTools 2>/dev/null || true
+            # 删除Homebrew安装的编译器
+            brew uninstall llvm gcc 2>/dev/null || true
+            echo "验证删除："
+            which gcc g++ clang clang++ || echo "✅ 编译器已删除"
+            
+          elif [[ "${{ matrix.os }}" == *"windows"* ]]; then
+            echo "删除Windows系统编译器..."
+            # 删除Visual Studio
+            $vsPaths = @(
+              "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools",
+              "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community",
+              "${env:ProgramFiles}\Microsoft Visual Studio\2022\BuildTools"
+            )
+            foreach ($path in $vsPaths) {
+              if (Test-Path $path) {
+                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            }
+            # 删除LLVM
+            $llvmPaths = @(
+              "${env:ProgramFiles}\LLVM",
+              "${env:ProgramFiles(x86)}\LLVM"
+            )
+            foreach ($path in $llvmPaths) {
+              if (Test-Path $path) {
+                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            }
+            echo "验证删除："
+            Get-Command clang,gcc -ErrorAction SilentlyContinue || echo "✅ 编译器已删除"
+          fi
+          
+          echo "============================="
+        shell: bash
 
       - name: Compile TypeScript
         run: npm run compile

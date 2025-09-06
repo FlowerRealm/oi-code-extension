@@ -307,12 +307,9 @@ suite('Extension Test Suite', () => {
                 if (res.error) {
                     console.log('[Strict Test] Input processing had error (may be expected):', res.error);
                 } else {
-                    // If no error, output should contain our input values
-                    if (res.output.includes('42') || res.output.includes('hello')) {
-                        console.log('[Strict Test] ✓ Input processing works correctly');
-                    } else {
-                        console.log('[Strict Test] ⚠ Input processing ran but output format may differ');
-                    }
+                    // If no error, output should exactly match our expected format
+                    assert.strictEqual(normalizeOutput(res.output), 'Number: 42, String: hello', 'The output of the input processing test is incorrect.');
+                    console.log('[Strict Test] ✓ Input processing works correctly');
                 }
                 
             } finally {
