@@ -15,3 +15,4 @@ export const DEFAULT_TIME_LIMIT = 20; // seconds
 export const DEFAULT_MEMORY_LIMIT = 512; // MB
 export const DEFAULT_PAIR_CHECK_TIME_LIMIT = 20; // seconds
 export const DEFAULT_PAIR_CHECK_MEMORY_LIMIT = 512; // MB
+export const DEFAULT_SINGLE_RUN_TIME_LIMIT = 5; // seconds - for single code execution

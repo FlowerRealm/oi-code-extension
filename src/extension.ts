@@ -9,10 +9,13 @@ import * as fs from 'fs';
 import * as Diff from 'diff';
 import { NativeCompilerManager, CompilerInfo } from './nativeCompiler';
 import {
-    OI_CODE_TEST_BASE_PATH,
-    OI_CODE_TEST_TMP_PATH,
+    DEFAULT_TIME_LIMIT,
+    DEFAULT_MEMORY_LIMIT,
     DEFAULT_PAIR_CHECK_TIME_LIMIT,
-    DEFAULT_PAIR_CHECK_MEMORY_LIMIT
+    DEFAULT_PAIR_CHECK_MEMORY_LIMIT,
+    DEFAULT_SINGLE_RUN_TIME_LIMIT,
+    OI_CODE_TEST_BASE_PATH,
+    OI_CODE_TEST_TMP_PATH
 } from './constants';
 
 /**
@@ -181,8 +184,8 @@ async function runPairWithNativeCompilers(
 }> {
     // Use public function to get suitable compiler
     const compiler = await getSuitableCompiler(context, languageId);
-    const timeLimit = options?.timeLimit ?? 20;
-    const memoryLimit = options?.memoryLimit ?? 512;
+    const timeLimit = options?.timeLimit ?? DEFAULT_TIME_LIMIT;
+    const memoryLimit = options?.memoryLimit ?? DEFAULT_MEMORY_LIMIT;
 
     // Run both programs in parallel
     const [result1, result2] = await Promise.all([
@@ -708,7 +711,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                         const input = testInput ?? '';
                         // Use provided options or fallback to defaults
-                        const timeLimit = options?.timeLimit ?? 20; // seconds
+                        const timeLimit = options?.timeLimit ?? DEFAULT_PAIR_CHECK_TIME_LIMIT; // seconds
 
                         // Use native compilers for pair check
                         const pairResult = await runPairWithNativeCompilers(
@@ -717,7 +720,7 @@ export function activate(context: vscode.ExtensionContext) {
                             file2Path,
                             langId,
                             input,
-                            { timeLimit, memoryLimit: 512 }
+                            { timeLimit, memoryLimit: DEFAULT_PAIR_CHECK_MEMORY_LIMIT }
                         );
                         const result1 = pairResult.result1;
                         const result2 = pairResult.result2;
@@ -769,8 +772,8 @@ export function activate(context: vscode.ExtensionContext) {
                         }
                     }
                     // Use provided options or fallback to defaults
-                    const timeLimit = options?.timeLimit ?? 5; // seconds
-                    const memoryLimit = options?.memoryLimit ?? 512; // MB
+                    const timeLimit = options?.timeLimit ?? DEFAULT_SINGLE_RUN_TIME_LIMIT; // seconds
+                    const memoryLimit = options?.memoryLimit ?? DEFAULT_MEMORY_LIMIT; // MB
 
                     return vscode.window.withProgress(
                         {
