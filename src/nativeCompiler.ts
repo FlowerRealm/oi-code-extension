@@ -1520,108 +1520,50 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     // 3. Integrate with executeWithTimeout as alternative to polling
                     // 4. Add fallback to current polling method if Job Objects fail
                     if (options.memoryLimit && process.platform === 'win32') {
-                        // Use a more efficient approach with cached process info and adaptive polling
-                        let lastCheckTime = 0;
-                        const CHECK_INTERVAL = 100; // Reduced from 200ms for better responsiveness
-                        const ADAPTIVE_THRESHOLD = 0.8; // Start checking more frequently at 80% of limit
+                        const memoryLimitBytes = options.memoryLimit * 1024 * 1024;
+                        let currentCheckInterval = 200; // ms
 
-                        memoryCheckInterval = setInterval(async () => {
-                            const now = Date.now();
-
-                            // Skip if we checked too recently, unless we're close to the limit
-                            if (now - lastCheckTime < CHECK_INTERVAL) {
-                                return;
-                            }
+                        const memoryChecker = () => {
+                            if (terminated || child.killed) return;
 
                             try {
                                 // Use PowerShell for more reliable and faster memory queries
                                 const memoryCheckCommand =
-                                    'powershell -Command "Get-Process -Id ' +
-                                    `${child.pid} | Select-Object -ExpandProperty WorkingSet"`;
-
-                                exec(memoryCheckCommand, { timeout: 50 }, (error: any, stdout: string) => {
-                                    // Check if process has already been terminated
-                                    if (terminated) {
+                                    `powershell -Command "(Get-Process -Id ${child.pid}).WorkingSet"`;
+                                exec(memoryCheckCommand, { timeout: 150 }, (error, stdout) => {
+                                    if (terminated || child.killed || error) {
+                                        if (!terminated && !child.killed) {
+                                            memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
+                                        }
                                         return;
                                     }
 
-                                    lastCheckTime = Date.now();
-
-                                    if (!error && stdout) {
-                                        const memoryBytes = parseInt(stdout.trim(), 10);
-                                        const memoryMB = memoryBytes / (1024 * 1024);
-
-                                        // Adaptive checking: check more frequently when close to limit
-                                        if (
-                                            options.memoryLimit &&
-                                            memoryMB > options.memoryLimit * ADAPTIVE_THRESHOLD
-                                        ) {
-                                            // Reduce interval when approaching limit
-                                            if (memoryCheckInterval) {
-                                                clearInterval(memoryCheckInterval);
-                                                memoryCheckInterval = setInterval(() => {
-                                                    // Check if process has already been terminated
-                                                    if (terminated) {
-                                                        return;
-                                                    }
-
-                                                    // Recreate the checking logic with shorter interval
-                                                    const memoryCheckCommand =
-                                                        `powershell -Command "Get-Process -Id ${child.pid} | ` +
-                                                        'Select-Object -ExpandProperty WorkingSet"';
-
-                                                    exec(
-                                                        memoryCheckCommand,
-                                                        { timeout: 50 },
-                                                        (error: any, stdout: string) => {
-                                                            // Check if process has already been terminated
-                                                            if (terminated) {
-                                                                return;
-                                                            }
-
-                                                            if (!error && stdout) {
-                                                                const memoryBytes = parseInt(stdout.trim(), 10);
-                                                                const memoryMB = memoryBytes / (1024 * 1024);
-
-                                                                if (
-                                                                    options.memoryLimit &&
-                                                                    memoryMB > options.memoryLimit
-                                                                ) {
-                                                                    memoryExceeded = true;
-                                                                    child.kill('SIGKILL');
-                                                                    if (memoryCheckInterval) {
-                                                                        clearInterval(memoryCheckInterval);
-                                                                        memoryCheckInterval = null;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    );
-                                                }, 50) as unknown as NodeJS.Timeout;
-                                            }
-                                        }
-
-                                        if (options.memoryLimit && memoryMB > options.memoryLimit) {
-                                            memoryExceeded = true;
-                                            child.kill('SIGKILL');
-                                            if (memoryCheckInterval) {
-                                                clearInterval(memoryCheckInterval);
-                                                memoryCheckInterval = null;
-                                            }
+                                    const memoryBytes = parseInt(stdout.trim(), 10);
+                                    if (memoryBytes > memoryLimitBytes) {
+                                        memoryExceeded = true;
+                                        child.kill('SIGKILL');
+                                    } else {
+                                        // Adaptive polling
+                                        currentCheckInterval = (memoryBytes / memoryLimitBytes > 0.8) ? 50 : 200;
+                                        if (!terminated && !child.killed) {
+                                            memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
                                         }
                                     }
                                 });
-                            } catch (error) {
-                                // Ignore memory check errors, continue polling
-                                lastCheckTime = Date.now();
+                            } catch (e) {
+                                if (!terminated && !child.killed) {
+                                    memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
+                                }
                             }
-                        }, CHECK_INTERVAL);
+                        };
 
-                        // Clean up memory check timer
+                        memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
+
+                        // Clean up memory check timer on process exit
                         child.on('close', () => {
                             terminated = true; // Set flag to prevent race conditions
                             if (memoryCheckInterval) {
-                                clearInterval(memoryCheckInterval);
+                                clearTimeout(memoryCheckInterval);
                                 memoryCheckInterval = null;
                             }
                         });
