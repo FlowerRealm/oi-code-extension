@@ -1258,9 +1258,18 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     private static getCompilerArgs(compiler: CompilerInfo, language: 'c' | 'cpp', sourcePath: string, outputPath: string): string[] {
         const config = vscode.workspace.getConfiguration('oicode');
         const optimizationLevel = config.get<string>('compile.opt', 'O2');
-        const languageStandard = config.get<string>('compile.std', 'c++17');
+        let languageStandard = config.get<string>('compile.std', 'c++17');
 
         const args = [];
+
+        // 对于较新的Clang版本，使用兼容的标准
+        if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
+            const majorVersion = parseInt(compiler.version.split('.')[0]) || 0;
+            if (majorVersion >= 20 && languageStandard === 'c++17') {
+                // Clang 20+ 可能对c++17有兼容性问题，降级到c++14
+                languageStandard = 'c++14';
+            }
+        }
 
         // 基础编译参数
         if (compiler.type === 'msvc') {
