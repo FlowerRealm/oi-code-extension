@@ -47,6 +47,10 @@
       {
         "command": "oicode.downloadDocker",
         "title": "OI-Code: 安装Docker"
+      },
+      {
+        "command": "oicode.rescanCompilers",
+        "title": "OI-Code: 重新扫描编译器"
       }
     ],
     "menus": {},
@@ -143,9 +147,10 @@
     "compile": "webpack --mode development",
     "watch": "webpack --watch --mode development",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "test": "npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js",
-    "test:log": "npm test > test-output.log 2>&1"
+    "test:log": "npm test > test-output.log 2>&1",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/diff": "^5.0.9",
@@ -160,11 +165,19 @@
     "diff": "^5.2.0",
     "eslint": "^8.47.0",
     "glob": "^11.0.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "mocha": "^11.7.1",
     "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,js}": [
+      "eslint --fix",
+      "git add"
+    ]
   }
 }

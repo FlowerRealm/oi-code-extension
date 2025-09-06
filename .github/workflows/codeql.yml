@@ -1,0 +1,50 @@
+name: "CodeQL - 代码安全分析"
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每周一早上2点UTC运行
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: CodeQL 分析
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript', 'typescript' ]
+        # CodeQL 支持 [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
+        # 我们只需要 JavaScript 和 TypeScript 分析
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        # 如果需要使用自定义查询，可以添加以下配置：
+        # queries: +security-and-quality
+        # 如果需要禁用默认查询，可以添加：
+        # disable-default-queries: true
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: '/language:${{ matrix.language }}'
+        # 可选：上传到 GitHub 高级安全
+        # 如果仓库启用了高级安全功能，此步骤会自动上传结果
