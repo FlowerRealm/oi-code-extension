@@ -62,6 +62,8 @@ This extension provides the following settings:
 
 - `oicode.compile.opt`: Default optimization level for C/C++ compilation (O0-O3).
 - `oicode.compile.std`: Default C++ standard for compilation (c++17, c++14, c++11, c11, c99).
+- `oicode.compile.autoDowngradeClang20`: Whether to automatically downgrade C++17 to C++14 for Clang 20+ to avoid compatibility issues.
+- `oicode.compile.disableStackProtector`: Disable stack protector on Windows (-fno-stack-protector). This may provide a slight performance boost but reduces security.
 
 ## Architecture
 

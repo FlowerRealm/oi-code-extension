@@ -56,6 +56,7 @@ OI-Code 是一个为竞技编程者和学生设计的 Visual Studio Code 扩展�
 - `oicode.compile.opt`：C/C++ 编译的默认优化级别。
 - `oicode.compile.std`：C++ 编译的默认标准。
 - `oicode.compile.autoDowngradeClang20`：是否自动降级 Clang 20+ 的 C++17 标准到 C++14 以避免兼容性问题。
+- `oicode.compile.disableStackProtector`：在 Windows 上禁用堆栈保护器 (-fno-stack-protector)。这可能提供轻微的性能提升，但会降低安全性。仅在竞技编程环境中启用。
 
 ## 性能优化
 

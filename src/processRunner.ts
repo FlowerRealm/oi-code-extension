@@ -20,6 +20,7 @@ const ALLOWED_COMMANDS = new Set([
     'g++',
     'cc',
     'c++',
+    'cl',
     // System utilities
     'which',
     'where',
@@ -69,7 +70,7 @@ function sanitizeArgument(arg: string): string {
  * Validates if a command is safe to execute
  */
 function validateCommand(command: string): boolean {
-    const baseCommand = path.basename(command).toLowerCase();
+    const baseCommand = path.basename(command, path.extname(command)).toLowerCase();
 
     // Check if it's an allowed command
     if (ALLOWED_COMMANDS.has(baseCommand)) {
@@ -102,7 +103,7 @@ function validateCommand(command: string): boolean {
         const hasAllowedExt = allowedExts.includes(ext);
         const hasNoExt = ext === '';
 
-        return (hasAllowedExt || (hasNoExt && isInSafeDir)) && isInSafeDir;
+        return isInSafeDir && (hasAllowedExt || hasNoExt);
     }
 
     return false;
