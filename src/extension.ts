@@ -9,7 +9,6 @@ import * as fs from 'fs';
 import * as Diff from 'diff';
 import { NativeCompilerManager, CompilerInfo } from './nativeCompiler';
 import {
-    DEFAULT_TIME_LIMIT,
     DEFAULT_MEMORY_LIMIT,
     DEFAULT_PAIR_CHECK_TIME_LIMIT,
     DEFAULT_PAIR_CHECK_MEMORY_LIMIT,
@@ -26,7 +25,7 @@ import {
  */
 async function getSuitableCompiler(context: vscode.ExtensionContext, languageId: 'c' | 'cpp'): Promise<CompilerInfo> {
     // Detect available compilers
-    const compilerResult = await NativeCompilerManager.detectCompilers(context);
+    let compilerResult = await NativeCompilerManager.detectCompilers(context);
     if (!compilerResult.success || compilerResult.compilers.length === 0) {
         const choice = await vscode.window.showErrorMessage(
             'No C/C++ compilers found. Please set up a compiler to proceed.',
@@ -34,11 +33,16 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
         );
         if (choice === 'Setup Compiler') {
             await vscode.commands.executeCommand('oicode.setupCompiler');
+            // After setup, re-detect compilers to see if installation was successful
+            compilerResult = await NativeCompilerManager.detectCompilers(context);
         }
-        NativeCompilerManager.getOutputChannel().appendLine(
-            `Compiler detection failed. Suggestions: ${compilerResult.suggestions.join(', ')}`
-        );
-        throw new Error('No compilers available. Please set up a compiler first.');
+
+        if (!compilerResult.success || compilerResult.compilers.length === 0) {
+            NativeCompilerManager.getOutputChannel().appendLine(
+                `Compiler detection failed. Suggestions: ${compilerResult.suggestions.join(', ')}`
+            );
+            throw new Error('No compilers available. Please set up a compiler first.');
+        }
     }
 
     // Select suitable compiler for the language
@@ -187,8 +191,8 @@ async function runPairWithNativeCompilers(
 }> {
     // Use public function to get suitable compiler
     const compiler = await getSuitableCompiler(context, languageId);
-    const timeLimit = options?.timeLimit ?? DEFAULT_TIME_LIMIT;
-    const memoryLimit = options?.memoryLimit ?? DEFAULT_MEMORY_LIMIT;
+    const timeLimit = options?.timeLimit ?? DEFAULT_PAIR_CHECK_TIME_LIMIT;
+    const memoryLimit = options?.memoryLimit ?? DEFAULT_PAIR_CHECK_MEMORY_LIMIT;
 
     // Run both programs in parallel
     const [result1, result2] = await Promise.all([

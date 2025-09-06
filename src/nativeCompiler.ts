@@ -1055,8 +1055,13 @@ try {
         throw "Installer integrity check failed. Download may be corrupted or tampered with."
     }
 } catch {
-    Write-Host "Warning: Could not verify checksum: $_"
-    Write-Host "Continuing with installation, but verification is recommended for security."
+    Write-Host "SECURITY WARNING: Checksum verification failed! Halting installation."
+    Write-Host "Expected: $ExpectedHash"
+    Write-Host "Actual: $ActualHash"
+    # Clean up downloaded files
+    Remove-Item $Installer -ErrorAction SilentlyContinue
+    Remove-Item $Sha256File -ErrorAction SilentlyContinue
+    throw "Installer integrity check failed. Download may be corrupted or tampered with."
 }
 
 Write-Host "Installing LLVM..."
@@ -1557,10 +1562,14 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                     // 1. Create native addon with Windows API bindings
                     // 2. Implement JobObject class with memory limit methods
                     // 3. Integrate with executeWithTimeout as alternative to polling
-                    // 4. Add fallback to current polling method if Job Objects fail
+                    // 4. Fallback to improved polling method while Job Objects implementation is pending
+                    // TODO: Implement Windows Job Objects for OS-level memory enforcement
+                    // Current limitations: Race conditions between polling intervals, potential MLE misses
+                    // Required: Native Node.js addon using Windows API (CreateJobObject, SetInformationJobObject)
+                    // Benefits: OS-level enforcement, no polling overhead, immediate memory limit violation detection
                     if (options.memoryLimit && process.platform === 'win32') {
                         const memoryLimitBytes = options.memoryLimit * 1024 * 1024;
-                        let currentCheckInterval = 200; // ms
+                        let currentCheckInterval = 100; // Reduced from 200ms to 100ms for better responsiveness
 
                         const memoryChecker = () => {
                             if (terminated || child.killed) return;
@@ -1569,7 +1578,7 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                                 // Use PowerShell for more reliable and faster memory queries
                                 const memoryCheckCommand =
                                     'powershell -Command "' + `(Get-Process -Id ${child.pid}).WorkingSet"`;
-                                exec(memoryCheckCommand, { timeout: 150 }, (error, stdout) => {
+                                exec(memoryCheckCommand, { timeout: 100 }, (error, stdout) => {
                                     if (terminated || child.killed || error) {
                                         if (!terminated && !child.killed) {
                                             memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
@@ -1582,8 +1591,9 @@ Remove-Item $Sha256File -ErrorAction SilentlyContinue
                                         memoryExceeded = true;
                                         child.kill('SIGKILL');
                                     } else {
-                                        // Adaptive polling
-                                        currentCheckInterval = memoryBytes / memoryLimitBytes > 0.8 ? 50 : 200;
+                                        // More aggressive adaptive polling - check more frequently near limits
+                                        const usageRatio = memoryBytes / memoryLimitBytes;
+                                        currentCheckInterval = usageRatio > 0.9 ? 25 : usageRatio > 0.7 ? 50 : 100;
                                         if (!terminated && !child.killed) {
                                             memoryCheckInterval = setTimeout(memoryChecker, currentCheckInterval);
                                         }

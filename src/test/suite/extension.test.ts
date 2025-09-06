@@ -527,7 +527,7 @@ int main() {
                         // Validate equality and expected output
                         assert.strictEqual(res.equal, true, `outputs should be equal for input=${input}`);
 
-                        const actualOutput = res.output1.trim();
+                        const actualOutput = normalizeOutput(res.output1);
                         const errorMessage =
                             `Expected output "${expectedOutput}" but got "${actualOutput}" ` +
                             `for input "${input}" in ${lang}`;
