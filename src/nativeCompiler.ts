@@ -1334,7 +1334,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         languageStandard: string
     ): string {
         // Handle Clang 20+ C++17 compatibility issues
-        if ((compiler.type === 'clang' || compiler.type === 'apple-clang') && language === 'cpp') {
+        if (
+            (compiler.type === 'clang' || compiler.type === 'clang++' || compiler.type === 'apple-clang') &&
+            language === 'cpp'
+        ) {
             const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
             const autoDowngrade = vscode.workspace.getConfiguration('oicode.compile').get('autoDowngradeClang20', true);
 
@@ -1644,6 +1647,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                 child.on('close', (code: number | null, signal: string | null) => {
                     clearTimeout(timeout);
+                    if (memoryCheckInterval) {
+                        clearInterval(memoryCheckInterval);
+                        memoryCheckInterval = null;
+                    }
 
                     // Check if terminated due to memory limit
                     if (process.platform !== 'win32' && options.memoryLimit) {
