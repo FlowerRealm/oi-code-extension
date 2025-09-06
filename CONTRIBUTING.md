@@ -73,9 +73,9 @@ npm run test:log
 3. **End-to-End Tests**: Test complete user workflows
 
 ### Cross-Platform Testing
-- Windows: Test file cleanup and Docker installation
+- Windows: Test file cleanup and compiler detection
 - Linux: Test core functionality
-- macOS: Test Docker installation and functionality
+- macOS: Test compiler detection and functionality
 
 ## Feature Development
 

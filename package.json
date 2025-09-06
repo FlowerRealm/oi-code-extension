@@ -117,11 +117,6 @@
           "default": true,
           "description": "是否自动降级 Clang 20+ 的 C++17 标准到 C++14 以避免兼容性问题。设置为 false 可禁用此行为。"
         },
-        "oicode.docker.compilers": {
-          "type": "object",
-          "description": "为不同语言自定义 Docker 镜像 (例如: { \"cpp\": \"my-custom-gcc:latest\" })。",
-          "default": {}
-        },
         "oi-code.language.c.Command": {
           "type": "string",
           "description": "Path to the C compiler (e.g., /usr/bin/gcc)."
