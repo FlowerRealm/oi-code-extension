@@ -245,7 +245,7 @@ docker build -f Dockerfile -t local-oi-code-clang .
 - Windows 版本: 使用 `ContainerAdministrator` 权限
 
 #### "网络超时"
-镜像构建使用了重试机制和国内镜像源。
+镜像构建使用了重试机制。
 如果仍然遇到网络问题，可以：
 1. 检查网络连接
 2. 使用 VPN

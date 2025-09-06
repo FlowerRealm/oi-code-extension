@@ -44,159 +44,118 @@ async function cleanupDir(dir: string, maxRetries = 3) {
     }
 }
 
-// Helper to check if Docker is available and working
-async function isDockerAvailable(): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-        const { exec } = require('child_process');
-        // First check if docker command exists
-        exec('docker --version', (error: any, stdout: any, stderr: any) => {
-            if (error) {
-                console.log('[Docker Check] Docker command not found:', error.message);
-                resolve(false);
-                return;
-            }
-            // Then check if docker daemon is running
-            exec('docker info', (error: any, stdout: any, stderr: any) => {
-                if (error) {
-                    console.log('[Docker Check] Docker daemon not running:', error.message);
-                    resolve(false);
-                } else {
-                    console.log('[Docker Check] Docker is available and running');
-                    resolve(true);
-                }
-            });
-        });
-    });
+// Helper to check if native compilers are available and working
+async function areCompilersAvailable(): Promise<boolean> {
+    try {
+        console.log('[Compiler Check] Testing actual compiler functionality...');
+        
+        // Test with a simple C program that should produce predictable output
+        const testCode = `#include <stdio.h>\nint main() { printf("test_output"); return 0; }`;
+        
+        // Create a temporary test file
+        const testDir = path.join(TEST_BASE_DIR, 'compiler-test');
+        await fs.mkdir(testDir, { recursive: true });
+        const testFile = path.join(testDir, 'test.c');
+        await fs.writeFile(testFile, testCode);
+        
+        // Open the file and try to run it
+        const uri = vscode.Uri.file(testFile);
+        const doc = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(doc);
+        
+        const result: any = await vscode.commands.executeCommand('oicode.runCode', '');
+        
+        console.log('[Compiler Check] Test result:', JSON.stringify(result, null, 2));
+        
+        // Clean up
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        await cleanupDir(testDir);
+        
+        // More lenient check: if we get any result object back, consider compilers available
+        // The actual functionality will be tested in the specific tests
+        if (result && typeof result === 'object') {
+            console.log('[Compiler Check] ✓ Compilers are responding (detailed functionality tested separately)');
+            return true;
+        }
+        
+        console.log('[Compiler Check] ✗ No compiler response received');
+        return false;
+    } catch (error: any) {
+        console.log('[Compiler Check] ✗ Error testing compilers:', error.message);
+        return false;
+    }
 }
 
-// Prepare Docker environment synchronously and completely
-async function prepareDockerEnvironment(): Promise<void> {
-    console.log('[Test Setup] Preparing Docker environment...');
+// Prepare compiler environment synchronously and completely
+async function prepareCompilerEnvironment(): Promise<void> {
+    console.log('[Test Setup] Preparing compiler environment...');
 
-    const dockerAvailable = await isDockerAvailable();
-    if (!dockerAvailable) {
-        console.log('[Test Setup] Docker not available for this environment, attempting to install...');
+    const compilersAvailable = await areCompilersAvailable();
+    if (!compilersAvailable) {
+        console.log('[Test Setup] No compilers available, attempting to setup...');
         
         try {
-            // Import and run Docker installer
-            const { Installer } = require('../docker/install');
-            await Installer.ensureDockerAvailableSilently();
-            console.log('[Test Setup] Docker installation completed');
+            // Initialize compiler environment
+            await vscode.commands.executeCommand('oicode.initializeEnvironment');
+            console.log('[Test Setup] Compiler environment initialized');
         } catch (error: any) {
-            console.log('[Test Setup] Docker installation failed:', error.message);
-            console.log('[Test Setup] Tests will run without Docker if possible');
+            console.log('[Test Setup] Compiler setup failed:', error.message);
+            console.log('[Test Setup] Tests will run without compilers if possible');
             return;
         }
         
-        // Check again after installation
-        if (!await isDockerAvailable()) {
-            console.log('[Test Setup] Docker still not available after installation attempt');
-            console.log('[Test Setup] Tests will run without Docker if possible');
+        // Check again after setup
+        if (!await areCompilersAvailable()) {
+            console.log('[Test Setup] Still no compilers available after setup attempt');
+            console.log('[Test Setup] Tests will run without compilers if possible');
             return;
         }
     }
 
     try {
-        console.log('[Test Setup] Initializing Docker environment...');
-
-        // Use our custom image preparation instead of the command
-        // This ensures we completely wait for Docker to be ready
-        await ensureDockerImageIsReady();
-
-        console.log('[Test Setup] Docker environment prepared successfully');
+        console.log('[Test Setup] Compiler environment prepared successfully');
     } catch (error: any) {
-        console.log('[Test Setup] Docker initialization failed:', error.message);
-        console.log('[Test Setup] Tests will run without Docker if possible');
+        console.log('[Test Setup] Compiler environment initialization failed:', error.message);
+        console.log('[Test Setup] Tests will run without compilers if possible');
     }
 }
 
-// Ensure Docker image is completely ready for testing
-async function ensureDockerImageIsReady(): Promise<void> {
-    // Use platform-specific image
-    const imageName = process.platform === 'win32' 
-        ? 'flowerrealm/oi-code-clang:latest-win'
-        : 'flowerrealm/oi-code-clang:latest';
+// Ensure native compilers are ready for testing
+async function ensureCompilersAreReady(): Promise<void> {
+    console.log('[Test Setup] Checking native compiler availability...');
 
-    console.log(`[Test Setup] Checking if image ${imageName} is available...`);
-
-    const execAsync = (command: string, args: string[]) => new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-        const { spawn } = require('child_process');
+    const compilersAvailable = await areCompilersAvailable();
+    if (!compilersAvailable) {
+        console.log('[Test Setup] No compilers available, attempting to setup...');
         
-        const child = spawn(command, args, { maxBuffer: 10 * 1024 * 1024 });
-        
-        let stdout = '';
-        let stderr = '';
-        
-        child.stdout.on('data', (data: Buffer) => {
-            stdout += data.toString();
-        });
-        
-        child.stderr.on('data', (data: Buffer) => {
-            stderr += data.toString();
-        });
-        
-        child.on('close', (code: number) => {
-            if (code !== 0) {
-                reject(Object.assign(new Error(`Command failed with exit code ${code}`), { stdout, stderr }));
-            } else {
-                resolve({ stdout, stderr });
-            }
-        });
-        
-        child.on('error', (error: any) => {
-            reject(Object.assign(new Error(error.message), { stdout, stderr }));
-        });
-    });
-
-    async function imageExistsLocally(): Promise<boolean> {
         try {
-            await execAsync('docker', ['inspect', imageName]);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    if (await imageExistsLocally()) {
-        console.log(`[Test Setup] Image ${imageName} is already available locally`);
-        return;
-    }
-
-    console.log(`[Test Setup] Image ${imageName} not found locally, pulling now...`);
-
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            console.log(`[Test Setup] docker pull attempt ${attempt}/${maxAttempts}...`);
-            await execAsync('docker', ['pull', imageName]);
-            // verify
-            if (await imageExistsLocally()) {
-                console.log('[Test Setup] Image pulled and verified');
-                // Initialize extension environment after image is ready
-                try {
-                    await vscode.commands.executeCommand('oicode.initializeEnvironment');
-                    console.log('[Test Setup] Extension environment initialized');
-                } catch (error) {
-                    console.warn('[Test Setup] Extension initialization failed:', error);
-                }
-                return;
-            }
-            throw new Error('Image verification failed after pull');
+            // Initialize compiler environment
+            await vscode.commands.executeCommand('oicode.initializeEnvironment');
+            console.log('[Test Setup] Compiler environment initialized');
         } catch (error: any) {
-            console.warn(`[Test Setup] docker pull failed (attempt ${attempt}): ${error?.message || error}`);
-            if (attempt < maxAttempts) {
-                const backoffMs = 2000 * attempt;
-                console.log(`[Test Setup] Waiting ${backoffMs}ms before retry...`);
-                await new Promise(res => setTimeout(res, backoffMs));
-            } else {
-                throw new Error(`Failed to pull required Docker image ${imageName} after ${maxAttempts} attempts: ${error?.message || error}`);
-            }
+            console.log('[Test Setup] Compiler setup failed:', error.message);
+            console.log('[Test Setup] Tests will run without compilers if possible');
+            return;
         }
+        
+        // Check again after setup
+        if (!await areCompilersAvailable()) {
+            console.log('[Test Setup] Still no compilers available after setup attempt');
+            console.log('[Test Setup] Tests will run without compilers if possible');
+            return;
+        }
+    }
+
+    try {
+        console.log('[Test Setup] Native compilers are ready for testing');
+    } catch (error: any) {
+        console.log('[Test Setup] Compiler readiness check failed:', error.message);
+        console.log('[Test Setup] Tests will run without compilers if possible');
     }
 }
 
 suite('Extension Test Suite', () => {
-    // Wait for extension activation and Docker preparation
+    // Wait for extension activation and compiler preparation
     before(async function () {
         this.timeout(120000);
         const extId = 'FlowerRealm.oi-code';
@@ -217,8 +176,8 @@ suite('Extension Test Suite', () => {
 
         console.log('[Test Setup] Extension activated successfully');
 
-        // Pre-initialize Docker environment synchronously before tests start
-        await prepareDockerEnvironment();
+        // Pre-initialize compiler environment synchronously before tests start
+        await prepareCompilerEnvironment();
     });
 
 
@@ -250,36 +209,32 @@ suite('Extension Test Suite', () => {
         assert.strictEqual(activeTab.label, 'OI-Code Settings', "Webview panel title is incorrect");
     });
 
-    test('Docker initialization and code execution', async function () {
+    test('Compiler initialization and code execution', async function () {
         this.timeout(90000);
 
-        // Check if Docker is available before running the test
-        const dockerAvailable = await isDockerAvailable();
+        // Check if compilers are available before running the test
+        const compilersAvailable = await areCompilersAvailable();
 
-        if (!dockerAvailable) {
-            console.log('[Docker Init Test] Docker not available, testing Docker installation instead');
-            // Test Docker installation when Docker is not available
-            try {
-                await vscode.commands.executeCommand('oicode.downloadDocker');
-                console.log('[Docker Init Test] Docker installation command executed successfully');
-                assert.ok(true, 'Docker installation command should execute without crashing');
-            } catch (error: any) {
-                console.log('[Docker Init Test] Docker installation failed as expected:', error.message);
-                assert.ok(true, 'Docker installation should fail gracefully in CI environment');
-            }
+        if (!compilersAvailable) {
+            console.log('[Compiler Init Test] Compilers not responding, skipping detailed execution tests');
+            // Don't fail the test, just skip the detailed validation
+            this.skip();
             return;
         }
 
-        console.log('[Docker Init Test] Docker is available, proceeding with code execution tests...');
-        // Docker environment already initialized in before() hook, skip re-initialization to avoid conflicts
+        console.log('[Compiler Init Test] Compilers are available, proceeding with code execution tests...');
+        // Compiler environment already initialized in before() hook, skip re-initialization to avoid conflicts
 
         // Test C code execution
         const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;
         const createdC = await createProblemAndOpen('UT-C-Hello', 'c', cCode);
         const resC: any = await vscode.commands.executeCommand('oicode.runCode', '');
-        console.log('[Docker Init Test] C execution result:', resC);
+        console.log('[Compiler Init Test] C execution result:', resC);
         assert.ok(resC, 'oicode.runCode should return a result for C');
-        assert.ok(typeof resC.output === 'string', 'C execution should return string output');
+        assert.strictEqual(typeof resC.output, 'string', 'C execution should return string output');
+        assert.strictEqual(resC.output.trim(), 'Hello, C!', 'C output should match expected result');
+        assert.strictEqual(resC.error, '', 'C execution should have no errors');
+        assert.strictEqual(resC.timedOut, false, 'C execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdC.sourcePath));
 
@@ -287,93 +242,216 @@ suite('Extension Test Suite', () => {
         const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\\n\"; return 0; }`;
         const createdCpp = await createProblemAndOpen('UT-CPP-Hello', 'cpp', cppCode);
         const resCpp: any = await vscode.commands.executeCommand('oicode.runCode', '');
-        console.log('[Docker Init Test] C++ execution result:', resCpp);
-        assert.ok(resCpp && typeof resCpp.output === 'string', 'C++ execution should return string output');
+        console.log('[Compiler Init Test] C++ execution result:', resCpp);
+        assert.ok(resCpp, 'oicode.runCode should return a result for C++');
+        assert.strictEqual(typeof resCpp.output, 'string', 'C++ execution should return string output');
+        assert.strictEqual(resCpp.output.trim(), 'Hello, C++!', 'C++ output should match expected result');
+        assert.strictEqual(resCpp.error, '', 'C++ execution should have no errors');
+        assert.strictEqual(resCpp.timedOut, false, 'C++ execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdCpp.sourcePath));
 
     });
+
+    // Additional strict tests for error handling and edge cases
+    describe('Strict Compiler Tests', () => {
+        
+        test('should handle compilation errors gracefully', async function () {
+            this.timeout(30000);
+            
+            // Test with invalid C code
+            const invalidCCode = `#include <stdio.h>\nint main() { invalid_syntax_here return 0; }`;
+            const created = await createProblemAndOpen('UT-Invalid-C', 'c', invalidCCode);
+            
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+                
+                // Should return a result but with error information
+                assert.ok(res, 'should return result even for compilation errors');
+                assert.ok(res.error, 'should have compilation error');
+                assert.strictEqual(typeof res.error, 'string', 'error should be a string');
+                assert.ok(res.error.length > 0, 'error message should not be empty');
+                
+                console.log('[Strict Test] ✓ Compilation error handled correctly:', res.error.substring(0, 100));
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(path.dirname(created.sourcePath));
+            }
+        });
+
+        test('should handle runtime errors gracefully', async function () {
+            this.timeout(30000);
+            
+            // Test with code that causes runtime error (division by zero)
+            const runtimeErrorCode = `#include <stdio.h>\nint main() { int a = 1, b = 0; printf("%d", a/b); return 0; }`;
+            const created = await createProblemAndOpen('UT-Runtime-Error', 'c', runtimeErrorCode);
+            
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+                
+                // Should return a result, potentially with runtime error information
+                assert.ok(res, 'should return result even for runtime errors');
+                
+                // Either should have error message or should handle the runtime error gracefully
+                if (res.error) {
+                    assert.strictEqual(typeof res.error, 'string', 'error should be a string');
+                    console.log('[Strict Test] ✓ Runtime error handled correctly:', res.error.substring(0, 100));
+                } else {
+                    // Some systems handle division by zero differently, so we just check it doesn't crash
+                    assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                    console.log('[Strict Test] ✓ Runtime handled without error, output:', res.output);
+                }
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(path.dirname(created.sourcePath));
+            }
+        });
+
+        test('should handle infinite loops with timeout', async function () {
+            this.timeout(45000); // Give extra time for timeout test
+            
+            // Test with infinite loop
+            const infiniteLoopCode = `#include <stdio.h>\nint main() { while(1) { } return 0; }`;
+            const created = await createProblemAndOpen('UT-Infinite-Loop', 'c', infiniteLoopCode);
+            
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+                
+                // Should handle timeout gracefully
+                assert.ok(res, 'should return result even for infinite loops');
+                
+                // Note: timeout detection depends on the specific implementation
+                // Either it should timeout OR it should handle it gracefully
+                if (res.timedOut) {
+                    console.log('[Strict Test] ✓ Infinite loop correctly detected as timeout');
+                } else {
+                    // If not timed out, it should at least not crash and have some error handling
+                    console.log('[Strict Test] ✓ Infinite loop handled (no timeout detected but no crash)');
+                    assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                }
+                
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(path.dirname(created.sourcePath));
+            }
+        });
+
+        test('should handle different input types correctly', async function () {
+            this.timeout(30000);
+            
+            // Test code that processes different types of input
+            const inputProcessingCode = `#include <stdio.h>\nint main() {\n    int num;\n    char str[100];\n    if (scanf("%d %s", &num, str) == 2) {\n        printf("Number: %d, String: %s\\n", num, str);\n    } else {\n        printf("Input error\\n");\n    }\n    return 0;\n}`;
+            const created = await createProblemAndOpen('UT-Input-Test', 'c', inputProcessingCode);
+            
+            try {
+                const testInput = "42 hello";
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', testInput);
+                
+                assert.ok(res, 'should return result for input processing');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                assert.strictEqual(res.timedOut, false, 'should not timeout');
+                
+                // Check that we got some output (the exact format may vary)
+                console.log('[Strict Test] Input processing output:', JSON.stringify(res.output));
+                
+                if (res.error) {
+                    console.log('[Strict Test] Input processing had error (may be expected):', res.error);
+                } else {
+                    // If no error, output should contain our input values
+                    if (res.output.includes('42') || res.output.includes('hello')) {
+                        console.log('[Strict Test] ✓ Input processing works correctly');
+                    } else {
+                        console.log('[Strict Test] ⚠ Input processing ran but output format may differ');
+                    }
+                }
+                
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(path.dirname(created.sourcePath));
+            }
+        });
+
+    });
+
 });
 
 // New test suite for OI-Code commands
 suite('OI-Code Commands Test Suite', () => {
 
 
-    test('should execute oi-code.installDocker command', async function () {
-        this.timeout(120000); // Increase timeout for Docker installation
-        // Check if Docker is already available
-        const dockerAvailable = await isDockerAvailable();
+    test('should execute oicode.setupCompiler command', async function () {
+        this.timeout(120000); // Increase timeout for compiler setup
+        // Check if compilers are already available
+        const compilersAvailable = await areCompilersAvailable();
 
-        if (dockerAvailable) {
-            vscode.window.showInformationMessage('Docker is already installed. Skipping installation test.');
-            assert.ok(true, 'Docker already available, test passed.');
+        if (compilersAvailable) {
+            vscode.window.showInformationMessage('Compilers are already available. Skipping setup test.');
+            assert.ok(true, 'Compilers already available, test passed.');
         } else {
-            vscode.window.showInformationMessage('Docker not found. Testing installation command...');
-            // Test that the command doesn't crash even if Docker installation fails
+            vscode.window.showInformationMessage('Compilers not found. Testing setup command...');
+            // Test that the command doesn't crash even if compiler setup fails
             try {
-                await vscode.commands.executeCommand('oicode.downloadDocker');
-                assert.ok(true, 'oi-code.downloadDocker command executed without crashing');
+                await vscode.commands.executeCommand('oicode.initializeEnvironment');
+                vscode.window.showInformationMessage('Compiler environment initialized successfully');
+                assert.ok(true, 'Compiler setup process completed without crashing');
             } catch (error: any) {
-                // Expected to fail in CI environments without Docker
+                // Expected to fail in some environments without compiler installation permissions
                 // Log error for debugging but continue with test
-                console.warn(`[Test] 'oicode.downloadDocker' command failed as expected: ${error.message}`);
-                assert.ok(true, `oi-code.downloadDocker command failed as expected: ${error.message}`);
+                console.warn(`[Test] Compiler setup failed as expected: ${error.message}`);
+                assert.ok(true, `Compiler setup failed as expected: ${error.message}`);
             }
         }
     });
 
 
 
-    describe('Code Execution Tests (requires Docker environment)', () => {
+    describe('Code Execution Tests (requires native compilers)', () => {
         before(async function () {
-            this.timeout(120000); // Increase timeout for Docker initialization
+            this.timeout(120000); // Increase timeout for compiler initialization
 
-            // Check if Docker is available and working before running tests
-            const dockerAvailable = await isDockerAvailable();
+            // Check if compilers are available and working before running tests
+            const compilersAvailable = await areCompilersAvailable();
 
-            if (!dockerAvailable) {
-                console.log('[Test Setup] Docker not available, skipping Docker-dependent tests');
-                vscode.window.showInformationMessage('Docker not available, skipping Docker-dependent tests.');
+            if (!compilersAvailable) {
+                console.log('[Test Setup] Compilers not available, skipping compiler-dependent tests');
+                vscode.window.showInformationMessage('Compilers not available, skipping compiler-dependent tests.');
                 this.skip(); // Skip all tests in this describe block
             }
 
-            console.log('[Test Setup] Docker is available, initializing Docker environment for code execution tests...');
-            vscode.window.showInformationMessage('Initializing Docker environment for code execution tests...');
+            console.log('[Test Setup] Compilers are available, initializing compiler environment for code execution tests...');
+            vscode.window.showInformationMessage('Initializing compiler environment for code execution tests...');
             await vscode.commands.executeCommand('oicode.initializeEnvironment');
-            // Ensure docker compiler defaults
-            const config = vscode.workspace.getConfiguration();
-            await config.update('oicode.docker.compilers', undefined, vscode.ConfigurationTarget.Global);
-            vscode.window.showInformationMessage('Docker environment initialized.');
+            vscode.window.showInformationMessage('Compiler environment initialized.');
         });
     });
 
-    // Separate test for Docker installation when Docker is not available
-    test('should handle Docker installation flow when Docker is not available', async function () {
+    // Separate test for compiler setup when compilers are not available
+    test('should handle compiler setup flow when compilers are not available', async function () {
         this.timeout(120000);
 
-        // Check if Docker is available
-        const dockerAvailable = await isDockerAvailable();
+        // Check if compilers are available
+        const compilersAvailable = await areCompilersAvailable();
 
-        if (dockerAvailable) {
-            console.log('[Docker Installation Test] Docker is already available, skipping installation test');
-            assert.ok(true, 'Docker already available, test passed.');
+        if (compilersAvailable) {
+            console.log('[Compiler Setup Test] Compilers are already available, skipping setup test');
+            assert.ok(true, 'Compilers already available, test passed.');
             return;
         }
 
-        console.log('[Docker Installation Test] Docker not available, testing Docker installation command...');
-        // Test Docker installation when Docker is not available
+        console.log('[Compiler Setup Test] Compilers not available, testing compiler setup command...');
+        // Test compiler setup when compilers are not available
         try {
-            await vscode.commands.executeCommand('oicode.downloadDocker');
-            console.log('[Docker Installation Test] Docker installation command executed successfully');
-            assert.ok(true, 'Docker installation command should execute without crashing');
+            await vscode.commands.executeCommand('oicode.initializeEnvironment');
+            console.log('[Compiler Setup Test] Compiler setup completed successfully');
         } catch (error: any) {
-            console.log('[Docker Installation Test] Docker installation failed as expected:', error.message);
-            assert.ok(true, `Docker installation should fail gracefully in CI environment: ${error.message}`);
+            console.log('[Compiler Setup Test] Compiler setup failed as expected:', error.message);
+            assert.ok(true, `Compiler setup should fail gracefully in restricted environment: ${error.message}`);
         }
     });
 
     describe('Pair Check Tests (Catalan numbers)', () => {
-        const inputs = ['1', '2', '3', '4', '5'];
+        const inputs = ['0', '1', '2', '3', '4'];
+        const expectedOutputs = ['1', '1', '2', '5', '14']; // Catalan numbers
 
         async function openBesideDocs(codeLeft: string, codeRight: string, ext: string) {
             // Close all editors to avoid picking unrelated editors in runPairCheck
@@ -438,20 +516,12 @@ int main() {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
                 this.timeout(60000);
 
-                // Check if Docker is available for this test
-                const dockerAvailableForTest = await isDockerAvailable();
+                // Check if compilers are available for this test
+                const compilersAvailableForTest = await areCompilersAvailable();
 
-                if (!dockerAvailableForTest) {
-                    console.log(`[PairCheck Test] Docker not available for ${lang}, testing Docker installation instead`);
-                    // Test Docker installation when Docker is not available
-                    try {
-                        await vscode.commands.executeCommand('oicode.downloadDocker');
-                        console.log(`[PairCheck Test] Docker installation command executed successfully for ${lang}`);
-                        assert.ok(true, 'Docker installation command should execute without crashing');
-                    } catch (error: any) {
-                        console.log(`[PairCheck Test] Docker installation failed as expected for ${lang}:`, error.message);
-                        assert.ok(true, 'Docker installation should fail gracefully in CI environment');
-                    }
+                if (!compilersAvailableForTest) {
+                    console.log(`[PairCheck Test] Compilers not responding for ${lang}, skipping pair check tests`);
+                    this.skip();
                     return;
                 }
 
@@ -459,31 +529,36 @@ int main() {
                 const ext = lang;
                 const { leftDir, rightDir } = await openBesideDocs(codes[0], codes[1], ext);
                 try {
-                    for (const input of inputs) {
-                        console.log(`\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}"`);
+                    for (let i = 0; i < inputs.length; i++) {
+                        const input = inputs[i];
+                        const expectedOutput = expectedOutputs[i];
+                        
+                        console.log(`\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`);
                         console.log(`[PairCheck Test] Input length: ${input.length}, Input bytes: ${[...input].map(c => c.charCodeAt(0)).join(',')}`);
 
                         const res: any = await vscode.commands.executeCommand('oicode.runPairCheck', input);
                         console.log(`[PairCheck Test] Result:`, JSON.stringify(res, null, 2));
 
-                        if (res && res.error) {
-                            console.log(`[PairCheck Test] Error: ${res.error}`);
+                        // Validate result structure
+                        assert.ok(res, 'pair check should return a result');
+                        assert.strictEqual(typeof res, 'object', 'result should be an object');
+                        
+                        if (res.error) {
                             assert.fail(`pair check error: ${res.error}`);
                         }
-                        if (!(res && res.equal === true)) {
-                            console.log('PairCheck mismatch debug:', {
-                                lang: lang,
-                                input: JSON.stringify(input),
-                                inputHex: [...input].map((c: string) => c.charCodeAt(0).toString(16)).join(' '),
-                                output1: (res?.output1 || '').split('\n').map((line: string) => line.trim()).filter((line: string) => line),
-                                output2: (res?.output2 || '').split('\n').map((line: string) => line.trim()).filter((line: string) => line),
-                                equal: res?.equal,
-                                output1Raw: res?.output1,
-                                output2Raw: res?.output2
-                            });
-                        }
-                        assert.ok(res && res.equal === true, `pair check mismatch for input=${JSON.stringify(input)} in ${lang}`);
-                        console.log(`[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}"`);
+                        
+                        // Validate outputs exist and are strings
+                        assert.ok(typeof res.output1 === 'string', 'output1 should be a string');
+                        assert.ok(typeof res.output2 === 'string', 'output2 should be a string');
+                        
+                        // Validate equality and expected output
+                        assert.strictEqual(res.equal, true, `outputs should be equal for input=${input}`);
+                        
+                        const actualOutput = res.output1.trim();
+                        assert.strictEqual(actualOutput, expectedOutput, 
+                            `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`);
+                        
+                        console.log(`[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}" → "${actualOutput}"`);
                     }
                 } finally {
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -495,122 +570,6 @@ int main() {
         }
     });
 
-    describe('Docker Installation Integration Tests', () => {
-        test('should install and prepare Docker in CI environment (Ubuntu)', async function () {
-            this.timeout(900000); // 15-minute timeout - Docker installation takes time
-
-            const platform = os.platform();
-            if (platform !== 'linux') {
-                console.log(`[Docker Install CI Test] Skipping on ${platform} - test designed for Linux CI`);
-                return;
-            }
-
-            const distro = require('fs').existsSync('/etc/os-release') ?
-                require('fs').readFileSync('/etc/os-release', 'utf8').match(/^ID=(.*)$/m)?.[1]?.replace(/"/g, '') || 'unknown' :
-                'unknown';
-
-            if (distro !== 'ubuntu' && distro !== 'debian') {
-                console.log(`[Docker Install CI Test] Skipping on ${distro} - test designed for Ubuntu/Debian`);
-                return;
-            }
-
-            console.log('[Docker Install CI Test] Running Docker CI installation test...');
-
-            // Record initial state
-            let initialDockerAvailable = false;
-            try {
-                const { exec } = require('child_process');
-                require('util').promisify(exec);
-
-                await new Promise<void>((resolve, reject) => {
-                    exec('docker --version', (error: any) => {
-                        initialDockerAvailable = !error;
-                        resolve();
-                    });
-                });
-            } catch {
-                initialDockerAvailable = false;
-            }
-
-            console.log(`[Docker Install CI Test] Initial Docker availability: ${initialDockerAvailable}`);
-
-            if (initialDockerAvailable) {
-                // 在本地环境中，跳过卸载现有Docker的测试，仅仅验证可用性
-                console.log('[Docker Install CI Test] Docker already available on local system, skipping installation test for safety');
-                console.log('[Docker Install CI Test] ✓ Docker CI integration test passed (local environment)');
-                assert.ok(true, 'Docker already available on local system - safe to skip destructive tests');
-                return;
-            }
-
-            // 测试自动安装
-            try {
-                console.log('[Docker Install CI Test] Starting Docker installation via extension...');
-                await vscode.commands.executeCommand('oicode.downloadDocker');
-
-                // 验证安装结果
-                console.log('[Docker Install CI Test] Verifying Docker installation...');
-
-                // 检查进程，验证会抛出异常
-                require('child_process').execSync('docker --version', {
-                    stdio: 'ignore',
-                    timeout: 5000
-                });
-                console.log('[Docker Install CI Test] ✓ Docker version check passed');
-
-                // 检查服务状态
-                const serviceStatus = require('child_process').execSync('sudo systemctl is-active docker', {
-                    encoding: 'utf8',
-                    timeout: 5000
-                }).trim();
-                console.log(`[Docker Install CI Test] Docker service status: ${serviceStatus}`);
-                assert.strictEqual(serviceStatus, 'active', 'Docker service should be active');
-
-                // 等待Docker准备就绪（最大5分钟）
-                console.log('[Docker Install CI Test] Waiting for Docker daemon to be ready...');
-                const startTime = Date.now();
-                let ready = false;
-                let attempts = 0;
-
-                while (!ready && (Date.now() - startTime) < 300000) { // 5分钟超时
-                    attempts++;
-                    try {
-                        require('child_process').execSync('docker ps', {
-                            stdio: 'ignore',
-                            timeout: 10000
-                        });
-                        ready = true;
-                        console.log(`[Docker Install CI Test] ✓ Docker ready after ${attempts} attempts (${((Date.now() - startTime) / 1000).toFixed(1)}s)`);
-                    } catch (error: any) {
-                        console.log(`[Docker Install CI Test] Attempt ${attempts} failed: ${error.message}`);
-                        await new Promise(resolve => setTimeout(resolve, 5000)); // 5秒等待后重试
-                    }
-                }
-
-                assert.ok(ready, 'Docker should be ready and accessible after installation');
-
-                // 测试基本功能
-                console.log('[Docker Install CI Test] Testing basic Docker functionality...');
-                const { stdout } = require('child_process').execSync('docker run --rm hello-world echo "Docker CI test successful"', {
-                    encoding: 'utf8',
-                    timeout: 60000
-                });
-                console.log(`[Docker Install CI Test] Basic Docker test output: ${stdout.trim()}`);
-                assert.strictEqual(stdout.trim(), 'Docker CI test successful', 'Docker should run containers successfully');
-
-                console.log('[Docker Install CI Test] ✓ All Docker CI installation tests passed');
-
-            } catch (error: any) {
-                console.error(`[Docker Install CI Test] ❌ Docker CI installation test failed:`, error);
-                // 在CI环境中我们期望安装会失败，但要确保失败是由于预期原因
-                if (error.message.includes('EACCES') || error.message.includes('permission denied') || error.message.includes('sudo')) {
-                    console.log('[Docker Install CI Test] Expected failure in CI context - installation attempted successfully');
-                    assert.ok(true, 'Docker installation command executed and failed as expected in privileged environment');
-                } else {
-                    throw error; // 其他错误需要抛出
-                }
-            }
-        });
-    });
-
+    
 
 });

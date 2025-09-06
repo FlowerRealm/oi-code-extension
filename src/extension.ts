@@ -6,9 +6,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { DockerManager } from './dockerManager';
 import * as Diff from 'diff';
-import { Installer } from './docker/install';
+import { NativeCompilerManager } from './nativeCompiler';
 import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
 
 function htmlEscape(str: string): string {
@@ -92,113 +91,55 @@ function getPairCheckWebviewContent(webview: vscode.Webview): string {
 </html>`;
 }
 
-async function runSingleInDocker(
-    projectRootPath: string,
-    sourceDir: string,
+
+async function runPairWithNativeCompilers(
+    sourcePath1: string,
+    sourcePath2: string,
     languageId: 'c' | 'cpp',
-    sourceFileName: string,
     input: string,
-    options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
-): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
-    // Generate unique executable filename to avoid conflicts
-    const baseName = path.parse(sourceFileName).name;
-    const uniqueId = Math.random().toString(36).slice(2, 7);
-    const executableName = `/tmp/${baseName}_${uniqueId}.out`;
-
-    // Build complete source file path
-    const sourceFilePath = `/tmp/source/${sourceFileName}`;
-
-    // Get compiler options
-    const config = vscode.workspace.getConfiguration();
-    const defaultOpt = config.get<string>('oicode.compile.opt') || '2';
-    const defaultStd = config.get<string>('oicode.compile.std') || 'c++17';
-
-    const effOpt = (options?.opt || defaultOpt).replace(/^O/, '');
-    // Ensure optimization level is valid
-    const validOptLevels = ['0', '1', '2', '3', 'g', 's', 'z', 'fast'];
-    const finalOpt = validOptLevels.includes(effOpt) ? effOpt : '2';
-    const effStd = options?.std || defaultStd;
-
-    // Validate path security - prevent path traversal attacks
-    if (sourceFilePath.includes('..') || executableName.includes('..')) {
-        throw new Error('Invalid file path: path traversal detected');
-    }
-
-    // Build compile command using Clang toolchain
-    let compileCommand: string;
-    if (languageId === 'cpp') {
-        compileCommand = `clang++ "${sourceFilePath}" -o "${executableName}" -O${finalOpt} -std=${effStd}`;
-    } else {
-        compileCommand = `clang "${sourceFilePath}" -o "${executableName}" -O${finalOpt}`;
-    }
-
-    // Build run command
-    const runCommand = `"${executableName}"`;
-
-    // Combine complete command: compile + run
-    // Use trap command to ensure temporary compilation products are reliably cleaned up
-    // even when the process is unexpectedly terminated
-    // Use double quotes around paths to prevent shell injection
-    const fullCommand = `trap "rm -f \\"${executableName}\\"" EXIT; ${compileCommand} && ${runCommand}`;
-
-    // Add debug information
-    console.log(`[RunSingleInDocker] Language: ${languageId}, Source file: ${sourceFileName}`);
-    console.log(`[RunSingleInDocker] Executable name: ${executableName}`);
-    console.log(`[RunSingleInDocker] Source file path: ${sourceFilePath}`);
-    console.log(`[RunSingleInDocker] Command: ${fullCommand}`);
-
-    // Run compilation and execution commands directly, no additional file copying needed as dockerManager handles it
-    const result = await DockerManager.run({
-        sourceDir,
-        command: fullCommand,
-        input,
-        memoryLimit: (options?.memoryLimit ? String(options.memoryLimit) : '512'),
-        projectRootPath,
-        languageId,
-        timeLimit: options?.timeLimit ?? 10
-    });
-    return {
-        stdout: result.stdout,
-        stderr: result.stderr,
-        timedOut: result.timedOut,
-        memoryExceeded: result.memoryExceeded,
-        spaceExceeded: result.spaceExceeded
-    };
-}
-
-/**
- * Run two code files in separate containers to avoid complex output parsing
- */
-async function runPairInSeparateContainers(
-    projectRootPath: string,
-    sourceDir: string,
-    languageId: 'c' | 'cpp',
-    sourceFileName1: string,
-    sourceFileName2: string,
-    input: string,
-    options?: { opt?: string; std?: string; timeLimit?: number; memoryLimit?: number }
+    options?: { timeLimit?: number; memoryLimit?: number }
 ): Promise<{
-    result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
-    result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
+    result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
+    result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
 }> {
-    // Run two programs in parallel, each using a separate container
+    // Check if we have compilers available
+    const compilerResult = await NativeCompilerManager.detectCompilers();
+    if (!compilerResult.success || compilerResult.compilers.length === 0) {
+        throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
+    }
+
+    // Select the best compiler for the language
+    const suitableCompilers = compilerResult.compilers.filter(c => 
+        languageId === 'c' ? c.type === 'clang' || c.type === 'gcc' || c.type === 'msvc' :
+        c.type === 'clang++' || c.type === 'g++' || c.type === 'msvc'
+    );
+    
+    if (suitableCompilers.length === 0) {
+        throw new Error(`No suitable compiler found for ${languageId}`);
+    }
+
+    const compiler = suitableCompilers[0]; // Use the first available compiler
+    const timeLimit = options?.timeLimit ?? 20;
+    const memoryLimit = options?.memoryLimit ?? 512;
+
+    // Run both programs in parallel
     const [result1, result2] = await Promise.all([
-        runSingleInDocker(
-            projectRootPath,
-            sourceDir,
-            languageId,
-            sourceFileName1,
-            input,
-            options
-        ),
-        runSingleInDocker(
-            projectRootPath,
-            sourceDir,
-            languageId,
-            sourceFileName2,
-            input,
-            options
-        )
+        NativeCompilerManager.compileAndRun({
+            sourcePath: sourcePath1,
+            language: languageId,
+            compiler: compiler,
+            input: input,
+            timeLimit,
+            memoryLimit
+        }),
+        NativeCompilerManager.compileAndRun({
+            sourcePath: sourcePath2,
+            language: languageId,
+            compiler: compiler,
+            input: input,
+            timeLimit,
+            memoryLimit
+        })
     ]);
 
     return { result1, result2 };
@@ -262,19 +203,17 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
                     const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
 
-                    // Define file extensions to ensure consistency with Docker file names
+                    // Define file extensions with proper language extensions
                     const file1Path = path.join(tempDir, `code1.${langId}`);
                     const file2Path = path.join(tempDir, `code2.${langId}`);
                     await fs.promises.writeFile(file1Path, editor1.document.getText());
                     await fs.promises.writeFile(file2Path, editor2.document.getText());
 
-                    // Optimize pair check: use separate containers to avoid complex output parsing
-                    const pairResult = await runPairInSeparateContainers(
-                        this._context.extensionPath,
-                        tempDir,
+                    // Use native compilers for pair check
+                    const pairResult = await runPairWithNativeCompilers(
+                        file1Path,
+                        file2Path,
                         langId,
-                        `code1.${langId}`,
-                        `code2.${langId}`,
                         message.input,
                         { timeLimit: 20, memoryLimit: 512 }
                     );
@@ -355,13 +294,19 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
 
-        // Initialize container pool
-        DockerManager.initializeContainerPool().catch(error => {
-            console.error('Failed to initialize container pool:', error);
+        // Initialize compiler manager
+        NativeCompilerManager.detectCompilers().then(result => {
+            if (result.success) {
+                console.log(`Detected ${result.compilers.length} compilers`);
+                if (result.recommended) {
+                    console.log(`Recommended compiler: ${result.recommended.name}`);
+                }
+            } else {
+                console.log('Compiler detection failed:', result.error);
+            }
+        }).catch(error => {
+            console.error('Failed to detect compilers:', error);
         });
-
-        // Setup editor event listeners for on-demand container management
-        setupEditorEventListeners(context);
 
         // Register WebviewView providers
         console.log('PairCheckViewProvider will be registered later');
@@ -639,13 +584,11 @@ export function activate(context: vscode.ExtensionContext) {
                 // Use provided options or fallback to defaults
                 const timeLimit = options?.timeLimit ?? 20; // seconds
 
-                // Optimize pair check: use separate containers to avoid complex output parsing
-                const pairResult = await runPairInSeparateContainers(
-                    context.extensionPath,
-                    tempDir,
+                // Use native compilers for pair check
+                const pairResult = await runPairWithNativeCompilers(
+                    file1Path,
+                    file2Path,
                     langId,
-                    `code1.${langId}`,
-                    `code2.${langId}`,
                     input,
                     { timeLimit, memoryLimit: 512 }
                 );
@@ -695,22 +638,44 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // Use provided options or fallback to defaults
             const timeLimit = options?.timeLimit ?? 5; // seconds
-            const memoryLimit = options?.memoryLimit ?? 512; // MB (use 512MB to enable container pool)
+            const memoryLimit = options?.memoryLimit ?? 512; // MB
+            
             return vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `Running ${sourceFile}...`,
                 cancellable: false
             }, async (progress) => {
-                progress.report({ increment: 0, message: 'Preparing container...' });
+                progress.report({ increment: 0, message: 'Detecting compilers...' });
                 try {
-                    const result = await runSingleInDocker(
-                        context.extensionPath,
-                        path.dirname(document.uri.fsPath),
-                        languageId,
-                        sourceFile,
-                        input || '',
-                        { timeLimit, memoryLimit }
+                    // Check if we have compilers available
+                    const compilerResult = await NativeCompilerManager.detectCompilers();
+                    if (!compilerResult.success || compilerResult.compilers.length === 0) {
+                        throw new Error('No compilers available. Please run "OI-Code: Setup Compiler" first.');
+                    }
+
+                    // Select the best compiler for the language
+                    const suitableCompilers = compilerResult.compilers.filter(c => 
+                        languageId === 'c' ? c.type === 'clang' || c.type === 'gcc' || c.type === 'msvc' :
+                        c.type === 'clang++' || c.type === 'g++' || c.type === 'msvc'
                     );
+                    
+                    if (suitableCompilers.length === 0) {
+                        throw new Error(`No suitable compiler found for ${languageId}`);
+                    }
+
+                    const compiler = suitableCompilers[0]; // Use the first available compiler
+                    progress.report({ increment: 50, message: `Compiling with ${compiler.type}...` });
+
+                    // Execute with native compiler
+                    const result = await NativeCompilerManager.compileAndRun({
+                        sourcePath: document.uri.fsPath,
+                        language: languageId,
+                        compiler: compiler,
+                        input: input || '',
+                        timeLimit,
+                        memoryLimit
+                    });
+
                     progress.report({ increment: 100 });
                     const panel = vscode.window.createWebviewPanel(
                         'oiCodeOutput',
@@ -721,19 +686,18 @@ export function activate(context: vscode.ExtensionContext) {
                     const meta: string[] = [];
                     if (result.timedOut) meta.push('TimedOut');
                     if (result.memoryExceeded) meta.push('MemoryExceeded');
-                    if (result.spaceExceeded) meta.push('SpaceExceeded');
                     let content = '';
                     if (meta.length) content += `<p><b>Flags:</b> ${meta.join(', ')}</p>`;
                     if (result.stdout) content += `<h2>Output:</h2><pre>${htmlEscape(result.stdout)}</pre>`;
                     if (result.stderr) content += `<h2>Error:</h2><pre>${htmlEscape(result.stderr)}</pre>`;
                     panel.webview.html = content || '<i>No output</i>';
-                    // Return in the format expected by tests: { output, error, ... }
+                    
+                    // Return in the format expected by tests
                     return {
                         output: result.stdout,
                         error: result.stderr,
                         timedOut: result.timedOut,
-                        memoryExceeded: result.memoryExceeded,
-                        spaceExceeded: result.spaceExceeded
+                        memoryExceeded: result.memoryExceeded
                     };
                 } catch (e: any) {
                     vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
@@ -745,41 +709,74 @@ export function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(vscode.commands.registerCommand('oicode.initializeEnvironment', async () => {
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Initializing OI-Code Environment',
-                cancellable: false // Building an image cannot be cancelled easily
+                title: '检查编译器环境',
+                cancellable: false
             }, async (progress) => {
-                progress.report({ message: 'Building Docker image, this may take a while...' });
+                progress.report({ message: '检测编译器...' });
                 try {
-                    await DockerManager.ensureDockerIsReady(context.extensionPath);
-                    progress.report({ message: 'Docker image ready!', increment: 100 });
-                    vscode.window.showInformationMessage('OI-Code Docker environment is ready!');
+                    const result = await NativeCompilerManager.detectCompilers();
+                    
+                    if (result.success && result.compilers.length > 0) {
+                        progress.report({ message: '编译器检测完成!', increment: 100 });
+                        vscode.window.showInformationMessage(
+                            `OI-Code环境已就绪！检测到 ${result.compilers.length} 个编译器，推荐使用: ${result.recommended?.name}`
+                        );
+                    } else {
+                        progress.report({ message: '需要安装编译器...' });
+                        const choice = await vscode.window.showInformationMessage(
+                            '未检测到C/C++编译器。是否要安装LLVM？',
+                            { modal: true },
+                            '安装LLVM',
+                            '查看帮助'
+                        );
+                        
+                        if (choice === '安装LLVM') {
+                            const installResult = await NativeCompilerManager.installLLVM();
+                            if (installResult.success) {
+                                vscode.window.showInformationMessage('LLVM安装完成！请重启VS Code。');
+                            }
+                        }
+                    }
                 } catch (error: any) {
-                    progress.report({ message: 'Failed to initialize Environment.', increment: 100 });
-                    vscode.window.showErrorMessage(`Failed to initialize environment: ${error.message}`);
+                    progress.report({ message: '编译器检测失败。' });
+                    vscode.window.showErrorMessage(`编译器环境初始化失败: ${error.message}`);
                 }
             });
         }));
 
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.downloadDocker', async () => {
-            const installCommand = Installer.getInstallCommand();
-            if (installCommand) {
-                vscode.window.showInformationMessage(
-                    installCommand.message,
-                    'Run in Terminal' // Button text
-                ).then(selection => {
-                    if (selection === 'Run in Terminal') {
-                        const terminal = vscode.window.createTerminal('Docker Installer');
-                        terminal.show();
-                        if (installCommand.isUrl) {
-                            vscode.env.openExternal(vscode.Uri.parse(installCommand.command));
-                            terminal.sendText(`echo "Opening browser to: ${installCommand.command}"`);
+        context.subscriptions.push(vscode.commands.registerCommand('oicode.setupCompiler', async () => {
+            try {
+                const result = await NativeCompilerManager.detectCompilers();
+                
+                if (result.success && result.compilers.length > 0) {
+                    vscode.window.showInformationMessage(
+                        `检测到 ${result.compilers.length} 个编译器。推荐使用: ${result.recommended?.name || '第一个编译器'}`
+                    );
+                } else {
+                    const choice = await vscode.window.showInformationMessage(
+                        '未检测到C/C++编译器。是否要安装LLVM？',
+                        { modal: true },
+                        '安装LLVM',
+                        '查看检测详情'
+                    );
+                    
+                    if (choice === '安装LLVM') {
+                        const installResult = await NativeCompilerManager.installLLVM();
+                        if (installResult.success) {
+                            vscode.window.showInformationMessage(installResult.message);
                         } else {
-                            terminal.sendText(installCommand.command);
+                            vscode.window.showErrorMessage(installResult.message, '查看详情').then(selection => {
+                                if (selection === '查看详情') {
+                                    NativeCompilerManager.getOutputChannel().show(true);
+                                }
+                            });
                         }
+                    } else if (choice === '查看检测详情') {
+                        NativeCompilerManager.getOutputChannel().show(true);
                     }
-                });
-            } else {
-                vscode.window.showErrorMessage('Could not determine Docker installation command for your system.');
+                }
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`编译器设置失败: ${error.message}`);
             }
         }));
 
@@ -813,8 +810,6 @@ async function getWebviewContent(context: vscode.ExtensionContext, fileName: str
 }
 
 export function deactivate(): Promise<void> {
-    // Thoroughly cleanup all Docker resources, including container deletion
-    return DockerManager.cleanupAllDockerResources().catch(error => {
-        console.error('Failed to cleanup all Docker resources:', error);
-    });
+    // Cleanup any temporary files or resources
+    return Promise.resolve();
 }
