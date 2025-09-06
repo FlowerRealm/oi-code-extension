@@ -1326,6 +1326,36 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     }
 
     /**
+     * Apply compiler-specific workarounds and compatibility fixes
+     */
+    private static applyCompilerWorkarounds(
+        compiler: CompilerInfo,
+        language: 'c' | 'cpp',
+        languageStandard: string
+    ): string {
+        // Handle Clang 20+ C++17 compatibility issues
+        if ((compiler.type === 'clang' || compiler.type === 'apple-clang') && language === 'cpp') {
+            const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
+            const autoDowngrade = vscode.workspace.getConfiguration('oicode.compile').get('autoDowngradeClang20', true);
+
+            if (majorVersion >= 20 && languageStandard === 'c++17' && autoDowngrade) {
+                this.getOutputChannel().appendLine(
+                    `[WARN] Downgrading C++ standard to 'c++14' for Clang ${compiler.version} ` +
+                        'due to compatibility issues. This can be disabled in settings by setting ' +
+                        'oicode.compile.autoDowngradeClang20 to false.'
+                );
+                return 'c++14';
+            } else if (majorVersion >= 20 && languageStandard === 'c++17' && !autoDowngrade) {
+                this.getOutputChannel().appendLine(
+                    `[INFO] Using C++17 with Clang ${compiler.version}. If you encounter compilation issues, ` +
+                        'consider setting oicode.compile.autoDowngradeClang20 to true in settings.'
+                );
+            }
+        }
+        return languageStandard;
+    }
+
+    /**
      * Get compiler arguments
      */
     private static getCompilerArgs(
@@ -1336,34 +1366,12 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     ): string[] {
         const config = vscode.workspace.getConfiguration('oicode');
         const optimizationLevel = config.get<string>('compile.opt', 'O2');
-        let languageStandard = config.get<string>('compile.std', 'c++17');
+        const initialLanguageStandard = config.get<string>('compile.std', 'c++17');
 
         const args = [];
 
-        // For newer Clang versions, use compatible standards
-        if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
-            const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
-            const autoDowngrade = vscode.workspace.getConfiguration('oicode.compile').get('autoDowngradeClang20', true);
-
-            if (majorVersion >= 20 && languageStandard === 'c++17' && autoDowngrade) {
-                // Clang 20+ may have compatibility issues with c++17, downgrade to c++14
-                // This is a temporary workaround due to some changes in C++17 standard library
-                // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
-                // This temporary workaround ensures backward compatibility
-                this.getOutputChannel().appendLine(
-                    "[WARN] Forcing C++ standard to 'c++14' for Clang " +
-                        `${compiler.version} due to known compatibility issues with c++17. ` +
-                        'This can be disabled in settings by setting oicode.compile.autoDowngradeClang20 to false.'
-                );
-                languageStandard = 'c++14';
-            } else if (majorVersion >= 20 && languageStandard === 'c++17' && !autoDowngrade) {
-                this.getOutputChannel().appendLine(
-                    '[INFO] Using C++17 with Clang ' +
-                        `${compiler.version}. If you encounter compilation issues, ` +
-                        'consider setting oicode.compile.autoDowngradeClang20 to true in settings.'
-                );
-            }
-        }
+        // Apply compiler-specific workarounds and get final language standard
+        const languageStandard = this.applyCompilerWorkarounds(compiler, language, initialLanguageStandard);
 
         // Basic compilation parameters
         if (compiler.type === 'msvc') {
@@ -1483,9 +1491,22 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     });
 
                     // For Windows, use improved polling to check memory usage
-                    // TODO: Future improvement - Use Windows Job Objects for more efficient memory limit enforcement
-                    // Job Objects provide OS-level resource management without polling overhead
-                    // See design document LLVM_NATIVE_ANALYSIS.md for implementation details
+                    // TODO: Implement Windows Job Objects for native memory limit enforcement
+                    // Current polling-based approach has limitations:
+                    // 1. Race conditions: Process can exceed limits between checks
+                    // 2. Performance overhead: Continuous polling consumes CPU cycles
+                    // 3. Reliability: PowerShell commands may fail or be slow
+                    //
+                    // Job Objects would provide:
+                    // - OS-level memory enforcement without polling
+                    // - Precise limit control and immediate termination
+                    // - Better performance and reliability
+                    // - Support for other resource limits (CPU, handles, etc.)
+                    //
+                    // Implementation requires:
+                    // - Native Node.js addon or Windows API binding
+                    // - CreateJobObjectW, AssignProcessToJobObjectW, SetInformationJobObjectW
+                    // - Memory limit configuration via JOBOBJECT_EXTENDED_LIMIT_INFORMATION
                     if (options.memoryLimit && process.platform === 'win32') {
                         // Use a more efficient approach with cached process info and adaptive polling
                         let lastCheckTime = 0;
@@ -1650,11 +1671,12 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             let stdout = '';
             let stderr = '';
 
-            // Set 10 second timeout to prevent command from hanging
+            // Set 30 second timeout to prevent command from hanging
+            // Increased timeout for better reliability on slow systems or under heavy load
             const timeout = setTimeout(() => {
                 child.kill('SIGKILL');
                 reject(new Error(`Command timed out: ${command} ${args.join(' ')}`));
-            }, 10000);
+            }, 30000);
 
             child.stdout.on('data', data => {
                 stdout += data.toString();
