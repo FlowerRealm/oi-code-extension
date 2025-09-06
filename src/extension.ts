@@ -88,7 +88,12 @@ function getPairCheckWebviewContent(): string {
             background-color: var(--vscode-editor-background);
         }
         .container { display: flex; flex-direction: column; height: 100%; }
-        .input-section { display: flex; flex-direction: column; padding: 8px; border-bottom: 1px solid var(--vscode-panel-border); }
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
         .input-section textarea {
             flex-grow: 1;
             width: 98%;
@@ -128,8 +133,14 @@ function getPairCheckWebviewContent(): string {
             <button id="run-button">Run Pair Check</button>
         </div>
         <div class="output-section">
-            <div id="output1-container" class="output-box"><h4>Left Code Output</h4><div id="output1-content"></div></div>
-            <div id="output2-container" class="output-box"><h4>Right Code Output</h4><div id="output2-content"></div></div>
+            <div id="output1-container" class="output-box">
+                <h4>Left Code Output</h4>
+                <div id="output1-content"></div>
+            </div>
+            <div id="output2-container" class="output-box">
+                <h4>Right Code Output</h4>
+                <div id="output2-content"></div>
+            </div>
         </div>
     </div>
     <script>

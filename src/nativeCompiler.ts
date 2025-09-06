@@ -217,8 +217,9 @@ export class NativeCompilerManager {
 
             output.appendLine(`Detected ${compilers.length} 个编译器:`);
             compilers.forEach(compiler => {
+                const bitInfo = compiler.is64Bit ? '64-bit' : '32-bit';
                 output.appendLine(
-                    `  - ${compiler.name} (${compiler.type}) v${compiler.version} [${compiler.is64Bit ? '64-bit' : '32-bit'}]`
+                    `  - ${compiler.name} (${compiler.type}) v${compiler.version} [${bitInfo}]`
                 );
             });
 
