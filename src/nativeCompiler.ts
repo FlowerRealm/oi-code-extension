@@ -1189,7 +1189,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         input: string;
         timeLimit: number;
         memoryLimit: number;
-    }): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean }> {
+    }): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
         const output = this.getOutputChannel();
         output.appendLine(`=== Compiling and running ${options.language} code ===`);
         output.appendLine(`Source file: ${options.sourcePath}`);
@@ -1226,7 +1226,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 return {
                     stdout: '',
                     stderr: compileResult.stderr,
-                    timedOut: compileResult.timedOut
+                    timedOut: compileResult.timedOut,
+                    spaceExceeded: compileResult.spaceExceeded
                 };
             }
 
@@ -1281,7 +1282,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 stdout: runResult.stdout,
                 stderr: runResult.stderr,
                 timedOut: runResult.timedOut,
-                memoryExceeded: runResult.memoryExceeded
+                memoryExceeded: runResult.memoryExceeded,
+                spaceExceeded: runResult.spaceExceeded
             };
 
         } catch (error: any) {
@@ -1290,7 +1292,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 stdout: '',
                 stderr: error.message,
                 timedOut: false,
-                memoryExceeded: false
+                memoryExceeded: false,
+                spaceExceeded: false
             };
         }
     }
@@ -1412,9 +1415,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             // If memory limit is set and on Unix system, use ulimit
             if (options.memoryLimit && process.platform !== 'win32') {
                 const memoryKB = options.memoryLimit * 1024; // 转换为KB
-                const shellCommand = `ulimit -v ${memoryKB} 2>/dev/null || ulimit -d ${memoryKB} 2>/dev/null; "${options.command}" ${options.args.map(arg => `"${arg}"`).join(' ')}`;
+                // The script first tries to set the limit. If it fails, the command will not be executed due to `&&`.
+                // This is safer than swallowing errors.
+                const shellScript = `ulimit -v ${memoryKB} && ulimit -d ${memoryKB} && exec "$@"`;
                 
-                child = spawn('sh', ['-c', shellCommand], { 
+                child = spawn('sh', ['-c', shellScript, 'sh', options.command, ...options.args], { 
                     cwd: options.cwd,
                     stdio: ['pipe', 'pipe', 'pipe']
                 });

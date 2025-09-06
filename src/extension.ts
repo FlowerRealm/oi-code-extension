@@ -10,6 +10,36 @@ import * as Diff from 'diff';
 import { NativeCompilerManager } from './nativeCompiler';
 import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
 
+/**
+ * 公共函数：检测并选择适合的编译器
+ * @param context VS Code扩展上下文
+ * @param languageId 语言ID ('c' 或 'cpp')
+ * @returns 返回选择的编译器信息，如果没有找到合适的编译器则抛出错误
+ */
+async function getSuitableCompiler(context: vscode.ExtensionContext, languageId: 'c' | 'cpp'): Promise<any> {
+    // 检测可用的编译器
+    const compilerResult = await NativeCompilerManager.detectCompilers(context);
+    if (!compilerResult.success || compilerResult.compilers.length === 0) {
+        const choice = await vscode.window.showErrorMessage(
+            'No C/C++ compilers found. Please set up a compiler to proceed.',
+            'Setup Compiler'
+        );
+        if (choice === 'Setup Compiler') {
+            await vscode.commands.executeCommand('oicode.setupCompiler');
+        }
+        throw new Error('No compilers available. Please set up a compiler first.');
+    }
+
+    // 选择适合语言的编译器
+    const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
+    
+    if (suitableCompilers.length === 0) {
+        throw new Error(`No suitable compiler found for ${languageId}`);
+    }
+
+    return suitableCompilers[0];
+}
+
 function htmlEscape(str: string): string {
     return str.replace(/[&<>"'\/]/g, (match) => {
         const escape: { [key: string]: string } = {
@@ -100,30 +130,11 @@ async function runPairWithNativeCompilers(
     input: string,
     options?: { timeLimit?: number; memoryLimit?: number }
 ): Promise<{
-    result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
-    result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean };
+    result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
+    result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
 }> {
-    // Check if we have compilers available (with context for caching)
-    const compilerResult = await NativeCompilerManager.detectCompilers(context);
-    if (!compilerResult.success || compilerResult.compilers.length === 0) {
-        const choice = await vscode.window.showErrorMessage(
-            'No C/C++ compilers found. Please set up a compiler to proceed.',
-            'Setup Compiler'
-        );
-        if (choice === 'Setup Compiler') {
-            await vscode.commands.executeCommand('oicode.setupCompiler');
-        }
-        throw new Error('No compilers available. Please set up a compiler first.');
-    }
-
-    // Select the best compiler for the language
-    const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
-    
-    if (suitableCompilers.length === 0) {
-        throw new Error(`No suitable compiler found for ${languageId}`);
-    }
-
-    const compiler = suitableCompilers[0]; // Use the first available compiler
+    // 使用公共函数获取适合的编译器
+    const compiler = await getSuitableCompiler(context, languageId);
     const timeLimit = options?.timeLimit ?? 20;
     const memoryLimit = options?.memoryLimit ?? 512;
 
@@ -613,27 +624,8 @@ export function activate(context: vscode.ExtensionContext) {
             }, async (progress) => {
                 progress.report({ increment: 0, message: 'Detecting compilers...' });
                 try {
-                    // Check if we have compilers available
-                    const compilerResult = await NativeCompilerManager.detectCompilers(context);
-                    if (!compilerResult.success || compilerResult.compilers.length === 0) {
-                        const choice = await vscode.window.showErrorMessage(
-                            'No C/C++ compilers found. Please set up a compiler to proceed.',
-                            'Setup Compiler'
-                        );
-                        if (choice === 'Setup Compiler') {
-                            await vscode.commands.executeCommand('oicode.setupCompiler');
-                        }
-                        return; // Stop execution if no compilers are available
-                    }
-
-                    // Select the best compiler for the language
-                    const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
-                    
-                    if (suitableCompilers.length === 0) {
-                        throw new Error(`No suitable compiler found for ${languageId}`);
-                    }
-
-                    const compiler = suitableCompilers[0]; // Use the first available compiler
+                    // 使用公共函数获取适合的编译器
+                    const compiler = await getSuitableCompiler(context, languageId);
                     progress.report({ increment: 50, message: `Compiling with ${compiler.type}...` });
 
                     // Execute with native compiler
@@ -656,6 +648,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const meta: string[] = [];
                     if (result.timedOut) meta.push('TimedOut');
                     if (result.memoryExceeded) meta.push('MemoryExceeded');
+                    if (result.spaceExceeded) meta.push('SpaceExceeded');
                     let content = '';
                     if (meta.length) content += `<p><b>Flags:</b> ${meta.join(', ')}</p>`;
                     if (result.stdout) content += `<h2>Output:</h2><pre>${htmlEscape(result.stdout)}</pre>`;
