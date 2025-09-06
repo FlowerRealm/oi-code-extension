@@ -1412,12 +1412,11 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             const execAsync = util.promisify(exec);
 
             if (process.platform === 'win32') {
-                // Windows: Use wmic command
-                const command = `wmic logicaldisk where "DeviceID='${directory.charAt(0)}:'" get FreeSpace /value`;
+                // Windows: Use PowerShell Get-Volume command (more modern than deprecated wmic)
+                const command = `powershell -Command "(Get-Volume -DriveLetter ${directory.charAt(0)}).SizeRemaining"`;
                 const { stdout } = await execAsync(command);
-                const match = stdout.match(/FreeSpace=(\d+)/);
-                if (match) {
-                    const freeSpaceBytes = parseInt(match[1], 10);
+                const freeSpaceBytes = parseInt(stdout.trim(), 10);
+                if (!isNaN(freeSpaceBytes)) {
                     const freeSpaceMB = freeSpaceBytes / (1024 * 1024);
                     return freeSpaceMB >= requiredSpaceMB;
                 }
@@ -1496,25 +1495,27 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
                     // For Windows, use improved polling to check memory usage
                     // TODO: Implement Windows Job Objects for native memory limit enforcement
-                    // Current polling-based approach has limitations:
-                    // 1. Race conditions: Process can exceed limits between checks
-                    //    (partially fixed with terminated flag)
-                    // 2. Performance overhead: Continuous polling consumes CPU cycles
-                    // 3. Reliability: PowerShell commands may fail or be slow
+                    // CRITICAL: Current polling-based approach has serious limitations:
+                    // 1. RACE CONDITIONS: Process can exceed memory limits between polling checks
+                    //    This can lead to incorrect verdicts in competitive programming
+                    // 2. Performance overhead: Continuous polling consumes CPU resources
+                    // 3. Reliability: PowerShell commands may fail or be slow under load
+                    // 4. Accuracy: WorkingSet includes shared memory, not accurate for limits
                     //
                     // Job Objects would provide:
-                    // - OS-level memory enforcement without polling
-                    // - Precise limit control and immediate termination
-                    // - Better performance and reliability
+                    // - OS-level memory enforcement without polling (ZERO race conditions)
+                    // - Precise limit control and immediate termination on exceed
+                    // - Zero performance overhead after setup
+                    // - Private Working Set tracking (accurate for competitive programming)
                     // - Support for other resource limits (CPU, handles, etc.)
                     //
-                    // Implementation requires:
+                    // URGENT Implementation requirements:
                     // - Native Node.js addon using node-addon-api or edge-js
                     // - Windows API calls: CreateJobObjectW, AssignProcessToJobObjectW, SetInformationJobObjectW
                     // - Memory limit configuration via JOBOBJECT_EXTENDED_LIMIT_INFORMATION
                     // - Proper error handling and resource cleanup
                     //
-                    // Suggested implementation approach:
+                    // HIGH PRIORITY Implementation approach:
                     // 1. Create native addon with Windows API bindings
                     // 2. Implement JobObject class with memory limit methods
                     // 3. Integrate with executeWithTimeout as alternative to polling
