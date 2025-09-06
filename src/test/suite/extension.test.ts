@@ -1,8 +1,7 @@
-/*---------------------------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
+ *-------------------------------------------------------------------------------------------- */
 
 import * as assert from 'assert';
 import { describe, before } from 'mocha';
@@ -22,10 +21,20 @@ function normalizeOutput(output: string): string {
 }
 
 // Helper: create a problem via command, inject code, and open it
-async function createProblemAndOpen(name: string, language: 'c' | 'cpp', code: string): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
+async function createProblemAndOpen(
+    name: string,
+    language: 'c' | 'cpp',
+    code: string
+): Promise<{ problemDir: string; sourcePath: string; uri: vscode.Uri }> {
     await fs.mkdir(TEST_BASE_DIR, { recursive: true });
-    const res: any = await vscode.commands.executeCommand('oicode.createProblem', { name, language, baseDir: TEST_BASE_DIR });
-    if (!res || res.error) { throw new Error(`failed to create problem: ${res?.error || 'unknown'}`); }
+    const res: any = await vscode.commands.executeCommand('oicode.createProblem', {
+        name,
+        language,
+        baseDir: TEST_BASE_DIR
+    });
+    if (!res || res.error) {
+        throw new Error(`failed to create problem: ${res?.error || 'unknown'}`);
+    }
     await fs.writeFile(res.sourcePath, code);
     const uri = vscode.Uri.file(res.sourcePath);
     const doc = await vscode.workspace.openTextDocument(uri);
@@ -53,36 +62,36 @@ async function cleanupDir(dir: string, maxRetries = 3) {
 async function areCompilersAvailable(): Promise<boolean> {
     try {
         console.log('[Compiler Check] Testing actual compiler functionality...');
-        
+
         // Test with a simple C program that should produce predictable output
-        const testCode = `#include <stdio.h>\nint main() { printf("test_output"); return 0; }`;
-        
+        const testCode = '#include <stdio.h>\nint main() { printf("test_output"); return 0; }';
+
         // Create a temporary test file
         const testDir = path.join(TEST_BASE_DIR, 'compiler-test');
         await fs.mkdir(testDir, { recursive: true });
         const testFile = path.join(testDir, 'test.c');
         await fs.writeFile(testFile, testCode);
-        
+
         // Open the file and try to run it
         const uri = vscode.Uri.file(testFile);
         const doc = await vscode.workspace.openTextDocument(uri);
         await vscode.window.showTextDocument(doc);
-        
+
         const result: any = await vscode.commands.executeCommand('oicode.runCode', '');
-        
+
         console.log('[Compiler Check] Test result:', JSON.stringify(result, null, 2));
-        
+
         // Clean up
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(testDir);
-        
+
         // More lenient check: if we get any result object back, consider compilers available
         // The actual functionality will be tested in the specific tests
         if (result && typeof result === 'object') {
             console.log('[Compiler Check] ✓ Compilers are responding (detailed functionality tested separately)');
             return true;
         }
-        
+
         console.log('[Compiler Check] ✗ No compiler response received');
         return false;
     } catch (error: any) {
@@ -98,7 +107,7 @@ async function prepareCompilerEnvironment(): Promise<void> {
     const compilersAvailable = await areCompilersAvailable();
     if (!compilersAvailable) {
         console.log('[Test Setup] No compilers available, attempting to setup...');
-        
+
         try {
             // Initialize compiler environment
             await vscode.commands.executeCommand('oicode.initializeEnvironment');
@@ -108,9 +117,9 @@ async function prepareCompilerEnvironment(): Promise<void> {
             console.log('[Test Setup] Tests will run without compilers if possible');
             return;
         }
-        
+
         // Check again after setup
-        if (!await areCompilersAvailable()) {
+        if (!(await areCompilersAvailable())) {
             console.log('[Test Setup] Still no compilers available after setup attempt');
             console.log('[Test Setup] Tests will run without compilers if possible');
             return;
@@ -125,7 +134,6 @@ async function prepareCompilerEnvironment(): Promise<void> {
     }
 }
 
-
 suite('Extension Test Suite', () => {
     // Wait for extension activation and compiler preparation
     before(async function () {
@@ -136,7 +144,9 @@ suite('Extension Test Suite', () => {
         const interval = 500;
         while ((!extension || !extension.isActive) && waited < 30000) {
             if (extension && !extension.isActive) {
-                try { await extension.activate(); } catch { }
+                try {
+                    await extension.activate();
+                } catch {}
             }
             await new Promise(res => setTimeout(res, interval));
             waited += interval;
@@ -152,7 +162,6 @@ suite('Extension Test Suite', () => {
         await prepareCompilerEnvironment();
     });
 
-
     test('Extension activation check', async function () {
         this.timeout(15000);
         const extId = 'FlowerRealm.oi-code';
@@ -160,14 +169,20 @@ suite('Extension Test Suite', () => {
         let waited = 0;
         const interval = 300;
         while (extension && !extension.isActive && waited < 6000) {
-            try { await extension.activate(); } catch { }
+            try {
+                await extension.activate();
+            } catch {}
             await new Promise(res => setTimeout(res, interval));
             waited += interval;
             extension = vscode.extensions.getExtension(extId);
         }
         const commands = await vscode.commands.getCommands();
-        const hasAny = commands.includes('oi-code.showSettingsPage') || commands.includes('oicode.initializeEnvironment');
-        assert.ok((extension && extension.isActive) || hasAny, 'OI-Code extension should be active or commands should be available');
+        const hasAny =
+            commands.includes('oi-code.showSettingsPage') || commands.includes('oicode.initializeEnvironment');
+        assert.ok(
+            (extension && extension.isActive) || hasAny,
+            'OI-Code extension should be active or commands should be available'
+        );
     });
 
     test('showSettingsPage command should create a webview panel', async function () {
@@ -175,10 +190,10 @@ suite('Extension Test Suite', () => {
         await vscode.commands.executeCommand('oi-code.showSettingsPage');
         await new Promise(resolve => setTimeout(resolve, 500));
         const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
-        assert.ok(activeTab, "No active tab found after executing command");
+        assert.ok(activeTab, 'No active tab found after executing command');
         const isWebview = activeTab.input instanceof vscode.TabInputWebview;
-        assert.ok(isWebview, "The active tab is not a webview panel");
-        assert.strictEqual(activeTab.label, 'OI-Code Settings', "Webview panel title is incorrect");
+        assert.ok(isWebview, 'The active tab is not a webview panel');
+        assert.strictEqual(activeTab.label, 'OI-Code Settings', 'Webview panel title is incorrect');
     });
 
     test('Compiler initialization and code execution', async function () {
@@ -198,58 +213,56 @@ suite('Extension Test Suite', () => {
         // Compiler environment already initialized in before() hook, skip re-initialization to avoid conflicts
 
         // Test C code execution
-        const cCode = `#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }`;
+        const cCode = '#include <stdio.h>\nint main() { printf(\"Hello, C!\\n\"); return 0; }';
         const createdC = await createProblemAndOpen('UT-C-Hello', 'c', cCode);
         const resC: any = await vscode.commands.executeCommand('oicode.runCode', '');
         console.log('[Compiler Init Test] C execution result:', resC);
         assert.ok(resC, 'oicode.runCode should return a result for C');
         assert.strictEqual(typeof resC.output, 'string', 'C execution should return string output');
-        
+
         // OI-style output comparison: ignore trailing whitespace and normalize line endings
         assert.strictEqual(normalizeOutput(resC.output), 'Hello, C!', 'C output should match expected result');
-        
+
         assert.strictEqual(resC.error, '', 'C execution should have no errors');
         assert.strictEqual(resC.timedOut, false, 'C execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdC.sourcePath));
 
         // Test C++ code execution
-        const cppCode = `#include <iostream>\nint main() { std::cout << \"Hello, C++!\" << std::endl; return 0; }`;
+        const cppCode = '#include <iostream>\nint main() { std::cout << \"Hello, C++!\" << std::endl; return 0; }';
         const createdCpp = await createProblemAndOpen('UT-CPP-Hello', 'cpp', cppCode);
         const resCpp: any = await vscode.commands.executeCommand('oicode.runCode', '');
         console.log('[Compiler Init Test] C++ execution result:', resCpp);
         assert.ok(resCpp, 'oicode.runCode should return a result for C++');
         assert.strictEqual(typeof resCpp.output, 'string', 'C++ execution should return string output');
-        
+
         // OI-style output comparison: ignore trailing whitespace and normalize line endings
         assert.strictEqual(normalizeOutput(resCpp.output), 'Hello, C++!', 'C++ output should match expected result');
-        
+
         assert.strictEqual(resCpp.error, '', 'C++ execution should have no errors');
         assert.strictEqual(resCpp.timedOut, false, 'C++ execution should not timeout');
         await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         await cleanupDir(path.dirname(createdCpp.sourcePath));
-
     });
 
     // Additional strict tests for error handling and edge cases
     describe('Strict Compiler Tests', () => {
-        
         test('should handle compilation errors gracefully', async function () {
             this.timeout(30000);
-            
+
             // Test with invalid C code
-            const invalidCCode = `#include <stdio.h>\nint main() { invalid_syntax_here return 0; }`;
+            const invalidCCode = '#include <stdio.h>\nint main() { invalid_syntax_here return 0; }';
             const created = await createProblemAndOpen('UT-Invalid-C', 'c', invalidCCode);
-            
+
             try {
                 const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
-                
+
                 // Should return a result but with error information
                 assert.ok(res, 'should return result even for compilation errors');
                 assert.ok(res.error, 'should have compilation error');
                 assert.strictEqual(typeof res.error, 'string', 'error should be a string');
                 assert.ok(res.error.length > 0, 'error message should not be empty');
-                
+
                 console.log('[Strict Test] ✓ Compilation error handled correctly:', res.error.substring(0, 100));
             } finally {
                 await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -259,17 +272,18 @@ suite('Extension Test Suite', () => {
 
         test('should handle runtime errors gracefully', async function () {
             this.timeout(30000);
-            
+
             // Test with code that causes runtime error (division by zero)
-            const runtimeErrorCode = `#include <stdio.h>\nint main() { int a = 1, b = 0; printf("%d", a/b); return 0; }`;
+            const runtimeErrorCode =
+                '#include <stdio.h>\nint main() { int a = 1, b = 0; printf("%d", a/b); return 0; }';
             const created = await createProblemAndOpen('UT-Runtime-Error', 'c', runtimeErrorCode);
-            
+
             try {
                 const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
-                
+
                 // Should return a result, potentially with runtime error information
                 assert.ok(res, 'should return result even for runtime errors');
-                
+
                 // Either should have error message or should handle the runtime error gracefully
                 if (res.error) {
                     assert.strictEqual(typeof res.error, 'string', 'error should be a string');
@@ -285,47 +299,56 @@ suite('Extension Test Suite', () => {
             }
         });
 
-        
         test('should handle different input types correctly', async function () {
             this.timeout(30000);
-            
+
             // Test code that processes different types of input
-            const inputProcessingCode = `#include <stdio.h>\nint main() {\n    int num;\n    char str[100];\n    if (scanf("%d %s", &num, str) == 2) {\n        printf("Number: %d, String: %s\\n", num, str);\n    } else {\n        printf("Input error\\n");\n    }\n    return 0;\n}`;
+            const inputProcessingCode =
+                '#include <stdio.h>\n' +
+                'int main() {\n' +
+                '    int num;\n' +
+                '    char str[100];\n' +
+                '    if (scanf("%d %s", &num, str) == 2) {\n' +
+                '        printf("Number: %d, String: %s\\n", num, str);\n' +
+                '    } else {\n' +
+                '        printf("Input error\\n");\n' +
+                '    }\n' +
+                '    return 0;\n' +
+                '}';
             const created = await createProblemAndOpen('UT-Input-Test', 'c', inputProcessingCode);
-            
+
             try {
-                const testInput = "42 hello";
+                const testInput = '42 hello';
                 const res: any = await vscode.commands.executeCommand('oicode.runCode', testInput);
-                
+
                 assert.ok(res, 'should return result for input processing');
                 assert.strictEqual(typeof res.output, 'string', 'output should be a string');
                 assert.strictEqual(res.timedOut, false, 'should not timeout');
-                
+
                 // Check that we got some output (the exact format may vary)
                 console.log('[Strict Test] Input processing output:', JSON.stringify(res.output));
-                
+
                 if (res.error) {
                     console.log('[Strict Test] Input processing had error (may be expected):', res.error);
                 } else {
                     // If no error, output should exactly match our expected format
-                    assert.strictEqual(normalizeOutput(res.output), 'Number: 42, String: hello', 'The output of the input processing test is incorrect.');
+                    assert.strictEqual(
+                        normalizeOutput(res.output),
+                        'Number: 42, String: hello',
+                        'The output of the input processing test is incorrect.'
+                    );
                     console.log('[Strict Test] ✓ Input processing works correctly');
                 }
-                
             } finally {
                 await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
                 await cleanupDir(path.dirname(created.sourcePath));
             }
         });
-
     });
-
 });
 
 // New test suite for OI-Code commands
 suite('OI-Code Commands Test Suite', () => {
-
-
     test('should execute oicode.setupCompiler command', async function () {
         this.timeout(120000); // Increase timeout for compiler setup
         // Check if compilers are already available
@@ -350,9 +373,6 @@ suite('OI-Code Commands Test Suite', () => {
         }
     });
 
-
-
-    
     // Separate test for compiler setup when compilers are not available
     test('should handle compiler setup flow when compilers are not available', async function () {
         this.timeout(120000);
@@ -395,7 +415,12 @@ suite('OI-Code Commands Test Suite', () => {
         }
 
         const cRec = `#include <stdio.h>
-long long C(int n){ if(n<=1) return 1; long long s=0; for(int i=0;i<n;i++) s+=C(i)*C(n-1-i); return s;}
+long long C(int n) {
+    if (n <= 1) return 1;
+    long long s = 0;
+    for (int i = 0; i < n; i++) s += C(i) * C(n - 1 - i);
+    return s;
+}
 int main(){
     int n;
     if(scanf("%d", &n) != 1) {
@@ -405,7 +430,24 @@ int main(){
     return 0;
 }`;
 
-        const cDp = `#include <stdio.h>\nlong long C[40];\nint main(){\n    int n;\n    if(scanf("%d", &n) != 1) {\n        return 1;\n    }\n    C[0] = 1;\n    for (int i = 1; i <= n; i++) {\n        C[i] = 0;\n        for (int j = 0; j < i; j++) {\n            C[i] += C[j] * C[i - 1 - j];\n        }\n    }\n    printf("%lld\\n", C[n]);\n    return 0;\n}`;
+        const cDp =
+            '#include <stdio.h>\n' +
+            'long long C[40];\n' +
+            'int main(){\n' +
+            '    int n;\n' +
+            '    if(scanf("%d", &n) != 1) {\n' +
+            '        return 1;\n' +
+            '    }\n' +
+            '    C[0] = 1;\n' +
+            '    for (int i = 1; i <= n; i++) {\n' +
+            '        C[i] = 0;\n' +
+            '        for (int j = 0; j < i; j++) {\n' +
+            '            C[i] += C[j] * C[i - 1 - j];\n' +
+            '        }\n' +
+            '    }\n' +
+            '    printf("%lld\\n", C[n]);\n' +
+            '    return 0;\n' +
+            '}';
 
         const cppRec = `#include <iostream>
 using namespace std;
@@ -438,8 +480,6 @@ int main() {
     return 0;
 }`;
 
-
-
         for (const lang of ['c', 'cpp'] as const) {
             test(`pair check ${lang} catalan recursive vs dp`, async function () {
                 this.timeout(60000);
@@ -448,7 +488,9 @@ int main() {
                 const compilersAvailableForTest = await areCompilersAvailable();
 
                 if (!compilersAvailableForTest) {
-                    console.log(`[PairCheck Test] Compilers not responding for ${lang}, skipping pair check tests`);
+                    console.log(
+                        `[PairCheck Test] Compilers not responding for ${lang}, skipping pair check tests`
+                    );
                     this.skip();
                     return;
                 }
@@ -460,33 +502,42 @@ int main() {
                     for (let i = 0; i < inputs.length; i++) {
                         const input = inputs[i];
                         const expectedOutput = expectedOutputs[i];
-                        
-                        console.log(`\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`);
-                        console.log(`[PairCheck Test] Input length: ${input.length}, Input bytes: ${[...input].map(c => c.charCodeAt(0)).join(',')}`);
+
+                        console.log(
+                            `\n[PairCheck Test] Testing ${lang} with input: "${input.trim()}" (expected: ${expectedOutput})`
+                        );
+                        console.log(
+                            `[PairCheck Test] Input length: ${input.length}, Input bytes: ${[...input].map(c => c.charCodeAt(0)).join(',')}`
+                        );
 
                         const res: any = await vscode.commands.executeCommand('oicode.runPairCheck', input);
-                        console.log(`[PairCheck Test] Result:`, JSON.stringify(res, null, 2));
+                        console.log('[PairCheck Test] Result:', JSON.stringify(res, null, 2));
 
                         // Validate result structure
                         assert.ok(res, 'pair check should return a result');
                         assert.strictEqual(typeof res, 'object', 'result should be an object');
-                        
+
                         if (res.error) {
                             assert.fail(`pair check error: ${res.error}`);
                         }
-                        
+
                         // Validate outputs exist and are strings
                         assert.ok(typeof res.output1 === 'string', 'output1 should be a string');
                         assert.ok(typeof res.output2 === 'string', 'output2 should be a string');
-                        
+
                         // Validate equality and expected output
                         assert.strictEqual(res.equal, true, `outputs should be equal for input=${input}`);
-                        
+
                         const actualOutput = res.output1.trim();
-                        assert.strictEqual(actualOutput, expectedOutput, 
-                            `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`);
-                        
-                        console.log(`[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}" → "${actualOutput}"`);
+                        assert.strictEqual(
+                            actualOutput,
+                            expectedOutput,
+                            `Expected output "${expectedOutput}" but got "${actualOutput}" for input "${input}" in ${lang}`
+                        );
+
+                        console.log(
+                            `[PairCheck Test] ✓ ${lang} test passed for input: "${input.trim()}" → "${actualOutput}"`
+                        );
                     }
                 } finally {
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -497,7 +548,4 @@ int main() {
             });
         }
     });
-
-    
-
 });

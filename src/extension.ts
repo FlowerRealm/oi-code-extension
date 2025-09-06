@@ -1,23 +1,23 @@
-/*---------------------------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as Diff from 'diff';
-import { NativeCompilerManager } from './nativeCompiler';
+import { NativeCompilerManager, CompilerInfo } from './nativeCompiler';
 import { OI_CODE_TEST_BASE_PATH, OI_CODE_TEST_TMP_PATH } from './constants';
 
 /**
- * 公共函数：检测并选择适合的编译器
- * @param context VS Code扩展上下文
- * @param languageId 语言ID ('c' 或 'cpp')
- * @returns 返回选择的编译器信息，如果没有找到合适的编译器则抛出错误
+ * Public function: Detect and select suitable compiler
+ * @param context VS Code extension context
+ * @param languageId Language ID ('c' or 'cpp')
+ * @returns Returns selected compiler information, throws error if no suitable compiler found
  */
-async function getSuitableCompiler(context: vscode.ExtensionContext, languageId: 'c' | 'cpp'): Promise<any> {
-    // 检测可用的编译器
+async function getSuitableCompiler(context: vscode.ExtensionContext, languageId: 'c' | 'cpp'): Promise<CompilerInfo> {
+    // Detect available compilers
     const compilerResult = await NativeCompilerManager.detectCompilers(context);
     if (!compilerResult.success || compilerResult.compilers.length === 0) {
         const choice = await vscode.window.showErrorMessage(
@@ -30,9 +30,9 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
         throw new Error('No compilers available. Please set up a compiler first.');
     }
 
-    // 选择适合语言的编译器
+    // Select suitable compiler for the language
     const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
-    
+
     if (suitableCompilers.length === 0) {
         throw new Error(`No suitable compiler found for ${languageId}`);
     }
@@ -41,14 +41,14 @@ async function getSuitableCompiler(context: vscode.ExtensionContext, languageId:
 }
 
 function htmlEscape(str: string): string {
-    return str.replace(/[&<>"'\/]/g, (match) => {
+    return str.replace(/[&<>"'\/]/g, match => {
         const escape: { [key: string]: string } = {
             '&': '&amp;',
             '<': '&lt;',
             '>': '&gt;',
             '"': '&quot;',
-            '\'': '&#39;',
-            '/': '&#x2F;',
+            "'": '&#39;',
+            '/': '&#x2F;'
         };
         return escape[match];
     });
@@ -64,7 +64,7 @@ function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: a
 }
 
 function getTheme(kind: vscode.ColorThemeKind): string {
-    return (kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast) ? 'dark' : 'light';
+    return kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast ? 'dark' : 'light';
 }
 
 function getPairCheckWebviewContent(): string {
@@ -75,14 +75,45 @@ function getPairCheckWebviewContent(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pair Check</title>
     <style>
-        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); }
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+                "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+                "Noto Color Emoji";
+            color: var(--vscode-editor-foreground);
+            background-color: var(--vscode-editor-background);
+        }
         .container { display: flex; flex-direction: column; height: 100%; }
         .input-section { display: flex; flex-direction: column; padding: 8px; border-bottom: 1px solid var(--vscode-panel-border); }
-        .input-section textarea { flex-grow: 1; width: 98%; border: 1px solid var(--vscode-input-border); background-color: var(--vscode-input-background); color: var(--vscode-input-foreground); font-family: var(--vscode-editor-font-family); }
-        .input-section button { margin-top: 8px; width: 100px; border: 1px solid var(--vscode-button-border); background-color: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+        .input-section textarea {
+            flex-grow: 1;
+            width: 98%;
+            border: 1px solid var(--vscode-input-border);
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            font-family: var(--vscode-editor-font-family);
+        }
+        .input-section button {
+            margin-top: 8px;
+            width: 100px;
+            border: 1px solid var(--vscode-button-border);
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
         .input-section button:hover { background-color: var(--vscode-button-hoverBackground); }
         .output-section { flex-grow: 1; display: flex; flex-direction: row; overflow: hidden; }
-        .output-box { flex: 1; padding: 8px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; font-family: var(--vscode-editor-font-family); }
+        .output-box {
+            flex: 1;
+            padding: 8px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: var(--vscode-editor-font-family);
+        }
         #output1-container { border-right: 1px solid var(--vscode-panel-border); }
         h4 { margin-top: 0; margin-bottom: 8px; }
         .diff-added { background-color: var(--vscode-editorGutter-addedBackground); }
@@ -121,7 +152,6 @@ function getPairCheckWebviewContent(): string {
 </html>`;
 }
 
-
 async function runPairWithNativeCompilers(
     context: vscode.ExtensionContext,
     sourcePath1: string,
@@ -133,7 +163,7 @@ async function runPairWithNativeCompilers(
     result1: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
     result2: { stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean };
 }> {
-    // 使用公共函数获取适合的编译器
+    // Use public function to get suitable compiler
     const compiler = await getSuitableCompiler(context, languageId);
     const timeLimit = options?.timeLimit ?? 20;
     const memoryLimit = options?.memoryLimit ?? 512;
@@ -193,7 +223,7 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'oicode.pairCheckView';
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _context: vscode.ExtensionContext) { }
+    constructor(private readonly _context: vscode.ExtensionContext) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
@@ -203,9 +233,14 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp'));
+                    const editors = vscode.window.visibleTextEditors.filter(
+                        e =>
+                            !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp')
+                    );
                     if (editors.length < 2) {
-                        vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
+                        vscode.window.showErrorMessage(
+                            'Need to open at least two C/C++ code files to perform pair check.'
+                        );
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
@@ -243,17 +278,22 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
                     if (result1.stderr || result2.stderr) {
                         this.setOutputs(output1, output2);
                     } else if (output1 === output2) {
-                        this.setOutputs('<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>', '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>');
+                        this.setOutputs(
+                            '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>',
+                            '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>'
+                        );
                     } else {
                         const { html1, html2 } = createDiffHtml(output1, output2);
                         this.setOutputs(html1, html2);
                     }
 
                     await fs.promises.rm(tempDir, { recursive: true, force: true });
-
                 } catch (e: any) {
                     vscode.window.showErrorMessage(`Pair check error: ${e.message}`);
-                    this.setOutputs(`<b>Error:</b>\n${htmlEscape(e.message)}`, `<b>Error:</b>\n${htmlEscape(e.message)}`);
+                    this.setOutputs(
+                        `<b>Error:</b>\n${htmlEscape(e.message)}`,
+                        `<b>Error:</b>\n${htmlEscape(e.message)}`
+                    );
                 }
             }
         });
@@ -267,510 +307,622 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
     }
 }
 
-
 export function activate(context: vscode.ExtensionContext) {
     try {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
 
         // Initialize compiler manager
-        NativeCompilerManager.detectCompilers(context).then(result => {
-            if (result.success) {
-                console.log(`Detected ${result.compilers.length} compilers`);
-                if (result.recommended) {
-                    console.log(`Recommended compiler: ${result.recommended.name}`);
+        NativeCompilerManager.detectCompilers(context)
+            .then(result => {
+                if (result.success) {
+                    console.log(`Detected ${result.compilers.length} compilers`);
+                    if (result.recommended) {
+                        console.log(`Recommended compiler: ${result.recommended.name}`);
+                    }
+                } else {
+                    console.log('Compiler detection failed:', result.error);
                 }
-            } else {
-                console.log('Compiler detection failed:', result.error);
-            }
-        }).catch(error => {
-            console.error('Failed to detect compilers:', error);
-        });
+            })
+            .catch(error => {
+                console.error('Failed to detect compilers:', error);
+            });
 
         // Register WebviewView providers
         console.log('PairCheckViewProvider will be registered later');
 
-
         // Sidebar: Problem view (inputs, statement editor, limits, options, actions)
-        context.subscriptions.push(vscode.window.registerWebviewViewProvider('oicode.problemView', {
-            async resolveWebviewView(webviewView: vscode.WebviewView) {
-                webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
-                webviewView.webview.html = await getWebviewContent(context, 'problem.html');
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('oicode.problemView', {
+                async resolveWebviewView(webviewView: vscode.WebviewView) {
+                    webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
+                    webviewView.webview.html = await getWebviewContent(context, 'problem.html');
 
-                function toSafeName(input: string): string {
-                    const s = input || 'unnamed';
-                    return s.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
-                }
-
-                async function pickProblemsBaseDir(): Promise<string> {
-                    const saved = context.globalState.get<string>('oicode.lastProblemsBaseDir');
-                    if (saved) {
-                        try {
-                            await fs.promises.access(saved);
-                            const choice = await vscode.window.showQuickPick([
-                                { label: `Use previous：${saved}`, value: 'saved' },
-                                { label: 'Choose again...', value: 'pick' }
-                            ], { placeHolder: 'Choose problem root directory' });
-                            if (!choice) { throw new Error('Problem root directory not selected'); }
-                            if (choice.value === 'saved') { return saved; }
-                        } catch { }
+                    function toSafeName(input: string): string {
+                        const s = input || 'unnamed';
+                        return s.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
                     }
-                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Choose problem root directory' });
-                    if (!pick || !pick[0]) { throw new Error('Problem root directory not selected'); }
-                    const baseDir = pick[0].fsPath;
-                    context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
-                    return baseDir;
-                }
 
-                async function ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
-                    const active = vscode.window.activeTextEditor;
-                    if (!active) { throw new Error('Please open a source file in the editor first.'); }
-                    const langId = getLanguageIdFromEditor(active);
-                    const problemName = toSafeName(m.name);
-
-                    const baseDir = await pickProblemsBaseDir();
-
-                    const problemDir = path.join(baseDir, problemName);
-                    const configDir = path.join(problemDir, 'config');
-                    await fs.promises.mkdir(problemDir, { recursive: true });
-                    await fs.promises.mkdir(configDir, { recursive: true });
-
-                    // Write source file
-                    const sourcePath = path.join(problemDir, `main.${langId}`);
-                    await fs.promises.writeFile(sourcePath, active.document.getText(), 'utf8');
-
-                    // Write config files
-                    const configJson = {
-                        name: m.name || '',
-                        url: m.url || '',
-                        timeLimit: Number(m.timeLimit) || 5,
-                        memoryLimit: Number(m.memoryLimit) || 256,
-                        opt: m.opt || '',
-                        std: m.std || '',
-                    };
-                    await fs.promises.writeFile(path.join(configDir, 'problem.json'), JSON.stringify(configJson, null, 2), 'utf8');
-                    if (m.statement) await fs.promises.writeFile(path.join(configDir, 'statement.md'), m.statement, 'utf8');
-                    if (m.samples) await fs.promises.writeFile(path.join(configDir, 'samples.txt'), m.samples, 'utf8');
-
-                    return { sourcePath };
-                }
-
-                webviewView.webview.onDidReceiveMessage(async (m: any) => {
-                    if (m.cmd === 'loadSamples') {
-                        const uris = await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: 'Select sample file' });
-                        if (uris && uris[0]) {
-                            const buf = await vscode.workspace.fs.readFile(uris[0]);
-                            const text = buf.toString();
-                            webviewView.webview.postMessage({ cmd: 'samplesLoaded', text });
+                    async function pickProblemsBaseDir(): Promise<string> {
+                        const saved = context.globalState.get<string>('oicode.lastProblemsBaseDir');
+                        if (saved) {
+                            try {
+                                await fs.promises.access(saved);
+                                const choice = await vscode.window.showQuickPick(
+                                    [
+                                        { label: `Use previous：${saved}`, value: 'saved' },
+                                        { label: 'Choose again...', value: 'pick' }
+                                    ],
+                                    { placeHolder: 'Choose problem root directory' }
+                                );
+                                if (!choice) {
+                                    throw new Error('Problem root directory not selected');
+                                }
+                                if (choice.value === 'saved') {
+                                    return saved;
+                                }
+                            } catch {}
                         }
-                    } else if (m.cmd === 'run') {
-                        try {
-                            const { sourcePath } = await ensureProblemStructure(m);
-                            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
-                            await vscode.window.showTextDocument(doc, { preview: false });
-                            await vscode.commands.executeCommand('oicode.runCode', m.samples || '', { timeLimit: m.timeLimit, memoryLimit: m.memoryLimit });
-                        } catch (e: any) {
-                            vscode.window.showErrorMessage(e.message || String(e));
+                        const pick = await vscode.window.showOpenDialog({
+                            canSelectFolders: true,
+                            canSelectFiles: false,
+                            canSelectMany: false,
+                            openLabel: 'Choose problem root directory'
+                        });
+                        if (!pick || !pick[0]) {
+                            throw new Error('Problem root directory not selected');
                         }
-                    } else if (m.cmd === 'pair') {
-                        await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '', { timeLimit: m.timeLimit, memoryLimit: m.memoryLimit });
+                        const baseDir = pick[0].fsPath;
+                        context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
+                        return baseDir;
                     }
-                });
-            }
-        }));
+
+                    async function ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
+                        const active = vscode.window.activeTextEditor;
+                        if (!active) {
+                            throw new Error('Please open a source file in the editor first.');
+                        }
+                        const langId = getLanguageIdFromEditor(active);
+                        const problemName = toSafeName(m.name);
+
+                        const baseDir = await pickProblemsBaseDir();
+
+                        const problemDir = path.join(baseDir, problemName);
+                        const configDir = path.join(problemDir, 'config');
+                        await fs.promises.mkdir(problemDir, { recursive: true });
+                        await fs.promises.mkdir(configDir, { recursive: true });
+
+                        // Write source file
+                        const sourcePath = path.join(problemDir, `main.${langId}`);
+                        await fs.promises.writeFile(sourcePath, active.document.getText(), 'utf8');
+
+                        // Write config files
+                        const configJson = {
+                            name: m.name || '',
+                            url: m.url || '',
+                            timeLimit: Number(m.timeLimit) || 5,
+                            memoryLimit: Number(m.memoryLimit) || 256,
+                            opt: m.opt || '',
+                            std: m.std || ''
+                        };
+                        await fs.promises.writeFile(
+                            path.join(configDir, 'problem.json'),
+                            JSON.stringify(configJson, null, 2),
+                            'utf8'
+                        );
+                        if (m.statement)
+                            await fs.promises.writeFile(path.join(configDir, 'statement.md'), m.statement, 'utf8');
+                        if (m.samples)
+                            await fs.promises.writeFile(path.join(configDir, 'samples.txt'), m.samples, 'utf8');
+
+                        return { sourcePath };
+                    }
+
+                    webviewView.webview.onDidReceiveMessage(async (m: any) => {
+                        if (m.cmd === 'loadSamples') {
+                            const uris = await vscode.window.showOpenDialog({
+                                canSelectMany: false,
+                                openLabel: 'Select sample file'
+                            });
+                            if (uris && uris[0]) {
+                                const buf = await vscode.workspace.fs.readFile(uris[0]);
+                                const text = buf.toString();
+                                webviewView.webview.postMessage({ cmd: 'samplesLoaded', text });
+                            }
+                        } else if (m.cmd === 'run') {
+                            try {
+                                const { sourcePath } = await ensureProblemStructure(m);
+                                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
+                                await vscode.window.showTextDocument(doc, { preview: false });
+                                await vscode.commands.executeCommand('oicode.runCode', m.samples || '', {
+                                    timeLimit: m.timeLimit,
+                                    memoryLimit: m.memoryLimit
+                                });
+                            } catch (e: any) {
+                                vscode.window.showErrorMessage(e.message || String(e));
+                            }
+                        } else if (m.cmd === 'pair') {
+                            await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '', {
+                                timeLimit: m.timeLimit,
+                                memoryLimit: m.memoryLimit
+                            });
+                        }
+                    });
+                }
+            })
+        );
 
         // Command: create a new problem skeleton by name
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.createProblem', async (payload?: { name?: string; language?: 'c' | 'cpp'; baseDir?: string }) => {
-            try {
-                let name = payload?.name;
-                if (!name) {
-                    name = await vscode.window.showInputBox({ prompt: 'Enter problem name (will be used as folder name)', placeHolder: 'e.g.: CF1234A' }) || '';
-                }
-                if (!name) { return; }
-                const safe = name.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
+        context.subscriptions.push(
+            vscode.commands.registerCommand(
+                'oicode.createProblem',
+                async (payload?: { name?: string; language?: 'c' | 'cpp'; baseDir?: string }) => {
+                    try {
+                        let name = payload?.name;
+                        if (!name) {
+                            name =
+                                (await vscode.window.showInputBox({
+                                    prompt: 'Enter problem name (will be used as folder name)',
+                                    placeHolder: 'e.g.: CF1234A'
+                                })) || '';
+                        }
+                        if (!name) {
+                            return;
+                        }
+                        const safe = name.replace(/[^\w\-\.]+/g, '_').slice(0, 64);
 
-                let baseDir = payload?.baseDir || context.globalState.get<string>('oicode.lastProblemsBaseDir');
-                if (baseDir) {
-                    try {
-                        await fs.promises.access(baseDir);
-                    } catch {
-                        baseDir = undefined;
-                    }
-                }
-                if (!baseDir) {
-                    const pick = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel: 'Choose problem root directory' });
-                    if (!pick || !pick[0]) { return; }
-                    baseDir = pick[0].fsPath;
-                }
-                context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
+                        let baseDir = payload?.baseDir || context.globalState.get<string>('oicode.lastProblemsBaseDir');
+                        if (baseDir) {
+                            try {
+                                await fs.promises.access(baseDir);
+                            } catch {
+                                baseDir = undefined;
+                            }
+                        }
+                        if (!baseDir) {
+                            const pick = await vscode.window.showOpenDialog({
+                                canSelectFolders: true,
+                                canSelectFiles: false,
+                                canSelectMany: false,
+                                openLabel: 'Choose problem root directory'
+                            });
+                            if (!pick || !pick[0]) {
+                                return;
+                            }
+                            baseDir = pick[0].fsPath;
+                        }
+                        context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
 
-                let langId = payload?.language as ('c' | 'cpp') | undefined;
-                if (!langId) {
-                    const langPick = await vscode.window.showQuickPick([
-                        { label: 'C', detail: 'main.c', value: 'c' },
-                        { label: 'C++', detail: 'main.cpp', value: 'cpp' }
-                    ], { placeHolder: 'Select language' });
-                    if (!langPick) { return; }
-                    langId = langPick.value as 'c' | 'cpp';
-                }
-                if (langId) {
-                    const ext = langId;
-                    const problemDir = path.join(baseDir, safe);
-                    const configDir = path.join(problemDir, 'config');
-                    await fs.promises.mkdir(problemDir, { recursive: true });
-                    await fs.promises.mkdir(configDir, { recursive: true });
-                    // Template source - Use empty file instead of template code
-                    const sourcePath = path.join(problemDir, `main.${ext}`);
-                    try {
-                        await fs.promises.access(sourcePath);
-                    } catch {
-                        // Create empty file and let user write code themselves
-                        await fs.promises.writeFile(sourcePath, '', 'utf8');
-                    }
-                    // Default config
-                    const problemJsonPath = path.join(configDir, 'problem.json');
-                    try {
-                        await fs.promises.access(problemJsonPath);
-                    } catch {
-                        await fs.promises.writeFile(problemJsonPath, JSON.stringify({ name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' }, null, 2), 'utf8');
-                    }
-                    const statementPath = path.join(configDir, 'statement.md');
-                    try {
-                        await fs.promises.access(statementPath);
-                    } catch {
-                        await fs.promises.writeFile(statementPath, `# ${safe}\n\nWrite problem statement here...\n`, 'utf8');
-                    }
-                    const samplesPath = path.join(configDir, 'samples.txt');
-                    try {
-                        await fs.promises.access(samplesPath);
-                    } catch {
-                        await fs.promises.writeFile(samplesPath, '', 'utf8');
-                    }
+                        let langId = payload?.language as ('c' | 'cpp') | undefined;
+                        if (!langId) {
+                            const langPick = await vscode.window.showQuickPick(
+                                [
+                                    { label: 'C', detail: 'main.c', value: 'c' },
+                                    { label: 'C++', detail: 'main.cpp', value: 'cpp' }
+                                ],
+                                { placeHolder: 'Select language' }
+                            );
+                            if (!langPick) {
+                                return;
+                            }
+                            langId = langPick.value as 'c' | 'cpp';
+                        }
+                        if (langId) {
+                            const ext = langId;
+                            const problemDir = path.join(baseDir, safe);
+                            const configDir = path.join(problemDir, 'config');
+                            await fs.promises.mkdir(problemDir, { recursive: true });
+                            await fs.promises.mkdir(configDir, { recursive: true });
+                            // Template source - Use empty file instead of template code
+                            const sourcePath = path.join(problemDir, `main.${ext}`);
+                            try {
+                                await fs.promises.access(sourcePath);
+                            } catch {
+                                // Create empty file and let user write code themselves
+                                await fs.promises.writeFile(sourcePath, '', 'utf8');
+                            }
+                            // Default config
+                            const problemJsonPath = path.join(configDir, 'problem.json');
+                            try {
+                                await fs.promises.access(problemJsonPath);
+                            } catch {
+                                await fs.promises.writeFile(
+                                    problemJsonPath,
+                                    JSON.stringify(
+                                        { name: safe, url: '', timeLimit: 5, memoryLimit: 256, opt: '', std: '' },
+                                        null,
+                                        2
+                                    ),
+                                    'utf8'
+                                );
+                            }
+                            const statementPath = path.join(configDir, 'statement.md');
+                            try {
+                                await fs.promises.access(statementPath);
+                            } catch {
+                                await fs.promises.writeFile(
+                                    statementPath,
+                                    `# ${safe}\n\nWrite problem statement here...\n`,
+                                    'utf8'
+                                );
+                            }
+                            const samplesPath = path.join(configDir, 'samples.txt');
+                            try {
+                                await fs.promises.access(samplesPath);
+                            } catch {
+                                await fs.promises.writeFile(samplesPath, '', 'utf8');
+                            }
 
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
-                    await vscode.window.showTextDocument(doc, { preview: false });
-                    vscode.window.showInformationMessage(`Problem created：${safe}`);
-                    return { problemDir, sourcePath };
+                            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(sourcePath));
+                            await vscode.window.showTextDocument(doc, { preview: false });
+                            vscode.window.showInformationMessage(`Problem created：${safe}`);
+                            return { problemDir, sourcePath };
+                        }
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Failed to create problem：${e.message || e}`);
+                        return { error: e?.message || String(e) };
+                    }
                 }
-            } catch (e: any) {
-                vscode.window.showErrorMessage(`Failed to create problem：${e.message || e}`);
-                return { error: e?.message || String(e) };
-            }
-        }));
+            )
+        );
 
         const pairCheckProvider = new PairCheckViewProvider(context);
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider(PairCheckViewProvider.viewType, pairCheckProvider)
         );
 
-        context.subscriptions.push(vscode.commands.registerCommand('oi-code.showSettingsPage', () => {
-            const panel = vscode.window.createWebviewPanel(
-                'oiCodeSettings',
-                'OI-Code Settings',
-                vscode.ViewColumn.One,
-                { enableScripts: true, retainContextWhenHidden: true }
-            );
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oi-code.showSettingsPage', () => {
+                const panel = vscode.window.createWebviewPanel(
+                    'oiCodeSettings',
+                    'OI-Code Settings',
+                    vscode.ViewColumn.One,
+                    { enableScripts: true, retainContextWhenHidden: true }
+                );
 
-            getWebviewContent(context, 'settings.html').then(html => panel.webview.html = html);
+                getWebviewContent(context, 'settings.html').then(html => (panel.webview.html = html));
 
-            const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
-                postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
-            });
+                const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
+                    postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
+                });
 
-            panel.onDidDispose(() => {
-                themeListener.dispose();
-            });
+                panel.onDidDispose(() => {
+                    themeListener.dispose();
+                });
+            })
+        );
 
-        }));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oi-code.showCompletionPage', () => {
+                // ... (omitted for brevity)
+            })
+        );
 
-        context.subscriptions.push(vscode.commands.registerCommand('oi-code.showCompletionPage', () => {
-            // ... (omitted for brevity)
-        }));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oi-code.showWelcomePage', () => {
+                // ... (omitted for brevity)
+            })
+        );
 
-        context.subscriptions.push(vscode.commands.registerCommand('oi-code.showWelcomePage', () => {
-            // ... (omitted for brevity)
-        }));
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oicode.startPairCheck', async () => {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (!activeEditor) {
+                    vscode.window.showErrorMessage('Please open a file first to start pair check.');
+                    return;
+                }
 
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.startPairCheck', async () => {
-            const activeEditor = vscode.window.activeTextEditor;
-            if (!activeEditor) {
-                vscode.window.showErrorMessage('Please open a file first to start pair check.');
-                return;
-            }
+                const originalDoc = activeEditor.document;
 
-            const originalDoc = activeEditor.document;
+                const pairDoc = await vscode.workspace.openTextDocument({
+                    content: '// Place or write your pair check code here\n// For example, a brute force solution\n',
+                    language: originalDoc.languageId
+                });
 
-            const pairDoc = await vscode.workspace.openTextDocument({
-                content: `// Place or write your pair check code here\n// For example, a brute force solution\n`,
-                language: originalDoc.languageId
-            });
+                await vscode.window.showTextDocument(pairDoc, vscode.ViewColumn.Beside);
 
-            await vscode.window.showTextDocument(pairDoc, vscode.ViewColumn.Beside);
-
-            await vscode.commands.executeCommand('oicode.pairCheckView.focus');
-        }));
+                await vscode.commands.executeCommand('oicode.pairCheckView.focus');
+            })
+        );
 
         // Programmatic pair-check command for tests and headless execution
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.runPairCheck', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
-            const editors = vscode.window.visibleTextEditors.filter(e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c'));
-            if (editors.length < 2) {
-                vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
-                return { error: 'NEED_TWO_EDITORS' };
-            }
-            const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
-            const langId = getLanguageIdFromEditor(editor1);
-            if (editor2.document.languageId !== langId) {
-                vscode.window.showErrorMessage('Both code files must have the same language type.');
-                return { error: 'LANG_MISMATCH' };
-            }
-
-            // Wait for editor content to load completely (using more reliable mechanism)
-            let attempts = 0;
-            const maxAttempts = 10;
-            const checkInterval = 200; // Check every 200ms
-
-            while (attempts < maxAttempts) {
-                const editor1Content = editor1.document.getText();
-                const editor2Content = editor2.document.getText();
-                if (editor1Content.length > 0 && editor2Content.length > 0) {
-                    break; // Content loaded successfully
-                }
-                attempts++;
-                await new Promise(resolve => setTimeout(resolve, checkInterval));
-            }
-
-            // Final check
-            const finalEditor1Content = editor1.document.getText();
-            const finalEditor2Content = editor2.document.getText();
-            if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
-                vscode.window.showErrorMessage('Editor content load timeout, please try again later.');
-                return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
-            }
-
-            // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
-            await fs.promises.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
-            const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-code-'));
-            try {
-                const file1Path = path.join(tempDir, `code1.${langId}`);
-                const file2Path = path.join(tempDir, `code2.${langId}`);
-                await fs.promises.writeFile(file1Path, finalEditor1Content);
-                await fs.promises.writeFile(file2Path, finalEditor2Content);
-
-                const input = testInput ?? '';
-                // Use provided options or fallback to defaults
-                const timeLimit = options?.timeLimit ?? 20; // seconds
-
-                // Use native compilers for pair check
-                const pairResult = await runPairWithNativeCompilers(
-                    context,
-                    file1Path,
-                    file2Path,
-                    langId,
-                    input,
-                    { timeLimit, memoryLimit: 512 }
-                );
-                const result1 = pairResult.result1;
-                const result2 = pairResult.result2;
-
-                const toDisplay = (r: any) => {
-                    if (r.timedOut) return 'TIMEOUT';
-                    if (r.memoryExceeded) return 'MEMORY_EXCEEDED';
-                    if (r.spaceExceeded) return 'SPACE_EXCEEDED';
-                    return r.stderr ? `ERROR:\n${r.stderr}` : r.stdout;
-                };
-                const output1 = toDisplay(result1 as any);
-                const output2 = toDisplay(result2 as any);
-                const norm = (s: string) => s.replace(/\r\n/g, '\n').trimEnd();
-                const equal = norm(output1) === norm(output2);
-                // Update panel view if present
-                pairCheckProvider.setOutputs(htmlEscape(output1), htmlEscape(output2));
-                return { output1, output2, equal };
-            } catch (e: any) {
-                vscode.window.showErrorMessage(`Pair check execution error: ${e.message}`);
-                return { error: e.message };
-            } finally {
-                await fs.promises.rm(tempDir, { recursive: true, force: true });
-            }
-        }));
-
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.runCode', async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                return vscode.window.showErrorMessage('Please open a file to run.');
-            }
-            const document = editor.document;
-            const languageId = document.languageId as 'c' | 'cpp';
-            const sourceFile = path.basename(document.fileName);
-            let input: string | undefined;
-            if (testInput !== undefined) {
-                input = testInput;
-            } else {
-                input = await vscode.window.showInputBox({
-                    prompt: 'Enter input for the program',
-                    placeHolder: 'Type your input here...'
-                });
-                if (input === undefined) {
-                    return; // User cancelled
-                }
-            }
-            // Use provided options or fallback to defaults
-            const timeLimit = options?.timeLimit ?? 5; // seconds
-            const memoryLimit = options?.memoryLimit ?? 512; // MB
-            
-            return vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: `Running ${sourceFile}...`,
-                cancellable: false
-            }, async (progress) => {
-                progress.report({ increment: 0, message: 'Detecting compilers...' });
-                try {
-                    // 使用公共函数获取适合的编译器
-                    const compiler = await getSuitableCompiler(context, languageId);
-                    progress.report({ increment: 50, message: `Compiling with ${compiler.type}...` });
-
-                    // Execute with native compiler
-                    const result = await NativeCompilerManager.compileAndRun({
-                        sourcePath: document.uri.fsPath,
-                        language: languageId,
-                        compiler: compiler,
-                        input: input || '',
-                        timeLimit,
-                        memoryLimit
-                    });
-
-                    progress.report({ increment: 100 });
-                    const panel = vscode.window.createWebviewPanel(
-                        'oiCodeOutput',
-                        `Output for ${sourceFile}`,
-                        vscode.ViewColumn.Two,
-                        {}
+        context.subscriptions.push(
+            vscode.commands.registerCommand(
+                'oicode.runPairCheck',
+                async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
+                    const editors = vscode.window.visibleTextEditors.filter(
+                        e =>
+                            !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c')
                     );
-                    const meta: string[] = [];
-                    if (result.timedOut) meta.push('TimedOut');
-                    if (result.memoryExceeded) meta.push('MemoryExceeded');
-                    if (result.spaceExceeded) meta.push('SpaceExceeded');
-                    let content = '';
-                    if (meta.length) content += `<p><b>Flags:</b> ${meta.join(', ')}</p>`;
-                    if (result.stdout) content += `<h2>Output:</h2><pre>${htmlEscape(result.stdout)}</pre>`;
-                    if (result.stderr) content += `<h2>Error:</h2><pre>${htmlEscape(result.stderr)}</pre>`;
-                    panel.webview.html = content || '<i>No output</i>';
-                    
-                    // Return in the format expected by tests
-                    return {
-                        output: result.stdout,
-                        error: result.stderr,
-                        timedOut: result.timedOut,
-                        memoryExceeded: result.memoryExceeded
-                    };
-                } catch (e: any) {
-                    vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
-                    throw e;
-                }
-            });
-        }));
+                    if (editors.length < 2) {
+                        vscode.window.showErrorMessage(
+                            'Need to open at least two C/C++ code files to perform pair check.'
+                        );
+                        return { error: 'NEED_TWO_EDITORS' };
+                    }
+                    const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
+                    const langId = getLanguageIdFromEditor(editor1);
+                    if (editor2.document.languageId !== langId) {
+                        vscode.window.showErrorMessage('Both code files must have the same language type.');
+                        return { error: 'LANG_MISMATCH' };
+                    }
 
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.initializeEnvironment', async () => {
-            vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Check Compiler Environment',
-                cancellable: false
-            }, async (progress) => {
-                progress.report({ message: 'Detecting compilers...' });
+                    // Wait for editor content to load completely (using more reliable mechanism)
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    const checkInterval = 200; // Check every 200ms
+
+                    while (attempts < maxAttempts) {
+                        const editor1Content = editor1.document.getText();
+                        const editor2Content = editor2.document.getText();
+                        if (editor1Content.length > 0 && editor2Content.length > 0) {
+                            break; // Content loaded successfully
+                        }
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, checkInterval));
+                    }
+
+                    // Final check
+                    const finalEditor1Content = editor1.document.getText();
+                    const finalEditor2Content = editor2.document.getText();
+                    if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
+                        vscode.window.showErrorMessage('Editor content load timeout, please try again later.');
+                        return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
+                    }
+
+                    // const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oi-code-'));
+                    await fs.promises.mkdir(OI_CODE_TEST_TMP_PATH, { recursive: true });
+                    const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_TMP_PATH, 'oi-code-'));
+                    try {
+                        const file1Path = path.join(tempDir, `code1.${langId}`);
+                        const file2Path = path.join(tempDir, `code2.${langId}`);
+                        await fs.promises.writeFile(file1Path, finalEditor1Content);
+                        await fs.promises.writeFile(file2Path, finalEditor2Content);
+
+                        const input = testInput ?? '';
+                        // Use provided options or fallback to defaults
+                        const timeLimit = options?.timeLimit ?? 20; // seconds
+
+                        // Use native compilers for pair check
+                        const pairResult = await runPairWithNativeCompilers(
+                            context,
+                            file1Path,
+                            file2Path,
+                            langId,
+                            input,
+                            { timeLimit, memoryLimit: 512 }
+                        );
+                        const result1 = pairResult.result1;
+                        const result2 = pairResult.result2;
+
+                        const toDisplay = (r: any) => {
+                            if (r.timedOut) return 'TIMEOUT';
+                            if (r.memoryExceeded) return 'MEMORY_EXCEEDED';
+                            if (r.spaceExceeded) return 'SPACE_EXCEEDED';
+                            return r.stderr ? `ERROR:\n${r.stderr}` : r.stdout;
+                        };
+                        const output1 = toDisplay(result1 as any);
+                        const output2 = toDisplay(result2 as any);
+                        const norm = (s: string) => s.replace(/\r\n/g, '\n').trimEnd();
+                        const equal = norm(output1) === norm(output2);
+                        // Update panel view if present
+                        pairCheckProvider.setOutputs(htmlEscape(output1), htmlEscape(output2));
+                        return { output1, output2, equal };
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Pair check execution error: ${e.message}`);
+                        return { error: e.message };
+                    } finally {
+                        await fs.promises.rm(tempDir, { recursive: true, force: true });
+                    }
+                }
+            )
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand(
+                'oicode.runCode',
+                async (testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) => {
+                    const editor = vscode.window.activeTextEditor;
+                    if (!editor) {
+                        return vscode.window.showErrorMessage('Please open a file to run.');
+                    }
+                    const document = editor.document;
+                    const languageId = document.languageId as 'c' | 'cpp';
+                    const sourceFile = path.basename(document.fileName);
+                    let input: string | undefined;
+                    if (testInput !== undefined) {
+                        input = testInput;
+                    } else {
+                        input = await vscode.window.showInputBox({
+                            prompt: 'Enter input for the program',
+                            placeHolder: 'Type your input here...'
+                        });
+                        if (input === undefined) {
+                            return; // User cancelled
+                        }
+                    }
+                    // Use provided options or fallback to defaults
+                    const timeLimit = options?.timeLimit ?? 5; // seconds
+                    const memoryLimit = options?.memoryLimit ?? 512; // MB
+
+                    return vscode.window.withProgress(
+                        {
+                            location: vscode.ProgressLocation.Notification,
+                            title: `Running ${sourceFile}...`,
+                            cancellable: false
+                        },
+                        async progress => {
+                            progress.report({ increment: 0, message: 'Detecting compilers...' });
+                            try {
+                                // Use public function to get suitable compiler
+                                const compiler = await getSuitableCompiler(context, languageId);
+                                progress.report({ increment: 50, message: `Compiling with ${compiler.type}...` });
+
+                                // Execute with native compiler
+                                const result = await NativeCompilerManager.compileAndRun({
+                                    sourcePath: document.uri.fsPath,
+                                    language: languageId,
+                                    compiler: compiler,
+                                    input: input || '',
+                                    timeLimit,
+                                    memoryLimit
+                                });
+
+                                progress.report({ increment: 100 });
+                                const panel = vscode.window.createWebviewPanel(
+                                    'oiCodeOutput',
+                                    `Output for ${sourceFile}`,
+                                    vscode.ViewColumn.Two,
+                                    {}
+                                );
+                                const meta: string[] = [];
+                                if (result.timedOut) meta.push('TimedOut');
+                                if (result.memoryExceeded) meta.push('MemoryExceeded');
+                                if (result.spaceExceeded) meta.push('SpaceExceeded');
+                                let content = '';
+                                if (meta.length) content += `<p><b>Flags:</b> ${meta.join(', ')}</p>`;
+                                if (result.stdout) content += `<h2>Output:</h2><pre>${htmlEscape(result.stdout)}</pre>`;
+                                if (result.stderr) content += `<h2>Error:</h2><pre>${htmlEscape(result.stderr)}</pre>`;
+                                panel.webview.html = content || '<i>No output</i>';
+
+                                // Return in the format expected by tests
+                                return {
+                                    output: result.stdout,
+                                    error: result.stderr,
+                                    timedOut: result.timedOut,
+                                    memoryExceeded: result.memoryExceeded,
+                                    spaceExceeded: result.spaceExceeded
+                                };
+                            } catch (e: any) {
+                                vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
+                                throw e;
+                            }
+                        }
+                    );
+                }
+            )
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oicode.initializeEnvironment', async () => {
+                vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: 'Check Compiler Environment',
+                        cancellable: false
+                    },
+                    async progress => {
+                        progress.report({ message: 'Detecting compilers...' });
+                        try {
+                            const result = await NativeCompilerManager.detectCompilers(context);
+
+                            if (result.success && result.compilers.length > 0) {
+                                progress.report({ message: 'Compiler detection complete!', increment: 100 });
+                                vscode.window.showInformationMessage(
+                                    `OI-Code environment ready! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
+                                );
+                            } else {
+                                progress.report({ message: 'Need to install compiler...' });
+                                const choice = await vscode.window.showInformationMessage(
+                                    'No C/C++ compilers detected. Would you like to install LLVM?',
+                                    { modal: true },
+                                    'Install LLVM',
+                                    'View Help'
+                                );
+
+                                if (choice === 'Install LLVM') {
+                                    const installResult = await NativeCompilerManager.installLLVM();
+                                    if (installResult.success) {
+                                        vscode.window.showInformationMessage(
+                                            'LLVM installation completed! Please restart VS Code.'
+                                        );
+                                    }
+                                }
+                            }
+                        } catch (error: any) {
+                            progress.report({ message: 'Compiler detection failed.' });
+                            vscode.window.showErrorMessage(
+                                `Compiler environment initialization failed: ${error.message}`
+                            );
+                        }
+                    }
+                );
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oicode.rescanCompilers', async () => {
+                try {
+                    vscode.window.withProgress(
+                        {
+                            location: vscode.ProgressLocation.Notification,
+                            title: 'Rescanning compilers...',
+                            cancellable: false
+                        },
+                        async progress => {
+                            progress.report({ message: 'Rescanning compilers...' });
+                            try {
+                                const result = await NativeCompilerManager.forceRescanCompilers(context);
+                                progress.report({ message: 'Rescan completed!', increment: 100 });
+
+                                if (result.success && result.compilers.length > 0) {
+                                    vscode.window.showInformationMessage(
+                                        `Compiler rescan completed! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
+                                    );
+                                } else {
+                                    vscode.window.showWarningMessage('No available compilers detected');
+                                }
+                            } catch (error: any) {
+                                progress.report({ message: 'Rescan failed' });
+                                vscode.window.showErrorMessage(`Compiler rescan failed: ${error.message}`);
+                            }
+                        }
+                    );
+                } catch (error: any) {
+                    vscode.window.showErrorMessage(`Compiler rescan failed: ${error.message}`);
+                }
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.commands.registerCommand('oicode.setupCompiler', async () => {
                 try {
                     const result = await NativeCompilerManager.detectCompilers(context);
-                    
+
                     if (result.success && result.compilers.length > 0) {
-                        progress.report({ message: 'Compiler detection complete!', increment: 100 });
                         vscode.window.showInformationMessage(
-                            `OI-Code environment ready! Detected ${result.compilers.length} compilers, recommended: ${result.recommended?.name}`
+                            `Detected ${result.compilers.length} compilers. Recommended: ${result.recommended?.name || 'first compiler'}`
                         );
                     } else {
-                        progress.report({ message: 'Need to install compiler...' });
                         const choice = await vscode.window.showInformationMessage(
-                            'No C/C++ compilers detected. Would you like to install LLVM?',
+                            'No C/C++ compilers detected. Do you want to install LLVM?',
                             { modal: true },
                             'Install LLVM',
-                            'View Help'
+                            'View Detection Details'
                         );
-                        
+
                         if (choice === 'Install LLVM') {
                             const installResult = await NativeCompilerManager.installLLVM();
                             if (installResult.success) {
-                                vscode.window.showInformationMessage('LLVM installation completed! Please restart VS Code.');
+                                vscode.window.showInformationMessage(installResult.message);
+                            } else {
+                                vscode.window
+                                    .showErrorMessage(installResult.message, 'View Details')
+                                    .then(selection => {
+                                        if (selection === 'View Details') {
+                                            NativeCompilerManager.getOutputChannel().show(true);
+                                        }
+                                    });
                             }
+                        } else if (choice === 'View Detection Details') {
+                            NativeCompilerManager.getOutputChannel().show(true);
                         }
                     }
                 } catch (error: any) {
-                    progress.report({ message: 'Compiler detection failed.' });
-                    vscode.window.showErrorMessage(`Compiler environment initialization failed: ${error.message}`);
+                    vscode.window.showErrorMessage(`Compiler setup failed: ${error.message}`);
                 }
-            });
-        }));
-
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.rescanCompilers', async () => {
-            try {
-                vscode.window.withProgress({
-                    location: vscode.ProgressLocation.Notification,
-                    title: '重新扫描编译器...',
-                    cancellable: false
-                }, async (progress) => {
-                    progress.report({ message: '正在重新扫描编译器...' });
-                    try {
-                        const result = await NativeCompilerManager.forceRescanCompilers(context);
-                        progress.report({ message: '重新扫描完成!', increment: 100 });
-                        
-                        if (result.success && result.compilers.length > 0) {
-                            vscode.window.showInformationMessage(
-                                `编译器重新扫描完成！检测到 ${result.compilers.length} 个编译器，推荐使用: ${result.recommended?.name}`
-                            );
-                        } else {
-                            vscode.window.showWarningMessage('未检测到可用的编译器');
-                        }
-                    } catch (error: any) {
-                        progress.report({ message: '重新扫描失败' });
-                        vscode.window.showErrorMessage(`编译器重新扫描失败: ${error.message}`);
-                    }
-                });
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`编译器重新扫描失败: ${error.message}`);
-            }
-        }));
-
-        context.subscriptions.push(vscode.commands.registerCommand('oicode.setupCompiler', async () => {
-            try {
-                const result = await NativeCompilerManager.detectCompilers(context);
-                
-                if (result.success && result.compilers.length > 0) {
-                    vscode.window.showInformationMessage(
-                        `检测到 ${result.compilers.length} 个编译器。推荐使用: ${result.recommended?.name || '第一个编译器'}`
-                    );
-                } else {
-                    const choice = await vscode.window.showInformationMessage(
-                        '未检测到C/C++编译器。是否要安装LLVM？',
-                        { modal: true },
-                        '安装LLVM',
-                        '查看检测详情'
-                    );
-                    
-                    if (choice === '安装LLVM') {
-                        const installResult = await NativeCompilerManager.installLLVM();
-                        if (installResult.success) {
-                            vscode.window.showInformationMessage(installResult.message);
-                        } else {
-                            vscode.window.showErrorMessage(installResult.message, '查看详情').then(selection => {
-                                if (selection === '查看详情') {
-                                    NativeCompilerManager.getOutputChannel().show(true);
-                                }
-                            });
-                        }
-                    } else if (choice === '查看检测详情') {
-                        NativeCompilerManager.getOutputChannel().show(true);
-                    }
-                }
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`编译器设置失败: ${error.message}`);
-            }
-        }));
+            })
+        );
 
         const hasLaunchedBeforeKey = 'oicode.hasLaunchedBefore';
         if (!context.globalState.get<boolean>(hasLaunchedBeforeKey)) {

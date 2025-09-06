@@ -1,7 +1,7 @@
-/*---------------------------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
+ *-------------------------------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
@@ -60,10 +60,10 @@ export class NativeCompilerManager {
      * @returns Filtered compiler list
      */
     public static filterSuitableCompilers(languageId: 'c' | 'cpp', compilers: CompilerInfo[]): CompilerInfo[] {
-        return compilers.filter(c => 
-            languageId === 'c' ? 
-                (c.type === 'clang' || c.type === 'apple-clang' || c.type === 'gcc' || c.type === 'msvc') :
-                (c.type === 'clang++' || c.type === 'apple-clang' || c.type === 'g++' || c.type === 'msvc')
+        return compilers.filter(c =>
+            languageId === 'c'
+                ? c.type === 'clang' || c.type === 'apple-clang' || c.type === 'gcc' || c.type === 'msvc'
+                : c.type === 'clang++' || c.type === 'apple-clang' || c.type === 'g++' || c.type === 'msvc'
         );
     }
 
@@ -78,9 +78,11 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 从全局状态加载缓存的编译器信息
+     * Load cached compiler information from global state
      */
-    private static async loadCachedCompilers(context: vscode.ExtensionContext): Promise<CompilerDetectionResult | null> {
+    private static async loadCachedCompilers(
+        context: vscode.ExtensionContext
+    ): Promise<CompilerDetectionResult | null> {
         try {
             const cached = context.globalState.get<string>(this.CACHE_KEY);
             if (!cached) {
@@ -88,18 +90,18 @@ export class NativeCompilerManager {
             }
 
             const parsed = JSON.parse(cached);
-            
-            // 检查缓存版本
+
+            // Check cache version
             if (parsed.version !== this.CACHE_VERSION) {
                 console.log('[CompilerCache] Cache version mismatch, ignoring');
                 return null;
             }
 
-            // 检查缓存时间（24小时过期）
+            // Check cache time (24 hours expiration)
             const cacheTime = new Date(parsed.timestamp);
             const now = new Date();
             const hoursDiff = (now.getTime() - cacheTime.getTime()) / (1000 * 60 * 60);
-            
+
             if (hoursDiff > 24) {
                 console.log('[CompilerCache] Cache expired, ignoring');
                 return null;
@@ -119,9 +121,12 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 保存编译器信息到全局状态
+     * Save compiler information to global state
      */
-    private static async saveCachedCompilers(context: vscode.ExtensionContext, result: CompilerDetectionResult): Promise<void> {
+    private static async saveCachedCompilers(
+        context: vscode.ExtensionContext,
+        result: CompilerDetectionResult
+    ): Promise<void> {
         try {
             const cacheData = {
                 version: this.CACHE_VERSION,
@@ -139,7 +144,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 清除编译器缓存
+     * Clear compiler cache
      */
     public static async clearCachedCompilers(context: vscode.ExtensionContext): Promise<void> {
         try {
@@ -152,7 +157,7 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 强制重新扫描编译器
+     * Force rescan compilers
      */
     public static async forceRescanCompilers(context: vscode.ExtensionContext): Promise<CompilerDetectionResult> {
         console.log('[CompilerCache] Forcing compiler rescan...');
@@ -161,18 +166,21 @@ export class NativeCompilerManager {
     }
 
     /**
-     * 检测系统中可用的编译器
+     * Detect available compilers in the system
      */
-    public static async detectCompilers(context?: vscode.ExtensionContext, forceRescan: boolean = false): Promise<CompilerDetectionResult> {
+    public static async detectCompilers(
+        context?: vscode.ExtensionContext,
+        forceRescan: boolean = false
+    ): Promise<CompilerDetectionResult> {
         const output = this.getOutputChannel();
-        
-        // 如果有内存缓存且不是强制重新扫描，直接返回
+
+        // If there is memory cache and not forcing rescan, return directly
         if (!forceRescan && this.cachedCompilers) {
             console.log('[CompilerCache] Using in-memory cached compiler information');
             return this.cachedCompilers;
         }
 
-        // 尝试从全局状态加载缓存
+        // Try to load cache from global state
         if (!forceRescan && context) {
             const cached = await this.loadCachedCompilers(context);
             if (cached) {
@@ -183,37 +191,39 @@ export class NativeCompilerManager {
         }
 
         output.clear();
-        output.appendLine('=== 检测可用编译器 ===');
+        output.appendLine('=== Detecting Available Compilers ===');
         output.show(true);
 
         try {
             const compilers: CompilerInfo[] = [];
 
-            // 根据平台检测编译器
+            // Detect compilers based on platform
             if (process.platform === 'win32') {
-                compilers.push(...await this.detectWindowsCompilers());
+                compilers.push(...(await this.detectWindowsCompilers()));
             } else if (process.platform === 'darwin') {
-                compilers.push(...await this.detectMacOSCompilers());
+                compilers.push(...(await this.detectMacOSCompilers()));
             } else if (process.platform === 'linux') {
-                compilers.push(...await this.detectLinuxCompilers());
+                compilers.push(...(await this.detectLinuxCompilers()));
             }
 
-            // 按优先级排序
+            // Sort by priority
             compilers.sort((a, b) => b.priority - a.priority);
 
-            // 选择推荐编译器
+            // Select recommended compiler
             const recommended = compilers.length > 0 ? compilers[0] : undefined;
 
-            // 生成建议
+            // Generate suggestions
             const suggestions = this.generateSuggestions(compilers);
 
-            output.appendLine(`检测到 ${compilers.length} 个编译器:`);
+            output.appendLine(`Detected ${compilers.length} 个编译器:`);
             compilers.forEach(compiler => {
-                output.appendLine(`  - ${compiler.name} (${compiler.type}) v${compiler.version} [${compiler.is64Bit ? '64-bit' : '32-bit'}]`);
+                output.appendLine(
+                    `  - ${compiler.name} (${compiler.type}) v${compiler.version} [${compiler.is64Bit ? '64-bit' : '32-bit'}]`
+                );
             });
 
             if (recommended) {
-                output.appendLine(`推荐编译器: ${recommended.name}`);
+                output.appendLine(`Recommended compiler: ${recommended.name}`);
             }
 
             const result = {
@@ -223,27 +233,26 @@ export class NativeCompilerManager {
                 suggestions
             };
 
-            // 缓存结果
+            // Cache results
             this.cachedCompilers = result;
             if (context) {
                 await this.saveCachedCompilers(context, result);
             }
 
             return result;
-
         } catch (error: any) {
-            const errorMsg = `编译器检测失败: ${error.message}`;
+            const errorMsg = `Compiler detection failed: ${error.message}`;
             output.appendLine(errorMsg);
-            
+
             return {
                 success: false,
                 compilers: [],
                 error: errorMsg,
                 suggestions: [
-                    '请确保已安装C/C++编译器',
-                    'Windows: 安装LLVM或MinGW',
-                    'macOS: 安装Xcode Command Line Tools',
-                    'Linux: 安装gcc或clang'
+                    'Please ensure C/C++ compilers are installed',
+                    'Windows: Install LLVM or MinGW',
+                    'macOS: Install Xcode Command Line Tools',
+                    'Linux: Install gcc or clang'
                 ]
             };
         }
@@ -311,7 +320,12 @@ export class NativeCompilerManager {
 
         // 4. Scan entire system drive (optional, may be slow)
         if (compilers.length === 0) {
-            const systemCompilers = await this.scanSystemForCompilers(['clang.exe', 'clang++.exe', 'gcc.exe', 'g++.exe']);
+            const systemCompilers = await this.scanSystemForCompilers([
+                'clang.exe',
+                'clang++.exe',
+                'gcc.exe',
+                'g++.exe'
+            ]);
             for (const compiler of systemCompilers) {
                 if (!checked.has(compiler.toLowerCase())) {
                     checked.add(compiler.toLowerCase());
@@ -349,8 +363,8 @@ export class NativeCompilerManager {
         const searchDirs = [
             '/usr/bin',
             '/usr/local/bin',
-            '/opt/local/bin',           // MacPorts
-            '/usr/local/opt/llvm/bin',  // Homebrew Intel
+            '/opt/local/bin', // MacPorts
+            '/usr/local/opt/llvm/bin', // Homebrew Intel
             '/opt/homebrew/opt/llvm/bin', // Homebrew Apple Silicon
             '/opt/homebrew/bin',
             '/usr/local/opt/gcc/bin',
@@ -434,8 +448,8 @@ export class NativeCompilerManager {
             '/usr/llvm/bin',
             '/opt/llvm/bin',
             '/usr/local/llvm/bin',
-            '/snap/bin',  // Snap packages
-            '/flatpak/bin', // Flatpak packages
+            '/snap/bin', // Snap packages
+            '/flatpak/bin' // Flatpak packages
         ];
 
         for (const dir of searchDirs) {
@@ -509,15 +523,18 @@ export class NativeCompilerManager {
                 'Microsoft Visual Studio\\Installer\\vswhere.exe'
             );
 
-            if (!await this.fileExists(vswherePath)) {
+            if (!(await this.fileExists(vswherePath))) {
                 return [];
             }
 
             const { stdout } = await this.executeCommand(vswherePath, [
                 '-latest',
-                '-products', '*',
-                '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
-                '-property', 'installationPath'
+                '-products',
+                '*',
+                '-requires',
+                'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                '-property',
+                'installationPath'
             ]);
 
             const installPath = stdout.trim();
@@ -528,18 +545,18 @@ export class NativeCompilerManager {
             // MSVC compilers are usually in the VC/Tools/MSVC directory under the installation path
             const msvcBasePath = path.join(installPath, 'VC', 'Tools', 'MSVC');
             const results: string[] = [];
-            
+
             try {
                 // First read MSVC version directories
                 const versions = await fs.readdir(msvcBasePath);
-                
+
                 for (const version of versions) {
                     // Check compiler paths in each version directory
                     const hostPaths = [
                         path.join(msvcBasePath, version, 'bin', 'Hostx64', 'x64', 'cl.exe'),
                         path.join(msvcBasePath, version, 'bin', 'Hostx86', 'x86', 'cl.exe')
                     ];
-                    
+
                     for (const compilerPath of hostPaths) {
                         try {
                             await fs.access(compilerPath);
@@ -565,14 +582,11 @@ export class NativeCompilerManager {
     private static async resolveFullPath(command: string): Promise<string | null> {
         try {
             if (path.isAbsolute(command)) {
-                return await this.fileExists(command) ? command : null;
+                return (await this.fileExists(command)) ? command : null;
             }
 
             // Search in PATH
-            const { stdout } = await this.executeCommand(
-                process.platform === 'win32' ? 'where' : 'which',
-                [command]
-            );
+            const { stdout } = await this.executeCommand(process.platform === 'win32' ? 'where' : 'which', [command]);
             return stdout.trim() || null;
         } catch {
             return null;
@@ -588,16 +602,16 @@ export class NativeCompilerManager {
             outputChannel.appendLine(`Testing compiler: ${compilerPath}`);
             const { stdout, stderr } = await this.executeCommand(compilerPath, ['--version']);
             const versionOutput = stdout + stderr;
-            
+
             // Parse compiler information
             const type = this.determineCompilerType(compilerPath, versionOutput);
             const version = this.parseVersion(versionOutput);
             const supportedStandards = this.getSupportedStandards(type, version);
             const is64Bit = await this.is64BitCompiler(compilerPath);
-            
+
             // Calculate priority
             const priority = this.calculatePriority(type, version, compilerPath);
-            
+
             // Generate friendly name
             const name = this.generateCompilerName(type, version, compilerPath);
 
@@ -620,7 +634,10 @@ export class NativeCompilerManager {
     /**
      * Determine compiler type
      */
-    private static determineCompilerType(compilerPath: string, versionOutput: string): 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang' {
+    private static determineCompilerType(
+        compilerPath: string,
+        versionOutput: string
+    ): 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang' {
         const path = compilerPath.toLowerCase();
         const output = versionOutput.toLowerCase();
 
@@ -659,8 +676,8 @@ export class NativeCompilerManager {
     private static parseVersion(versionOutput: string): string {
         // Match version number patterns
         const patterns = [
-            /(\d+\.\d+\.\d+)/,  // x.y.z
-            /(\d+\.\d+)/,       // x.y
+            /(\d+\.\d+\.\d+)/, // x.y.z
+            /(\d+\.\d+)/, // x.y
             /version (\d+\.\d+\.\d+)/,
             /version (\d+\.\d+)/
         ];
@@ -750,12 +767,12 @@ export class NativeCompilerManager {
      */
     private static generateCompilerName(type: string, version: string, path: string): string {
         const nameMap: { [key: string]: string } = {
-            'clang': 'Clang',
+            clang: 'Clang',
             'clang++': 'Clang++',
             'apple-clang': 'Apple Clang',
-            'gcc': 'GCC',
+            gcc: 'GCC',
             'g++': 'G++',
-            'msvc': 'MSVC'
+            msvc: 'MSVC'
         };
 
         const baseName = nameMap[type] || type.toUpperCase();
@@ -1041,18 +1058,21 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         await fs.writeFile(scriptPath, installScript, 'utf8');
 
         // Run with administrator privileges
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Installing LLVM...',
-            cancellable: false
-        }, async (progress) => {
-            progress.report({ message: 'Downloading and installing LLVM...' });
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Installing LLVM...',
+                cancellable: false
+            },
+            async progress => {
+                progress.report({ message: 'Downloading and installing LLVM...' });
 
-            await this.executeCommand('powershell', [
-                '-Command',
-                `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' -Verb RunAs -Wait`
-            ]);
-        });
+                await this.executeCommand('powershell', [
+                    '-Command',
+                    `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File "${scriptPath}"' -Verb RunAs -Wait`
+                ]);
+            }
+        );
 
         // Clean up script file
         try {
@@ -1065,11 +1085,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             success: true,
             message: 'LLVM installer started',
             restartRequired: true,
-            nextSteps: [
-                'Please complete LLVM installation wizard',
-                '重启VS Code',
-                '运行编译器检测验证安装'
-            ]
+            nextSteps: ['Please complete LLVM installation wizard', '重启VS Code', '运行编译器检测验证安装']
         };
     }
 
@@ -1094,24 +1110,24 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             };
         }
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Installing LLVM...',
-            cancellable: false
-        }, async (progress) => {
-            progress.report({ message: 'Installing LLVM via Homebrew...' });
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Installing LLVM...',
+                cancellable: false
+            },
+            async progress => {
+                progress.report({ message: 'Installing LLVM via Homebrew...' });
 
-            await this.executeCommand('brew', ['install', 'llvm']);
-        });
+                await this.executeCommand('brew', ['install', 'llvm']);
+            }
+        );
 
         return {
             success: true,
             message: 'LLVM installation completed',
             restartRequired: true,
-            nextSteps: [
-                '重启VS Code',
-                '运行编译器检测验证安装'
-            ]
+            nextSteps: ['重启VS Code', '运行编译器检测验证安装']
         };
     }
 
@@ -1148,34 +1164,34 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             }
         }
 
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'Installing LLVM...',
-            cancellable: false
-        }, async (progress) => {
-            progress.report({ message: `Installing LLVM using ${packageManager}...` });
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Installing LLVM...',
+                cancellable: false
+            },
+            async progress => {
+                progress.report({ message: `Installing LLVM using ${packageManager}...` });
 
-            switch (packageManager) {
-                case 'apt':
-                    await this.executeCommand('sudo', ['apt', 'update']);
-                    await this.executeCommand('sudo', ['apt', 'install', '-y', 'clang', 'clang++', 'lldb']);
-                    break;
-                case 'dnf':
-                    await this.executeCommand('sudo', ['dnf', 'install', '-y', 'clang', 'clang++', 'lldb']);
-                    break;
-                case 'pacman':
-                    await this.executeCommand('sudo', ['pacman', '-S', '--noconfirm', 'clang', 'lldb']);
-                    break;
+                switch (packageManager) {
+                    case 'apt':
+                        await this.executeCommand('sudo', ['apt', 'update']);
+                        await this.executeCommand('sudo', ['apt', 'install', '-y', 'clang', 'clang++', 'lldb']);
+                        break;
+                    case 'dnf':
+                        await this.executeCommand('sudo', ['dnf', 'install', '-y', 'clang', 'clang++', 'lldb']);
+                        break;
+                    case 'pacman':
+                        await this.executeCommand('sudo', ['pacman', '-S', '--noconfirm', 'clang', 'lldb']);
+                        break;
+                }
             }
-        });
+        );
 
         return {
             success: true,
             message: 'LLVM installation completed',
-            nextSteps: [
-                '重启VS Code',
-                '运行编译器检测验证安装'
-            ]
+            nextSteps: ['重启VS Code', '运行编译器检测验证安装']
         };
     }
 
@@ -1189,7 +1205,13 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         input: string;
         timeLimit: number;
         memoryLimit: number;
-    }): Promise<{ stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
+    }): Promise<{
+        stdout: string;
+        stderr: string;
+        timedOut?: boolean;
+        memoryExceeded?: boolean;
+        spaceExceeded?: boolean;
+    }> {
         const output = this.getOutputChannel();
         output.appendLine(`=== Compiling and running ${options.language} code ===`);
         output.appendLine(`Source file: ${options.sourcePath}`);
@@ -1207,8 +1229,13 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             await fs.copyFile(options.sourcePath, tempSourcePath);
 
             // Build compilation command
-            const compileArgs = this.getCompilerArgs(options.compiler, options.language, tempSourcePath, executablePath);
-            
+            const compileArgs = this.getCompilerArgs(
+                options.compiler,
+                options.language,
+                tempSourcePath,
+                executablePath
+            );
+
             output.appendLine(`Compilation command: ${options.compiler.path} ${compileArgs.join(' ')}`);
 
             // Compile
@@ -1256,7 +1283,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             // Run program
             output.appendLine(`Execution command: ${executablePath}`);
             output.appendLine(`Execution input: "${options.input}"`);
-            
+
             const runResult = await this.executeWithTimeout({
                 command: executablePath,
                 args: [],
@@ -1265,7 +1292,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 input: options.input,
                 memoryLimit: options.memoryLimit
             });
-            
+
             output.appendLine(`Execution result - Exit code: ${runResult.exitCode}`);
             output.appendLine(`Execution result - Standard output: "${runResult.stdout}"`);
             output.appendLine(`Execution result - Standard error: "${runResult.stderr}"`);
@@ -1285,7 +1312,6 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 memoryExceeded: runResult.memoryExceeded,
                 spaceExceeded: runResult.spaceExceeded
             };
-
         } catch (error: any) {
             output.appendLine(`Compilation and execution failed: ${error.message}`);
             return {
@@ -1301,7 +1327,12 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     /**
      * Get compiler arguments
      */
-    private static getCompilerArgs(compiler: CompilerInfo, language: 'c' | 'cpp', sourcePath: string, outputPath: string): string[] {
+    private static getCompilerArgs(
+        compiler: CompilerInfo,
+        language: 'c' | 'cpp',
+        sourcePath: string,
+        outputPath: string
+    ): string[] {
         const config = vscode.workspace.getConfiguration('oicode');
         const optimizationLevel = config.get<string>('compile.opt', 'O2');
         let languageStandard = config.get<string>('compile.std', 'c++17');
@@ -1316,7 +1347,9 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 // This is a temporary workaround due to some changes in C++17 standard library implementation in Clang 20+
                 // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
                 // This temporary workaround ensures backward compatibility
-                this.getOutputChannel().appendLine(`[WARN] Forcing C++ standard to 'c++14' for Clang ${compiler.version} due to known compatibility issues with c++17. This can be overridden in settings.`);
+                this.getOutputChannel().appendLine(
+                    `[WARN] Forcing C++ standard to 'c++14' for Clang ${compiler.version} due to known compatibility issues with c++17. This can be overridden in settings.`
+                );
                 languageStandard = 'c++14';
             }
         }
@@ -1327,14 +1360,14 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             if (language === 'cpp') {
                 args.push(`/std:${languageStandard}`);
             }
-            args.push('/Fe:' + outputPath);
+            args.push(`/Fe:${outputPath}`);
         } else {
             args.push(`-${optimizationLevel}`);
             if (language === 'cpp') {
                 args.push(`-std=${languageStandard}`);
             }
             args.push('-o', outputPath);
-            
+
             // For Apple Clang, need to explicitly link C++ standard library
             if (compiler.type === 'apple-clang' && language === 'cpp') {
                 args.push('-lc++');
@@ -1355,7 +1388,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         try {
             const util = require('util');
             const execAsync = util.promisify(exec);
-            
+
             if (process.platform === 'win32') {
                 // Windows: Use wmic command
                 const command = `wmic logicaldisk where "DeviceID='${directory.charAt(0)}:'" get FreeSpace /value`;
@@ -1374,7 +1407,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 const freeSpaceMB = freeSpaceKB / 1024;
                 return freeSpaceMB >= requiredSpaceMB;
             }
-            
+
             return true; // If unable to get disk space information, default to sufficient
         } catch {
             return true; // Default to sufficient when check fails
@@ -1391,14 +1424,21 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         timeout: number;
         input: string;
         memoryLimit?: number; // Memory limit (MB)
-    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean; memoryExceeded?: boolean; spaceExceeded?: boolean }> {
-        return new Promise((resolve) => {
+    }): Promise<{
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+        timedOut?: boolean;
+        memoryExceeded?: boolean;
+        spaceExceeded?: boolean;
+    }> {
+        return new Promise(resolve => {
             (async () => {
                 let child: any;
                 let memoryExceeded = false;
                 let spaceExceeded = false;
                 let memoryCheckInterval: NodeJS.Timeout | null = null;
-                
+
                 // Check disk space
                 const hasEnoughSpace = await this.checkDiskSpace(options.cwd);
                 if (!hasEnoughSpace) {
@@ -1411,125 +1451,125 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                     });
                     return;
                 }
-            
-            // If memory limit is set and on Unix system, use ulimit
-            if (options.memoryLimit && process.platform !== 'win32') {
-                const memoryKB = options.memoryLimit * 1024; // 转换为KB
-                // The script first tries to set the limit. If it fails, the command will not be executed due to `&&`.
-                // This is safer than swallowing errors.
-                const shellScript = `ulimit -v ${memoryKB} && ulimit -d ${memoryKB} && exec "$@"`;
-                
-                child = spawn('sh', ['-c', shellScript, 'sh', options.command, ...options.args], { 
-                    cwd: options.cwd,
-                    stdio: ['pipe', 'pipe', 'pipe']
-                });
-            } else {
-                // Windows or no memory limit case
-                child = spawn(options.command, options.args, { 
-                    cwd: options.cwd,
-                    stdio: ['pipe', 'pipe', 'pipe']
-                });
-                
-                // For Windows, use polling to check memory usage
-                // TODO: Future improvement - Use Windows Job Objects for more efficient memory limit enforcement
-                // Job Objects provide OS-level resource management without polling overhead
-                // See design document LLVM_NATIVE_ANALYSIS.md for implementation details
-                if (options.memoryLimit && process.platform === 'win32') {
-                    memoryCheckInterval = setInterval(async () => {
-                        try {
-                            // Use wmic command to get process memory usage
-                            const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
-                            
-                            exec(memoryCheckCommand, (error: any, stdout: string) => {
-                                if (!error && stdout) {
-                                    const memoryMatch = stdout.match(/WorkingSetSize=(\d+)/);
-                                    if (memoryMatch) {
-                                        const memoryBytes = parseInt(memoryMatch[1], 10);
-                                        const memoryMB = memoryBytes / (1024 * 1024);
-                                        
-                                        if (options.memoryLimit && memoryMB > options.memoryLimit) {
-                                            memoryExceeded = true;
-                                            child.kill('SIGKILL');
-                                            if (memoryCheckInterval) {
-                                                clearInterval(memoryCheckInterval);
-                                                memoryCheckInterval = null;
+
+                // If memory limit is set and on Unix system, use ulimit
+                if (options.memoryLimit && process.platform !== 'win32') {
+                    const memoryKB = options.memoryLimit * 1024; // 转换为KB
+                    // The script first tries to set the limit. If it fails, the command will not be executed due to `&&`.
+                    // This is safer than swallowing errors.
+                    const shellScript = `ulimit -v ${memoryKB} && ulimit -d ${memoryKB} && exec "$@"`;
+
+                    child = spawn('sh', ['-c', shellScript, 'sh', options.command, ...options.args], {
+                        cwd: options.cwd,
+                        stdio: ['pipe', 'pipe', 'pipe']
+                    });
+                } else {
+                    // Windows or no memory limit case
+                    child = spawn(options.command, options.args, {
+                        cwd: options.cwd,
+                        stdio: ['pipe', 'pipe', 'pipe']
+                    });
+
+                    // For Windows, use polling to check memory usage
+                    // TODO: Future improvement - Use Windows Job Objects for more efficient memory limit enforcement
+                    // Job Objects provide OS-level resource management without polling overhead
+                    // See design document LLVM_NATIVE_ANALYSIS.md for implementation details
+                    if (options.memoryLimit && process.platform === 'win32') {
+                        memoryCheckInterval = setInterval(async () => {
+                            try {
+                                // Use wmic command to get process memory usage
+                                const memoryCheckCommand = `wmic process where ProcessId=${child.pid} get WorkingSetSize /value`;
+
+                                exec(memoryCheckCommand, (error: any, stdout: string) => {
+                                    if (!error && stdout) {
+                                        const memoryMatch = stdout.match(/WorkingSetSize=(\d+)/);
+                                        if (memoryMatch) {
+                                            const memoryBytes = parseInt(memoryMatch[1], 10);
+                                            const memoryMB = memoryBytes / (1024 * 1024);
+
+                                            if (options.memoryLimit && memoryMB > options.memoryLimit) {
+                                                memoryExceeded = true;
+                                                child.kill('SIGKILL');
+                                                if (memoryCheckInterval) {
+                                                    clearInterval(memoryCheckInterval);
+                                                    memoryCheckInterval = null;
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            });
-                        } catch (error) {
-                            // Ignore memory check errors, continue polling
-                        }
-                    }, 200); // Check every 200ms - balance between responsiveness and performance
-                    
-                    // Clean up memory check timer
-                    child.on('close', () => {
-                        if (memoryCheckInterval) {
-                            clearInterval(memoryCheckInterval);
-                        }
-                    });
-                }
-            }
+                                });
+                            } catch (error) {
+                                // Ignore memory check errors, continue polling
+                            }
+                        }, 200); // Check every 200ms - balance between responsiveness and performance
 
-            let stdout = '';
-            let stderr = '';
-            let timedOut = false;
-
-            const timeout = setTimeout(() => {
-                timedOut = true;
-                child.kill('SIGKILL');
-            }, options.timeout);
-
-            child.stdout?.on('data', (data: Buffer | string) => {
-                stdout += data.toString();
-            });
-
-            child.stderr?.on('data', (data: Buffer | string) => {
-                stderr += data.toString();
-            });
-
-            child.on('close', (code: number | null, signal: string | null) => {
-                clearTimeout(timeout);
-                
-                // Check if terminated due to memory limit
-                if (process.platform !== 'win32' && options.memoryLimit) {
-                    // On Unix systems, if process is killed by SIGKILL and not timed out, it might be due to memory limit
-                    if (signal === 'SIGKILL' && !timedOut) {
-                        memoryExceeded = true;
+                        // Clean up memory check timer
+                        child.on('close', () => {
+                            if (memoryCheckInterval) {
+                                clearInterval(memoryCheckInterval);
+                            }
+                        });
                     }
                 }
-                
-                resolve({
-                    exitCode: code ?? -1,
-                    stdout,
-                    stderr,
-                    timedOut,
-                    memoryExceeded,
-                    spaceExceeded
-                });
-            });
 
-            child.on('error', (error: Error) => {
-                clearTimeout(timeout);
-                // 清理内存检查定时器
-                if (memoryCheckInterval) {
-                    clearInterval(memoryCheckInterval);
+                let stdout = '';
+                let stderr = '';
+                let timedOut = false;
+
+                const timeout = setTimeout(() => {
+                    timedOut = true;
+                    child.kill('SIGKILL');
+                }, options.timeout);
+
+                child.stdout?.on('data', (data: Buffer | string) => {
+                    stdout += data.toString();
+                });
+
+                child.stderr?.on('data', (data: Buffer | string) => {
+                    stderr += data.toString();
+                });
+
+                child.on('close', (code: number | null, signal: string | null) => {
+                    clearTimeout(timeout);
+
+                    // Check if terminated due to memory limit
+                    if (process.platform !== 'win32' && options.memoryLimit) {
+                        // On Unix systems, if process is killed by SIGKILL and not timed out, it might be due to memory limit
+                        if (signal === 'SIGKILL' && !timedOut) {
+                            memoryExceeded = true;
+                        }
+                    }
+
+                    resolve({
+                        exitCode: code ?? -1,
+                        stdout,
+                        stderr,
+                        timedOut,
+                        memoryExceeded,
+                        spaceExceeded
+                    });
+                });
+
+                child.on('error', (error: Error) => {
+                    clearTimeout(timeout);
+                    // 清理内存检查定时器
+                    if (memoryCheckInterval) {
+                        clearInterval(memoryCheckInterval);
+                    }
+                    resolve({
+                        exitCode: -1,
+                        stdout: '',
+                        stderr: error.message,
+                        timedOut: false,
+                        memoryExceeded: false,
+                        spaceExceeded: false
+                    });
+                });
+
+                if (options.input) {
+                    child.stdin?.write(options.input);
                 }
-                resolve({
-                    exitCode: -1,
-                    stdout: '',
-                    stderr: error.message,
-                    timedOut: false,
-                    memoryExceeded: false,
-                    spaceExceeded: false
-                });
-            });
-
-            if (options.input) {
-                child.stdin?.write(options.input);
-            }
-            child.stdin?.end();
+                child.stdin?.end();
             })();
         });
     }
@@ -1549,15 +1589,15 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 reject(new Error(`Command timed out: ${command} ${args.join(' ')}`));
             }, 10000);
 
-            child.stdout.on('data', (data) => {
+            child.stdout.on('data', data => {
                 stdout += data.toString();
             });
 
-            child.stderr.on('data', (data) => {
+            child.stderr.on('data', data => {
                 stderr += data.toString();
             });
 
-            child.on('close', (code) => {
+            child.on('close', code => {
                 clearTimeout(timeout);
                 if (code === 0) {
                     resolve({ stdout, stderr });
@@ -1566,7 +1606,7 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 }
             });
 
-            child.on('error', (error) => {
+            child.on('error', error => {
                 clearTimeout(timeout);
                 reject(error);
             });
@@ -1611,7 +1651,8 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         // Check if it's the compiler we're looking for
                         const entryName = entry.toLowerCase();
                         for (const compilerName of compilerNames) {
-                            const targetName = compilerName.toLowerCase() + (process.platform === 'win32' ? '.exe' : '');
+                            const targetName =
+                                compilerName.toLowerCase() + (process.platform === 'win32' ? '.exe' : '');
                             if (entryName === targetName || entryName === compilerName.toLowerCase()) {
                                 foundCompilers.push(entryPath);
                                 break;
@@ -1644,7 +1685,10 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
             ];
 
             for (const xcodePath of xcodePaths) {
-                const toolchainPath = path.join(xcodePath, 'Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin');
+                const toolchainPath = path.join(
+                    xcodePath,
+                    'Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin'
+                );
                 const developerPath = path.join(xcodePath, 'Contents/Developer/usr/bin');
                 const platformsPath = path.join(xcodePath, 'Contents/Developer/Platforms');
 
@@ -1690,14 +1734,28 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 '/opt/llvm-*',
                 '/usr/local/llvm-*',
                 '/home/*/.local/llvm-*',
-                '/usr/local/opt/llvm@*',  // Homebrew
+                '/usr/local/opt/llvm@*', // Homebrew
                 '/opt/homebrew/opt/llvm@*' // Homebrew Apple Silicon
             ];
 
             for (const pattern of searchPatterns) {
                 try {
-                    const { stdout } = await this.executeCommand('find', ['/usr', '/opt', '/home', '-maxdepth', '3', '-name', pattern, '-type', 'd', '2>/dev/null']);
-                    const dirs = stdout.trim().split('\n').filter(dir => dir.length > 0);
+                    const { stdout } = await this.executeCommand('find', [
+                        '/usr',
+                        '/opt',
+                        '/home',
+                        '-maxdepth',
+                        '3',
+                        '-name',
+                        pattern,
+                        '-type',
+                        'd',
+                        '2>/dev/null'
+                    ]);
+                    const dirs = stdout
+                        .trim()
+                        .split('\n')
+                        .filter(dir => dir.length > 0);
                     for (const dir of dirs) {
                         const binPath = path.join(dir, 'bin');
                         if (await this.fileExists(binPath)) {
@@ -1711,8 +1769,19 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
             // Search for versioned compilers in /usr/bin
             try {
-                const { stdout } = await this.executeCommand('find', ['/usr/bin', '-name', 'clang-[0-9]*', '-o', '-name', 'clang++-[0-9]*', '2>/dev/null']);
-                const compilers = stdout.trim().split('\n').filter(compiler => compiler.length > 0);
+                const { stdout } = await this.executeCommand('find', [
+                    '/usr/bin',
+                    '-name',
+                    'clang-[0-9]*',
+                    '-o',
+                    '-name',
+                    'clang++-[0-9]*',
+                    '2>/dev/null'
+                ]);
+                const compilers = stdout
+                    .trim()
+                    .split('\n')
+                    .filter(compiler => compiler.length > 0);
                 for (const compiler of compilers) {
                     const dir = path.dirname(compiler);
                     if (!directories.includes(dir)) {
@@ -1737,17 +1806,26 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
         try {
             // Search for common GCC installation locations
-            const searchPatterns = [
-                '/usr/gcc-*',
-                '/opt/gcc-*',
-                '/usr/local/gcc-*',
-                '/home/*/.local/gcc-*'
-            ];
+            const searchPatterns = ['/usr/gcc-*', '/opt/gcc-*', '/usr/local/gcc-*', '/home/*/.local/gcc-*'];
 
             for (const pattern of searchPatterns) {
                 try {
-                    const { stdout } = await this.executeCommand('find', ['/usr', '/opt', '/home', '-maxdepth', '3', '-name', pattern, '-type', 'd', '2>/dev/null']);
-                    const dirs = stdout.trim().split('\n').filter(dir => dir.length > 0);
+                    const { stdout } = await this.executeCommand('find', [
+                        '/usr',
+                        '/opt',
+                        '/home',
+                        '-maxdepth',
+                        '3',
+                        '-name',
+                        pattern,
+                        '-type',
+                        'd',
+                        '2>/dev/null'
+                    ]);
+                    const dirs = stdout
+                        .trim()
+                        .split('\n')
+                        .filter(dir => dir.length > 0);
                     for (const dir of dirs) {
                         const binPath = path.join(dir, 'bin');
                         if (await this.fileExists(binPath)) {
@@ -1761,8 +1839,19 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
 
             // Search for versioned compilers in /usr/bin
             try {
-                const { stdout } = await this.executeCommand('find', ['/usr/bin', '-name', 'gcc-[0-9]*', '-o', '-name', 'g++-[0-9]*', '2>/dev/null']);
-                const compilers = stdout.trim().split('\n').filter(compiler => compiler.length > 0);
+                const { stdout } = await this.executeCommand('find', [
+                    '/usr/bin',
+                    '-name',
+                    'gcc-[0-9]*',
+                    '-o',
+                    '-name',
+                    'g++-[0-9]*',
+                    '2>/dev/null'
+                ]);
+                const compilers = stdout
+                    .trim()
+                    .split('\n')
+                    .filter(compiler => compiler.length > 0);
                 for (const compiler of compilers) {
                     const dir = path.dirname(compiler);
                     if (!directories.includes(dir)) {
@@ -1785,22 +1874,26 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
     private static async scanSystemForCompilers(compilerNames: string[]): Promise<string[]> {
         const foundCompilers: string[] = [];
         const output = this.getOutputChannel();
-        
+
         output.appendLine('Starting full system compiler scan (this may take some time)...');
 
         try {
             // Build find command
             const namePatterns = compilerNames.map(name => `-name "${name}"`).join(' -o ');
-            const searchCommand = process.platform === 'win32' 
-                ? `where /R C:\\ ${compilerNames.join(' ')} 2>nul`
-                : `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`; // Limit result count
+            const searchCommand =
+                process.platform === 'win32'
+                    ? `where /R C:\\ ${compilerNames.join(' ')} 2>nul`
+                    : `find / -type f \\( ${namePatterns} \\) 2>/dev/null | head -50`; // Limit result count
 
             const { stdout } = await this.executeCommand(process.platform === 'win32' ? 'cmd' : 'sh', [
                 process.platform === 'win32' ? '/c' : '-c',
                 searchCommand
             ]);
 
-            const lines = stdout.trim().split('\n').filter(line => line.length > 0);
+            const lines = stdout
+                .trim()
+                .split('\n')
+                .filter(line => line.length > 0);
             for (const line of lines) {
                 const compilerPath = line.trim();
                 if (await this.fileExists(compilerPath)) {
