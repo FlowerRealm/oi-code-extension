@@ -17,7 +17,7 @@ const TEST_BASE_DIR = path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
 
 // Helper function for OI-style output comparison: ignore trailing whitespace and normalize line endings
 function normalizeOutput(output: string): string {
-    return output.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    return output.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 }
 
 // Helper: create a problem via command, inject code, and open it

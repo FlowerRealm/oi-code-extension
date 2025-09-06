@@ -236,7 +236,11 @@ class PairCheckViewProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _context: vscode.ExtensionContext) {}
 
-    resolveWebviewView(webviewView: vscode.WebviewView) {
+    resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
+    ) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._context.extensionUri] };
         webviewView.webview.html = getPairCheckWebviewContent();
@@ -345,8 +349,15 @@ export function activate(context: vscode.ExtensionContext) {
         // Sidebar: Problem view (inputs, statement editor, limits, options, actions)
         context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('oicode.problemView', {
-                async resolveWebviewView(webviewView: vscode.WebviewView) {
-                    webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
+                async resolveWebviewView(
+                    webviewView: vscode.WebviewView,
+                    _context: vscode.WebviewViewResolveContext,
+                    _token: vscode.CancellationToken
+                ) {
+                    webviewView.webview.options = {
+                        enableScripts: true,
+                        localResourceRoots: [context.extensionUri]
+                    };
                     webviewView.webview.html = await getWebviewContent(context, 'problem.html');
 
                     function toSafeName(input: string): string {

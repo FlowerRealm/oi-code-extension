@@ -1343,7 +1343,9 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
         // For newer Clang versions, use compatible standards
         if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
             const majorVersion = parseInt(compiler.version.split('.')[0], 10) || 0;
-            if (majorVersion >= 20 && languageStandard === 'c++17') {
+            const autoDowngrade = vscode.workspace.getConfiguration('oicode.compile').get('autoDowngradeClang20', true);
+
+            if (majorVersion >= 20 && languageStandard === 'c++17' && autoDowngrade) {
                 // Clang 20+ may have compatibility issues with c++17, downgrade to c++14
                 // This is a temporary workaround due to some changes in C++17 standard library
                 // Note: This issue was found in Clang 20.x versions, specifically表现为某些C++17标准库特性编译失败
@@ -1351,9 +1353,15 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                 this.getOutputChannel().appendLine(
                     "[WARN] Forcing C++ standard to 'c++14' for Clang " +
                         `${compiler.version} due to known compatibility issues with c++17. ` +
-                        'This can be overridden in settings.'
+                        'This can be disabled in settings by setting oicode.compile.autoDowngradeClang20 to false.'
                 );
                 languageStandard = 'c++14';
+            } else if (majorVersion >= 20 && languageStandard === 'c++17' && !autoDowngrade) {
+                this.getOutputChannel().appendLine(
+                    '[INFO] Using C++17 with Clang ' +
+                        `${compiler.version}. If you encounter compilation issues, ` +
+                        'consider setting oicode.compile.autoDowngradeClang20 to true in settings.'
+                );
             }
         }
 
@@ -1474,44 +1482,98 @@ Remove-Item $Installer -ErrorAction SilentlyContinue
                         stdio: ['pipe', 'pipe', 'pipe']
                     });
 
-                    // For Windows, use polling to check memory usage
+                    // For Windows, use improved polling to check memory usage
                     // TODO: Future improvement - Use Windows Job Objects for more efficient memory limit enforcement
                     // Job Objects provide OS-level resource management without polling overhead
                     // See design document LLVM_NATIVE_ANALYSIS.md for implementation details
                     if (options.memoryLimit && process.platform === 'win32') {
+                        // Use a more efficient approach with cached process info and adaptive polling
+                        let lastCheckTime = 0;
+                        const CHECK_INTERVAL = 100; // Reduced from 200ms for better responsiveness
+                        const ADAPTIVE_THRESHOLD = 0.8; // Start checking more frequently at 80% of limit
+
                         memoryCheckInterval = setInterval(async () => {
+                            const now = Date.now();
+
+                            // Skip if we checked too recently, unless we're close to the limit
+                            if (now - lastCheckTime < CHECK_INTERVAL) {
+                                return;
+                            }
+
                             try {
-                                // Use wmic command to get process memory usage
+                                // Use PowerShell for more reliable and faster memory queries
                                 const memoryCheckCommand =
-                                    'wmic process where ProcessId=' + `${child.pid} get WorkingSetSize /value`;
+                                    'powershell -Command "Get-Process -Id ' +
+                                    `${child.pid} | Select-Object -ExpandProperty WorkingSet"`;
 
-                                exec(memoryCheckCommand, (error: any, stdout: string) => {
+                                exec(memoryCheckCommand, { timeout: 50 }, (error: any, stdout: string) => {
+                                    lastCheckTime = Date.now();
+
                                     if (!error && stdout) {
-                                        const memoryMatch = stdout.match(/WorkingSetSize=(\d+)/);
-                                        if (memoryMatch) {
-                                            const memoryBytes = parseInt(memoryMatch[1], 10);
-                                            const memoryMB = memoryBytes / (1024 * 1024);
+                                        const memoryBytes = parseInt(stdout.trim(), 10);
+                                        const memoryMB = memoryBytes / (1024 * 1024);
 
-                                            if (options.memoryLimit && memoryMB > options.memoryLimit) {
-                                                memoryExceeded = true;
-                                                child.kill('SIGKILL');
-                                                if (memoryCheckInterval) {
-                                                    clearInterval(memoryCheckInterval);
-                                                    memoryCheckInterval = null;
-                                                }
+                                        // Adaptive checking: check more frequently when close to limit
+                                        if (
+                                            options.memoryLimit &&
+                                            memoryMB > options.memoryLimit * ADAPTIVE_THRESHOLD
+                                        ) {
+                                            // Reduce interval when approaching limit
+                                            if (memoryCheckInterval) {
+                                                clearInterval(memoryCheckInterval);
+                                                memoryCheckInterval = setInterval(() => {
+                                                    // Recreate the checking logic with shorter interval
+                                                    const memoryCheckCommand =
+                                                        `powershell -Command "Get-Process -Id ${child.pid} | ` +
+                                                        'Select-Object -ExpandProperty WorkingSet"';
+
+                                                    exec(
+                                                        memoryCheckCommand,
+                                                        { timeout: 50 },
+                                                        (error: any, stdout: string) => {
+                                                            if (!error && stdout) {
+                                                                const memoryBytes = parseInt(stdout.trim(), 10);
+                                                                const memoryMB = memoryBytes / (1024 * 1024);
+
+                                                                if (
+                                                                    options.memoryLimit &&
+                                                                    memoryMB > options.memoryLimit
+                                                                ) {
+                                                                    memoryExceeded = true;
+                                                                    child.kill('SIGKILL');
+                                                                    if (memoryCheckInterval) {
+                                                                        clearInterval(memoryCheckInterval);
+                                                                        memoryCheckInterval = null;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    );
+                                                }, 50) as unknown as NodeJS.Timeout;
+                                            }
+                                        }
+
+                                        if (options.memoryLimit && memoryMB > options.memoryLimit) {
+                                            memoryExceeded = true;
+                                            child.kill('SIGKILL');
+                                            if (memoryCheckInterval) {
+                                                clearInterval(memoryCheckInterval);
+                                                memoryCheckInterval = null;
                                             }
                                         }
                                     }
                                 });
                             } catch (error) {
                                 // Ignore memory check errors, continue polling
+                                lastCheckTime = Date.now();
                             }
-                        }, 200); // Check every 200ms - balance between responsiveness and performance
+                        }, CHECK_INTERVAL);
 
                         // Clean up memory check timer
                         child.on('close', () => {
                             if (memoryCheckInterval) {
                                 clearInterval(memoryCheckInterval);
+                                memoryCheckInterval = null;
                             }
                         });
                     }
