@@ -322,9 +322,9 @@ export class ProcessRunner {
 
             let command: string;
             if (process.platform === 'win32') {
-                command =
-                    `wmic logicaldisk where 'DeviceID='${path.parse(directory).root.replace(/\\/g, '')}'' ` +
-                    'get FreeSpace';
+                // Use PowerShell instead of wmic for better compatibility, especially on Windows ARM
+                const driveLetter = path.parse(directory).root.replace(/\\/g, '');
+                command = `powershell -Command "Get-PSDrive -Name ${driveLetter} | Select-Object -ExpandProperty Free"`;
             } else {
                 command = `df -k "${directory}"`;
             }
@@ -332,9 +332,9 @@ export class ProcessRunner {
             const { stdout } = await exec(command);
 
             if (process.platform === 'win32') {
-                const match = stdout.match(/(\d+)/);
-                if (match) {
-                    const freeSpaceBytes = parseInt(match[1]);
+                // PowerShell outputs free space in bytes directly
+                const freeSpaceBytes = parseInt(stdout.trim());
+                if (!isNaN(freeSpaceBytes)) {
                     return freeSpaceBytes > requiredSpaceMB * 1024 * 1024;
                 }
             } else {
