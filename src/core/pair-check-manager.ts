@@ -158,14 +158,20 @@ export class PairCheckManager {
             const result1 = pairResult.result1;
             const result2 = pairResult.result2;
 
-            const toDisplay = (r: any) => {
+            const toDisplay = (r: {
+                timedOut?: boolean;
+                memoryExceeded?: boolean;
+                spaceExceeded?: boolean;
+                stderr?: string;
+                stdout?: string;
+            }): string => {
                 if (r.timedOut) return 'TIMEOUT';
                 if (r.memoryExceeded) return 'MEMORY_EXCEEDED';
                 if (r.spaceExceeded) return 'SPACE_EXCEEDED';
-                return r.stderr ? `ERROR:\n${r.stderr}` : r.stdout;
+                return r.stderr ? `ERROR:\n${r.stderr}` : r.stdout || '';
             };
-            const output1 = toDisplay(result1 as any);
-            const output2 = toDisplay(result2 as any);
+            const output1 = toDisplay(result1);
+            const output2 = toDisplay(result2);
             const equal = normalizeOutput(output1) === normalizeOutput(output2);
 
             return { output1, output2, equal };
@@ -191,11 +197,12 @@ export class PairCheckManager {
         try {
             const input = testInput ?? '';
             const result = await this.executePairCheck(context, editor1, editor2, input, options);
-            this.setOutputs(htmlEscape(result.output1), htmlEscape(result.output2));
+            this.setOutputs(htmlEscape(result.output1 || ''), htmlEscape(result.output2 || ''));
             return result;
-        } catch (e: any) {
-            vscode.window.showErrorMessage(`Pair check execution error: ${e.message}`);
-            return { error: e.message };
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            vscode.window.showErrorMessage(`Pair check execution error: ${errorMessage}`);
+            return { error: errorMessage };
         }
     }
 
@@ -213,7 +220,7 @@ export class PairCheckManager {
             }
         });
 
-        webviewView.webview.onDidReceiveMessage(async (message: any) => {
+        webviewView.webview.onDidReceiveMessage(async (message: { command: string; input?: string }) => {
             if (message.command === 'runPairCheck') {
                 try {
                     const editors = vscode.window.visibleTextEditors.filter(
@@ -230,34 +237,38 @@ export class PairCheckManager {
 
                     this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
 
-                    const result = await this.executePairCheck(context, editor1, editor2, message.input, {
+                    const result = await this.executePairCheck(context, editor1, editor2, message.input || '', {
                         timeLimit: DEFAULT_PAIR_CHECK_TIME_LIMIT,
                         memoryLimit: DEFAULT_PAIR_CHECK_MEMORY_LIMIT
                     });
 
-                    const output1 = result.output1.includes('ERROR:')
-                        ? `<b>Error:</b>\n${htmlEscape(result.output1.replace('ERROR:\n', ''))}`
-                        : result.output1;
-                    const output2 = result.output2.includes('ERROR:')
-                        ? `<b>Error:</b>\n${htmlEscape(result.output2.replace('ERROR:\n', ''))}`
-                        : result.output2;
+                    const output1 = result.output1 || '';
+                    const output2 = result.output2 || '';
 
-                    if (result.output1.includes('ERROR') || result.output2.includes('ERROR')) {
-                        this.setOutputs(output1, output2);
+                    const processedOutput1 = output1.includes('ERROR:')
+                        ? `<b>Error:</b>\n${htmlEscape(output1.replace('ERROR:\n', ''))}`
+                        : output1;
+                    const processedOutput2 = output2.includes('ERROR:')
+                        ? `<b>Error:</b>\n${htmlEscape(output2.replace('ERROR:\n', ''))}`
+                        : output2;
+
+                    if (output1.includes('ERROR') || output2.includes('ERROR')) {
+                        this.setOutputs(processedOutput1, processedOutput2);
                     } else if (result.equal) {
                         this.setOutputs(
                             '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>',
                             '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>'
                         );
                     } else {
-                        const { html1, html2 } = this.createDiffHtml(result.output1, result.output2);
+                        const { html1, html2 } = this.createDiffHtml(output1, output2);
                         this.setOutputs(html1, html2);
                     }
-                } catch (e: any) {
-                    vscode.window.showErrorMessage(`Pair check error: ${e.message}`);
+                } catch (e: unknown) {
+                    const errorMessage = e instanceof Error ? e.message : String(e);
+                    vscode.window.showErrorMessage(`Pair check error: ${errorMessage}`);
                     this.setOutputs(
-                        `<b>Error:</b>\n${htmlEscape(e.message)}`,
-                        `<b>Error:</b>\n${htmlEscape(e.message)}`
+                        `<b>Error:</b>\n${htmlEscape(errorMessage)}`,
+                        `<b>Error:</b>\n${htmlEscape(errorMessage)}`
                     );
                 }
             }

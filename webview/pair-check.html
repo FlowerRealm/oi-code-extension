@@ -89,10 +89,12 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function setSafeHtml(elementId, content) {
+        function setSafeHtml(elementId, htmlContent) {
             const element = document.getElementById(elementId);
             if (element) {
-                element.textContent = content;
+                // The HTML content is sanitized on the backend, so using innerHTML here is safe
+                // and necessary to render the diff highlighting.
+                element.innerHTML = htmlContent;
             }
         }
 

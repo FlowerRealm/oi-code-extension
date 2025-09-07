@@ -23,11 +23,15 @@ export class CommandManager {
         this.context = context;
     }
 
-    private async getSuitableCompiler(languageId: 'c' | 'cpp'): Promise<CompilerInfo> {
+    private getContext(): vscode.ExtensionContext {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
-        return getSuitableCompiler(this.context, languageId);
+        return this.context;
+    }
+
+    private async getSuitableCompiler(languageId: 'c' | 'cpp'): Promise<CompilerInfo> {
+        return getSuitableCompiler(this.getContext(), languageId);
     }
 
     public async runCode(testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) {
@@ -125,9 +129,7 @@ export class CommandManager {
     }
 
     public async initializeEnvironment() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
+        this.getContext();
 
         vscode.window.withProgress(
             {
@@ -138,7 +140,7 @@ export class CommandManager {
             async progress => {
                 progress.report({ message: 'Detecting compilers...' });
                 try {
-                    const result = await NativeCompilerManager.detectCompilers(this.context!);
+                    const result = await NativeCompilerManager.detectCompilers(this.getContext());
 
                     if (result.success && result.compilers.length > 0) {
                         progress.report({ message: 'Compiler detection complete!', increment: 100 });
@@ -176,9 +178,7 @@ export class CommandManager {
     }
 
     public async rescanCompilers() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
+        this.getContext();
 
         try {
             vscode.window.withProgress(
@@ -190,7 +190,7 @@ export class CommandManager {
                 async progress => {
                     progress.report({ message: 'Rescanning compilers...' });
                     try {
-                        const result = await NativeCompilerManager.forceRescanCompilers(this.context!);
+                        const result = await NativeCompilerManager.forceRescanCompilers(this.getContext());
                         progress.report({ message: 'Rescan completed!', increment: 100 });
 
                         if (result.success && result.compilers.length > 0) {
@@ -217,12 +217,10 @@ export class CommandManager {
     }
 
     public async setupCompiler() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
+        this.getContext();
 
         try {
-            const result = await NativeCompilerManager.detectCompilers(this.context);
+            const result = await NativeCompilerManager.detectCompilers(this.getContext());
 
             if (result.success && result.compilers.length > 0) {
                 const detectedMessage =
@@ -273,9 +271,7 @@ export class CommandManager {
     }
 
     public async deepScanCompilers() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
+        this.getContext();
 
         try {
             await vscode.window.withProgress(
@@ -287,7 +283,7 @@ export class CommandManager {
                 async (progress, token) => {
                     progress.report({ message: 'Performing deep system scan for compilers...' });
 
-                    const result = await NativeCompilerManager.detectCompilers(this.context, true, true);
+                    const result = await NativeCompilerManager.detectCompilers(this.getContext(), true, true);
 
                     if (token.isCancellationRequested) {
                         return;
