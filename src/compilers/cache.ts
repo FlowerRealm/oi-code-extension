@@ -4,7 +4,7 @@
  *-------------------------------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-import { CompilerDetectionResult } from './types';
+import { CompilerDetectionResult } from '../types';
 
 /**
  * Manages caching of detected compilers

@@ -8,8 +8,8 @@ import * as os from 'os';
 import * as https from 'https';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { ProcessRunner } from './processRunner';
-import { LLVMInstallResult } from './types';
+import { ProcessRunner } from '../../process';
+import { LLVMInstallResult } from '../../types';
 
 /**
  * Handles automatic LLVM installation for different platforms

@@ -39,17 +39,23 @@ npm test
 
 ### TypeScript Standards
 - Use TypeScript strict mode
-- Follow ESLint configuration
+- Follow ESLint configuration (no errors, minimal warnings)
 - Use Prettier for code formatting
 - **English Comments**: All comments must be written in English to improve code readability
 - **Code Organization**: Avoid duplicate code, prioritize reusable functions and modules
 - **Error Handling**: Use appropriate try-catch blocks and Promise error handling
+- **Type Safety**: Prefer `unknown` over `any` for error handling with proper `instanceof` checks
+- **Async Patterns**: Use async/await instead of "fire-and-forget" Promises
+- **Security**: WebView content must be sanitized using `escapeHtml()` and `setSafeHtml()` functions
 
 ### Testing Standards
 - Use Mocha testing framework
 - Place test files in the `src/test/` directory
 - Test cases should have descriptive names
 - Include error handling tests
+- **Security Testing**: Verify WebView content sanitization
+- **Integration Testing**: Test compiler detection and execution workflows
+- **Cross-Platform Testing**: Ensure compatibility across Windows, macOS, and Linux
 
 ### Git Commit Standards
 - Use clear, descriptive commit messages

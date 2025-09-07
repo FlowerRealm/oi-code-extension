@@ -322,9 +322,12 @@ export class ProcessRunner {
 
             let command: string;
             if (process.platform === 'win32') {
+                // Use PowerShell instead of wmic for better compatibility, especially on Windows ARM
+                // Try multiple approaches for Windows ARM compatibility
+                const driveLetter = path.parse(directory).root.replace(/\\/g, '').replace(':', '');
                 command =
-                    `wmic logicaldisk where 'DeviceID='${path.parse(directory).root.replace(/\\/g, '')}'' ` +
-                    'get FreeSpace';
+                    `powershell -Command "Get-PSDrive -Name ${driveLetter.toUpperCase()} ` +
+                    '-ErrorAction SilentlyContinue | Select-Object -ExpandProperty Free"';
             } else {
                 command = `df -k "${directory}"`;
             }
@@ -332,9 +335,9 @@ export class ProcessRunner {
             const { stdout } = await exec(command);
 
             if (process.platform === 'win32') {
-                const match = stdout.match(/(\d+)/);
-                if (match) {
-                    const freeSpaceBytes = parseInt(match[1]);
+                // PowerShell outputs free space in bytes directly
+                const freeSpaceBytes = parseInt(stdout.trim());
+                if (!isNaN(freeSpaceBytes)) {
                     return freeSpaceBytes > requiredSpaceMB * 1024 * 1024;
                 }
             } else {
@@ -350,6 +353,24 @@ export class ProcessRunner {
 
             return true;
         } catch (error) {
+            // If PowerShell command fails, try alternative approach for Windows ARM
+            if (process.platform === 'win32' && error instanceof Error) {
+                try {
+                    const util = require('util');
+                    const exec = util.promisify(require('child_process').exec);
+                    // Alternative approach: use wmic with better error handling
+                    const { stdout } = await exec('wmic logicaldisk get freespace');
+                    const lines = stdout.split('\n');
+                    for (let i = 1; i < lines.length; i++) {
+                        const freeSpaceBytes = parseInt(lines[i].trim());
+                        if (!isNaN(freeSpaceBytes)) {
+                            return freeSpaceBytes > requiredSpaceMB * 1024 * 1024;
+                        }
+                    }
+                } catch (fallbackError) {
+                    console.warn('[ProcessRunner] Failed to check disk space with fallback:', fallbackError);
+                }
+            }
             console.warn('[ProcessRunner] Failed to check disk space:', error);
             return true;
         }

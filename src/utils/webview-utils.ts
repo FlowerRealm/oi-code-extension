@@ -1,0 +1,56 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+
+export function htmlEscape(str: string): string {
+    return str.replace(/[&<>"'/]/g, match => {
+        const escape: { [key: string]: string } = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+            '/': '&#x2F;'
+        };
+        return escape[match];
+    });
+}
+
+export function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: Record<string, unknown> = {}) {
+    try {
+        panel.webview.postMessage({ command, ...data });
+    } catch (e) {
+        console.error(`Failed to post message '${command}' to webview:`, e);
+    }
+}
+
+export function getTheme(kind: vscode.ColorThemeKind): string {
+    return kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast ? 'dark' : 'light';
+}
+
+export function getLanguageIdFromEditor(editor: vscode.TextEditor): 'c' | 'cpp' {
+    const langId = editor.document.languageId;
+    if (langId === 'c' || langId === 'cpp') {
+        return langId;
+    }
+    throw new Error(`Unsupported language: ${langId}`);
+}
+
+export function toSafeName(input: string): string {
+    const s = input || 'unnamed';
+    return s.replace(/[^\w-.]+/g, '_').slice(0, 64);
+}
+
+export function normalizeOutput(output: string): string {
+    return output.replace(/\r\n/g, '\n').trimEnd();
+}
+
+export async function getWebviewContent(context: vscode.ExtensionContext, fileName: string): Promise<string> {
+    const filePath = vscode.Uri.file(path.join(context.extensionPath, 'out', fileName));
+    try {
+        const content = await vscode.workspace.fs.readFile(filePath);
+        return content.toString();
+    } catch (e) {
+        console.error(`Failed to read ${fileName}`, e);
+        return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
+    }
+}

@@ -7,12 +7,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { CompilerInfo, CompilerDetectionResult, LLVMInstallResult } from './types';
+import { CompilerInfo, CompilerDetectionResult, LLVMInstallResult } from '../../types';
 
-import { CompilerCache } from './compilerCache';
-import { CompilerDetector } from './compilerDetector';
-import { CompilerInstaller } from './compilerInstaller';
-import { ProcessRunner } from './processRunner';
+import { CompilerCache } from '../../compilers/cache';
+import { CompilerDetector } from '../../compilers/detector/compilerDetector';
+import { CompilerInstaller } from '../../compilers/installer/compilerInstaller';
+import { ProcessRunner } from '../../process';
 
 /**
  * Compilation and execution options
@@ -223,12 +223,13 @@ export class NativeCompilerManager {
                 spaceExceeded: execResult.memoryExceeded, // For compatibility
                 executionTime: execResult.exitCode === 0 ? undefined : undefined
             };
-        } catch (error: any) {
-            outputChannel.appendLine(`[NativeCompilerManager] Error: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            outputChannel.appendLine(`[NativeCompilerManager] Error: ${errorMessage}`);
             return {
                 success: false,
                 stdout: '',
-                stderr: error.message,
+                stderr: errorMessage,
                 timedOut: false,
                 memoryExceeded: false
             };

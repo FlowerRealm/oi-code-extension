@@ -6,9 +6,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { CompilerInfo, CompilerDetectionResult } from './types';
+import { CompilerInfo, CompilerDetectionResult } from '../../types';
 
-import { ProcessRunner } from './processRunner';
+import { ProcessRunner } from '../../process';
 
 /**
  * Handles cross-platform compiler detection
@@ -59,11 +59,12 @@ export class CompilerDetector {
 
             this.getOutputChannel().appendLine(`[CompilerDetector] Found ${compilers.length} compilers`);
             return result;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             const errorResult: CompilerDetectionResult = {
                 success: false,
                 compilers: [],
-                error: error.message,
+                error: errorMessage,
                 suggestions: [
                     'Make sure C/C++ compilers are installed',
                     'Check that compiler directories are in PATH',
@@ -71,7 +72,7 @@ export class CompilerDetector {
                 ]
             };
 
-            this.getOutputChannel().appendLine(`[CompilerDetector] Detection failed: ${error.message}`);
+            this.getOutputChannel().appendLine(`[CompilerDetector] Detection failed: ${errorMessage}`);
             return errorResult;
         }
     }

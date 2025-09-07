@@ -47,6 +47,7 @@ const config = {
         { from: 'webview/settings.html', to: 'settings.html' },
         { from: 'webview/completion.html', to: 'completion.html' },
         { from: 'webview/problem.html', to: 'problem.html' },
+        { from: 'webview/pair-check.html', to: 'pair-check.html' },
         { from: 'webview/settings-schema.json', to: 'settings-schema.json' },
         { from: 'webview/icons', to: 'icons' },
       ],
