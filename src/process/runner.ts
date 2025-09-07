@@ -323,7 +323,7 @@ export class ProcessRunner {
             let command: string;
             if (process.platform === 'win32') {
                 // Use PowerShell instead of wmic for better compatibility, especially on Windows ARM
-                const driveLetter = path.parse(directory).root.replace(/\\/g, '');
+                const driveLetter = path.parse(directory).root.replace(/\\/g, '').replace(':', '');
                 command = `powershell -Command "Get-PSDrive -Name ${driveLetter} | Select-Object -ExpandProperty Free"`;
             } else {
                 command = `df -k "${directory}"`;
