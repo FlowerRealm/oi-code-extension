@@ -6,9 +6,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { CompilerInfo, CompilerDetectionResult } from './types';
+import { CompilerInfo, CompilerDetectionResult } from '../../types';
 
-import { ProcessRunner } from './processRunner';
+import { ProcessRunner } from '../../process';
 
 /**
  * Handles cross-platform compiler detection
