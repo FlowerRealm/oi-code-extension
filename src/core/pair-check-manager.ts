@@ -109,6 +109,18 @@ export class PairCheckManager {
         }
     }
 
+    private _getPairCheckEditors(): [vscode.TextEditor, vscode.TextEditor] {
+        const editors = vscode.window.visibleTextEditors.filter(
+            e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp')
+        );
+        if (editors.length < 2) {
+            vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
+            throw new Error('NEED_TWO_EDITORS');
+        }
+        const sortedEditors = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
+        return [sortedEditors[0], sortedEditors[1]];
+    }
+
     private async executePairCheck(
         context: vscode.ExtensionContext,
         editor1: vscode.TextEditor,
@@ -185,22 +197,17 @@ export class PairCheckManager {
         testInput?: string,
         options?: { timeLimit?: number; memoryLimit?: number }
     ) {
-        const editors = vscode.window.visibleTextEditors.filter(
-            e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c')
-        );
-        if (editors.length < 2) {
-            vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
-            return { error: 'NEED_TWO_EDITORS' };
-        }
-        const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
-
         try {
+            const [editor1, editor2] = this._getPairCheckEditors();
             const input = testInput ?? '';
             const result = await this.executePairCheck(context, editor1, editor2, input, options);
             this.setOutputs(htmlEscape(result.output1 || ''), htmlEscape(result.output2 || ''));
             return result;
         } catch (e: unknown) {
             const errorMessage = e instanceof Error ? e.message : String(e);
+            if (errorMessage === 'NEED_TWO_EDITORS') {
+                return { error: 'NEED_TWO_EDITORS' };
+            }
             vscode.window.showErrorMessage(`Pair check execution error: ${errorMessage}`);
             return { error: errorMessage };
         }
@@ -223,17 +230,7 @@ export class PairCheckManager {
         webviewView.webview.onDidReceiveMessage(async (message: { command: string; input?: string }) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const editors = vscode.window.visibleTextEditors.filter(
-                        e =>
-                            !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp')
-                    );
-                    if (editors.length < 2) {
-                        vscode.window.showErrorMessage(
-                            'Need to open at least two C/C++ code files to perform pair check.'
-                        );
-                        return;
-                    }
-                    const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
+                    const [editor1, editor2] = this._getPairCheckEditors();
 
                     this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
 
