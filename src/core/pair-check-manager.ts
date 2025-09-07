@@ -247,17 +247,17 @@ export class PairCheckManager {
 
                     const processedOutput1 = output1.includes('ERROR:')
                         ? `<b>Error:</b>\n${htmlEscape(output1.replace('ERROR:\n', ''))}`
-                        : output1;
+                        : htmlEscape(output1);
                     const processedOutput2 = output2.includes('ERROR:')
                         ? `<b>Error:</b>\n${htmlEscape(output2.replace('ERROR:\n', ''))}`
-                        : output2;
+                        : htmlEscape(output2);
 
                     if (output1.includes('ERROR') || output2.includes('ERROR')) {
                         this.setOutputs(processedOutput1, processedOutput2);
                     } else if (result.equal) {
                         this.setOutputs(
-                            '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>',
-                            '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>'
+                            '<span style="color:var(--vscode-terminal-ansiGreen);">✓ Output matches (Accepted)</span>',
+                            '<span style="color:var(--vscode-terminal-ansiGreen);">✓ Output matches (Accepted)</span>'
                         );
                     } else {
                         const { html1, html2 } = this.createDiffHtml(output1, output2);
