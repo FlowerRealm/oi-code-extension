@@ -426,6 +426,11 @@ int main(){
     if(scanf("%d", &n) != 1) {
         return 1;
     }
+    // Add range check to prevent overflow
+    if (n < 0 || n > 20) {
+        printf("0\\n");
+        return 0;
+    }
     printf("%lld\\n", C(n));
     return 0;
 }`;
