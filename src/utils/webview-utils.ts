@@ -15,7 +15,7 @@ export function htmlEscape(str: string): string {
     });
 }
 
-export function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: any = {}) {
+export function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: Record<string, unknown> = {}) {
     try {
         panel.webview.postMessage({ command, ...data });
     } catch (e) {
@@ -52,5 +52,19 @@ export async function getWebviewContent(context: vscode.ExtensionContext, fileNa
     } catch (e) {
         console.error(`Failed to read ${fileName}`, e);
         return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
+    }
+}
+
+export function setSafeHtmlContent(elementId: string, content: string): void {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = content;
+    }
+}
+
+export function setSafeHtmlContentWithFormatting(elementId: string, content: string): void {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.innerHTML = htmlEscape(content);
     }
 }

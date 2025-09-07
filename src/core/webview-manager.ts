@@ -47,60 +47,28 @@ export class WebViewManager {
     }
 
     public showSettingsPage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const panel = vscode.window.createWebviewPanel('oiCodeSettings', 'OI-Code Settings', vscode.ViewColumn.One, {
-            enableScripts: true,
-            retainContextWhenHidden: true
-        });
-
-        this.getWebviewContent('settings.html').then(html => (panel.webview.html = html));
-
-        const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
-            postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
-        });
-
-        panel.onDidDispose(() => {
-            themeListener.dispose();
-        });
+        this.createWebviewPanel('oiCodeSettings', 'OI-Code Settings', 'settings.html');
     }
 
     public showCompletionPage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const panel = vscode.window.createWebviewPanel(
-            'oiCodeCompletion',
-            'OI-Code Setup Complete',
-            vscode.ViewColumn.One,
-            { enableScripts: true, retainContextWhenHidden: true }
-        );
-
-        this.getWebviewContent('completion.html').then(html => (panel.webview.html = html));
-
-        const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
-            postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
-        });
-
-        panel.onDidDispose(() => {
-            themeListener.dispose();
-        });
+        this.createWebviewPanel('oiCodeCompletion', 'OI-Code Setup Complete', 'completion.html');
     }
 
     public showWelcomePage() {
+        this.createWebviewPanel('oiCodeWelcome', 'Welcome to OI-Code', 'init.html');
+    }
+
+    private createWebviewPanel(viewType: string, title: string, htmlFile: string) {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
 
-        const panel = vscode.window.createWebviewPanel('oiCodeWelcome', 'Welcome to OI-Code', vscode.ViewColumn.One, {
+        const panel = vscode.window.createWebviewPanel(viewType, title, vscode.ViewColumn.One, {
             enableScripts: true,
             retainContextWhenHidden: true
         });
 
-        this.getWebviewContent('init.html').then(html => (panel.webview.html = html));
+        this.getWebviewContent(htmlFile).then(html => (panel.webview.html = html));
 
         const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
             postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });

@@ -223,12 +223,13 @@ export class NativeCompilerManager {
                 spaceExceeded: execResult.memoryExceeded, // For compatibility
                 executionTime: execResult.exitCode === 0 ? undefined : undefined
             };
-        } catch (error: any) {
-            outputChannel.appendLine(`[NativeCompilerManager] Error: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            outputChannel.appendLine(`[NativeCompilerManager] Error: ${errorMessage}`);
             return {
                 success: false,
                 stdout: '',
-                stderr: error.message,
+                stderr: errorMessage,
                 timedOut: false,
                 memoryExceeded: false
             };

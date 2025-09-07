@@ -79,12 +79,32 @@
             const inputData = document.getElementById('input-data').value;
             vscode.postMessage({ command: 'runPairCheck', input: inputData });
         });
-        window.addEventListener('message', event => {
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+      function setSafeHtml(elementId, content, allowFormatting = false) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (allowFormatting) {
+                    element.innerHTML = escapeHtml(content);
+                } else {
+                    element.textContent = content;
+                }
+            }
+        }
+
+      window.addEventListener('message', event => {
             const message = event.data;
             switch (message.command) {
                 case 'setOutputs':
-                    document.getElementById('output1-content').innerHTML = message.output1;
-                    document.getElementById('output2-content').innerHTML = message.output2;
+                    setSafeHtml('output1-content', message.output1, true);
+                    setSafeHtml('output2-content', message.output2, true);
                     break;
             }
         });

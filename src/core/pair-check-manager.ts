@@ -6,7 +6,7 @@ import { NativeCompilerManager } from '../native';
 import { CompilerInfo } from '../types';
 import { DEFAULT_PAIR_CHECK_TIME_LIMIT, DEFAULT_PAIR_CHECK_MEMORY_LIMIT, OI_CODE_TEST_BASE_PATH } from '../constants';
 import { htmlEscape, getLanguageIdFromEditor, normalizeOutput, getWebviewContent } from '../utils/webview-utils';
-import { getSuitableCompiler } from '../extension';
+import { getSuitableCompiler } from '../utils/compiler-utils';
 
 export class PairCheckManager {
     private static instance: PairCheckManager;

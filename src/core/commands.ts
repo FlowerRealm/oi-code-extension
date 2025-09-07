@@ -4,7 +4,7 @@ import { NativeCompilerManager } from '../native';
 import { CompilerInfo } from '../types';
 import { DEFAULT_MEMORY_LIMIT, DEFAULT_SINGLE_RUN_TIME_LIMIT } from '../constants';
 import { htmlEscape, getLanguageIdFromEditor } from '../utils/webview-utils';
-import { getSuitableCompiler } from '../extension';
+import { getSuitableCompiler } from '../utils/compiler-utils';
 
 export class CommandManager {
     private static instance: CommandManager;
@@ -115,8 +115,9 @@ export class CommandManager {
                         memoryExceeded: result.memoryExceeded,
                         spaceExceeded: result.spaceExceeded
                     };
-                } catch (e: any) {
-                    vscode.window.showErrorMessage(`An unexpected error occurred: ${e.message}`);
+                } catch (e: unknown) {
+                    const errorMessage = e instanceof Error ? e.message : String(e);
+                    vscode.window.showErrorMessage(`An unexpected error occurred: ${errorMessage}`);
                     throw e;
                 }
             }
@@ -165,9 +166,10 @@ export class CommandManager {
                             }
                         }
                     }
-                } catch (error: any) {
+                } catch (error: unknown) {
                     progress.report({ message: 'Compiler detection failed.' });
-                    vscode.window.showErrorMessage(`Compiler environment initialization failed: ${error.message}`);
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    vscode.window.showErrorMessage(`Compiler environment initialization failed: ${errorMessage}`);
                 }
             }
         );
@@ -201,14 +203,16 @@ export class CommandManager {
                         } else {
                             vscode.window.showWarningMessage('No available compilers detected');
                         }
-                    } catch (error: any) {
+                    } catch (error: unknown) {
                         progress.report({ message: 'Rescan failed' });
-                        vscode.window.showErrorMessage(`Compiler rescan failed: ${error.message}`);
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        vscode.window.showErrorMessage(`Compiler rescan failed: ${errorMessage}`);
                     }
                 }
             );
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Compiler rescan failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Compiler rescan failed: ${errorMessage}`);
         }
     }
 
@@ -262,8 +266,9 @@ export class CommandManager {
                     await vscode.commands.executeCommand('oicode.deepScanCompilers');
                 }
             }
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Compiler setup failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Compiler setup failed: ${errorMessage}`);
         }
     }
 
@@ -300,8 +305,9 @@ export class CommandManager {
                     NativeCompilerManager.getOutputChannel().show(true);
                 }
             );
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Deep scan failed: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Deep scan failed: ${errorMessage}`);
         }
     }
 }

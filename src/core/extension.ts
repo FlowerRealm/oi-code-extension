@@ -5,25 +5,24 @@ import { CommandManager } from './commands';
 import { WebViewManager } from './webview-manager';
 import { NativeCompilerManager } from '../native';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     try {
         console.log('OI-Code extension is now active!');
         console.log('Extension path:', context.extensionPath);
 
-        NativeCompilerManager.detectCompilers(context)
-            .then(result => {
-                if (result.success) {
-                    console.log(`Detected ${result.compilers.length} compilers`);
-                    if (result.recommended) {
-                        console.log(`Recommended compiler: ${result.recommended.name}`);
-                    }
-                } else {
-                    console.log('Compiler detection failed:', result.error);
+        try {
+            const result = await NativeCompilerManager.detectCompilers(context);
+            if (result.success) {
+                console.log(`Detected ${result.compilers.length} compilers`);
+                if (result.recommended) {
+                    console.log(`Recommended compiler: ${result.recommended.name}`);
                 }
-            })
-            .catch(error => {
-                console.error('Failed to detect compilers:', error);
-            });
+            } else {
+                console.log('Compiler detection failed:', result.error);
+            }
+        } catch (error) {
+            console.error('Failed to detect compilers:', error);
+        }
 
         const pairCheckManager = PairCheckManager.getInstance();
         const problemManager = ProblemManager.getInstance();
