@@ -3,13 +3,7 @@ import * as path from 'path';
 import { NativeCompilerManager } from '../native';
 import { CompilerInfo } from '../types';
 import { DEFAULT_MEMORY_LIMIT, DEFAULT_SINGLE_RUN_TIME_LIMIT } from '../constants';
-import {
-    htmlEscape,
-    postWebviewMessage,
-    getTheme,
-    getLanguageIdFromEditor,
-    getWebviewContent
-} from '../utils/webview-utils';
+import { htmlEscape, getLanguageIdFromEditor } from '../utils/webview-utils';
 import { getSuitableCompiler } from '../extension';
 
 export class CommandManager {
@@ -309,33 +303,5 @@ export class CommandManager {
         } catch (error: any) {
             vscode.window.showErrorMessage(`Deep scan failed: ${error.message}`);
         }
-    }
-
-    public showSettingsPage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const panel = vscode.window.createWebviewPanel('oiCodeSettings', 'OI-Code Settings', vscode.ViewColumn.One, {
-            enableScripts: true,
-            retainContextWhenHidden: true
-        });
-
-        this.getWebviewContent('settings.html').then(html => (panel.webview.html = html));
-
-        const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
-            postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
-        });
-
-        panel.onDidDispose(() => {
-            themeListener.dispose();
-        });
-    }
-
-    private async getWebviewContent(fileName: string): Promise<string> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-        return getWebviewContent(this.context, fileName);
     }
 }

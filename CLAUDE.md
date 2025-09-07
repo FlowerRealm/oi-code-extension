@@ -24,38 +24,42 @@ npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js
 
 ### Core Components
 
-**NativeCompilerManager** (`src/nativeCompiler.ts`): Central native compiler operations hub
+**NativeCompilerManager** (`src/native/manager/nativeCompilerManager.ts`): Central native compiler operations hub
 - Manages compiler detection, prioritization, and execution
 - Handles secure compilation with resource limits and timeout enforcement
 - Implements automatic LLVM installation when no compilers are available
 - Supports C/C++ compilation and execution with system compilers
 - Fixed critical exit code handling bug (prevents `0 || -1` issue)
 
-**Compiler Detection Architecture**:
+**Compiler Detection Architecture** (`src/compilers/detector/compilerDetector.ts`):
 - System-wide PATH scanning for available compilers
 - Platform-specific detection (Windows: MSVC/MinGW/LLVM, macOS: Xcode/LLVM, Linux: GCC/LLVM)
 - Intelligent compiler prioritization based on version and type
 - Fallback mechanisms when preferred compilers are unavailable
 - Automatic permission handling for executable binaries
 
-**WebView Integration** (`webview/`):
+**WebView Integration** (`src/core/webview-manager.ts` and `src/utils/webview-utils.ts`):
 - Multiple HTML panels for problem management, settings, and pair checking
 - Uses `postWebviewMessage()` for communication with extension
 - Theme-aware rendering (dark/light support)
 - Rich diff visualization for pair check results
+- Centralized HTML content loading utilities
 
 ### Extension Entry Point
 
-**Main Extension** (`src/extension.ts`):
+**Main Extension** (`src/core/extension.ts`):
+- Core extension logic with clean module imports
+- Central activation point with error handling
 - Commands: `oicode.createProblem`, `oicode.runCode`, `oicode.startPairCheck`, `oicode.setupCompiler`
 - WebView panels for problem view and pair check view
 - Integration with VS Code activity bar and panel containers
 - Secure input handling and HTML escaping
 - Automatic compiler detection on extension activation
+- Backward compatibility through `src/extension.ts` re-exports
 
 ### Native Compiler Integration
 
-**Compiler Detection** (`src/nativeCompiler.ts`):
+**Compiler Detection** (`src/compilers/detector/compilerDetector.ts`):
 - Cross-platform compiler discovery (Windows, macOS, Linux)
 - Support for multiple compiler types: Clang, GCC, MSVC, Apple Clang
 - Version parsing and compiler capability assessment
@@ -73,7 +77,7 @@ npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js
 - `oicode.compile.opt`: Optimization level (O0-O3)
 - `oicode.compile.std`: C++ standard (c++17/c++14/c++11/c11/c99)
 
-**Constants** (`src/constants.ts`):
+**Constants** (`src/constants/constants.ts`):
 - Test directory: `~/.oi-code-tests/tmp`
 - Problem management base paths
 
