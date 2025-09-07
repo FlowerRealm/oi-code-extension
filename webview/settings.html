@@ -1,177 +1,521 @@
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="light">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OI-Code 设置</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         :root {
-            --side-bar-background: #f0f0f0;
-            --input-background: #ffffff;
-            --input-foreground: #333333;
-            --foreground: #333333;
-            --background: #ffffff;
-            --border-color: #cccccc;
-            --focus-border: #007acc;
-            --list-hover-background: #e8e8e8;
-            --list-active-selection-background: #cce5ff;
-            --header-border: #e7e7e7;
+            --background-primary: #ffffff;
+            --background-secondary: #f8f9fa;
+            --background-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+            --border-color: #dee2e6;
+            --accent-color: #0066cc;
+            --accent-hover: #0052a3;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+            --radius: 8px;
+            --transition: all 0.2s ease;
         }
 
-        html[data-theme='dark'] {
-            --side-bar-background: #252526;
-            --input-background: #3C3C3C;
-            --input-foreground: #CCCCCC;
-            --foreground: #CCCCCC;
-            --background: #1E1E1E;
-            --border-color: #3C3C3C;
-            --focus-border: #007FD4;
-            --list-hover-background: #2A2D2E;
-            --list-active-selection-background: #094771;
-            --header-border: #3c3c3c;
-        }
-
-        html {
-            scroll-behavior: smooth;
+        [data-theme='dark'] {
+            --background-primary: #1a1a1a;
+            --background-secondary: #2d2d2d;
+            --background-tertiary: #404040;
+            --text-primary: #e4e4e4;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --border-color: #404040;
+            --accent-color: #4d9fff;
+            --accent-hover: #6bb1ff;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
         }
 
         body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-            color: var(--foreground);
-            background-color: var(--background);
-            display: flex;
-            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
             height: 100vh;
             overflow: hidden;
         }
 
-        .settings-wrapper {
+        .container {
             display: flex;
-            flex-grow: 1;
-            overflow: hidden;
+            height: 100vh;
         }
 
-        header {
-            padding: 20px;
-            border-bottom: 1px solid var(--header-border);
-            flex-shrink: 0;
+        .sidebar {
+            width: 280px;
+            background: var(--background-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 2rem 0;
+            overflow-y: auto;
         }
 
-        header input[type="search"] {
+        .sidebar-header {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-title {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .search-box {
             width: 100%;
-            padding: 8px;
-            background-color: var(--input-background);
-            color: var(--input-foreground);
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border-color);
-            border-radius: 2px;
+            border-radius: var(--radius);
+            background: var(--background-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: var(--transition);
         }
 
-        header input[type="search"]:focus {
+        .search-box:focus {
             outline: none;
-            border-color: var(--focus-border);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
-        nav {
-            width: 250px;
-            background-color: var(--side-bar-background);
-            padding: 10px 0;
-            overflow-y: auto;
-            flex-shrink: 0;
+        .nav-section {
+            padding: 0 1rem;
         }
 
-        nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        nav li {
-            padding: 10px 20px;
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0;
+            border-radius: var(--radius);
             cursor: pointer;
-            white-space: nowrap;
+            transition: var(--transition);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
         }
 
-        nav li:hover {
-            background-color: var(--list-hover-background);
+        .nav-item:hover {
+            background: var(--background-tertiary);
+            color: var(--text-primary);
         }
 
-        nav li.active {
-            background-color: var(--list-active-selection-background);
+        .nav-item.active {
+            background: var(--accent-color);
+            color: white;
         }
 
-        main {
-            flex-grow: 1;
-            padding: 20px;
+        .main-content {
+            flex: 1;
+            padding: 2rem;
             overflow-y: auto;
+            background: var(--background-primary);
+        }
+
+        .content-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .content-title {
+            font-size: 2rem;
+            font-weight: 300;
+            letter-spacing: -1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .content-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .settings-group {
+            margin-bottom: 2rem;
+        }
+
+        .settings-section {
+            background: var(--background-secondary);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
         }
 
         .setting-item {
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
         }
 
-        .setting-item label {
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-label {
             display: block;
-            font-size: 1.1em;
-            margin-bottom: 5px;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
         }
 
-        .setting-item p {
-            font-size: 0.9em;
-            opacity: 0.7;
-            margin-top: 0;
+        .setting-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            line-height: 1.5;
         }
 
-        .setting-item input,
-        .setting-item select {
+        .setting-control {
             width: 100%;
-            max-width: 500px;
-            padding: 8px;
-            background-color: var(--input-background);
-            color: var(--input-foreground);
-            border: 1px solid var(--border-color);
-            border-radius: 2px;
+            max-width: 400px;
         }
 
-        h2 {
-            scroll-margin-top: 20px;
-            /* Offset for scroll-into-view */
+        .input-field {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--background-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .select-field {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--background-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .select-field:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-color);
+            transition: var(--transition);
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: var(--transition);
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 2rem 0;
+        }
+
+        .save-button {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .save-button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 240px;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
-
 <body>
-    <header>
-        <input type="search" id="search-box" placeholder="搜索设置">
-    </header>
-    <div class="settings-wrapper">
-        <nav id="categories-nav"></nav>
-        <main id="settings-main"></main>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">设置</h1>
+                <input type="search" class="search-box" placeholder="搜索设置..." />
+            </div>
+            <nav class="nav-section" id="navigation">
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-header">
+                <h2 class="content-title" id="page-title">编译器设置</h2>
+                <p class="content-description" id="page-description">配置您的编译器选项和优化级别</p>
+            </div>
+
+            <div id="settings-container">
+            </div>
+        </main>
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
+        
+        let settingsData = {};
+        let currentCategory = '编译器设置';
+        
+        const navigation = document.getElementById('navigation');
+        const searchBox = document.querySelector('.search-box');
+        const settingsContainer = document.getElementById('settings-container');
+        const pageTitle = document.getElementById('page-title');
+        const pageDescription = document.getElementById('page-description');
 
-        const searchBox = document.getElementById('search-box');
-        const categoriesNav = document.getElementById('categories-nav');
-        const settingsMain = document.getElementById('settings-main');
-        let fullSettingsData = {};
-        let intersectionObserver;
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-        // --- Event Listeners ---
+        function setSafeHtml(element, html) {
+            element.innerHTML = escapeHtml(html);
+        }
+
+        function createNavigationItem(category) {
+            const item = document.createElement('div');
+            item.className = 'nav-item';
+            if (category === currentCategory) {
+                item.classList.add('active');
+            }
+            item.textContent = category;
+            item.addEventListener('click', () => showCategory(category));
+            return item;
+        }
+
+        function createSettingItem(setting) {
+            const div = document.createElement('div');
+            div.className = 'setting-item';
+
+            const label = document.createElement('label');
+            label.className = 'setting-label';
+            label.textContent = setting.name;
+            div.appendChild(label);
+
+            if (setting.description) {
+                const description = document.createElement('p');
+                description.className = 'setting-description';
+                description.textContent = setting.description;
+                div.appendChild(description);
+            }
+
+            const control = document.createElement('div');
+            control.className = 'setting-control';
+
+            if (setting.type === 'boolean') {
+                const toggle = document.createElement('label');
+                toggle.className = 'toggle-switch';
+                
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = setting.value;
+                input.addEventListener('change', (e) => {
+                    vscode.postMessage({
+                        command: 'saveSetting',
+                        id: setting.vscode_setting_id,
+                        value: e.target.checked
+                    });
+                });
+                
+                const slider = document.createElement('span');
+                slider.className = 'toggle-slider';
+                
+                toggle.appendChild(input);
+                toggle.appendChild(slider);
+                control.appendChild(toggle);
+                
+            } else if (setting.type === 'select') {
+                const select = document.createElement('select');
+                select.className = 'select-field';
+                
+                setting.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option.value;
+                    optionElement.textContent = option.label;
+                    if (option.value === setting.value) {
+                        optionElement.selected = true;
+                    }
+                    select.appendChild(optionElement);
+                });
+                
+                select.addEventListener('change', (e) => {
+                    vscode.postMessage({
+                        command: 'saveSetting',
+                        id: setting.vscode_setting_id,
+                        value: e.target.value
+                    });
+                });
+                
+                control.appendChild(select);
+                
+            } else {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'input-field';
+                input.value = setting.value || '';
+                input.addEventListener('change', (e) => {
+                    vscode.postMessage({
+                        command: 'saveSetting',
+                        id: setting.vscode_setting_id,
+                        value: e.target.value
+                    });
+                });
+                control.appendChild(input);
+            }
+
+            div.appendChild(control);
+            return div;
+        }
+
+        function renderNavigation() {
+            navigation.innerHTML = '';
+            Object.keys(settingsData).forEach(category => {
+                navigation.appendChild(createNavigationItem(category));
+            });
+        }
+
+        function showCategory(category) {
+            currentCategory = category;
+            
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.textContent === category) {
+                    item.classList.add('active');
+                }
+            });
+
+            const settings = settingsData[category];
+            if (settings && settings.length > 0) {
+                pageTitle.textContent = category;
+                pageDescription.textContent = settings[0].description || '配置相关设置';
+                
+                settingsContainer.innerHTML = '';
+                const section = document.createElement('div');
+                section.className = 'settings-section';
+                
+                settings.forEach(setting => {
+                    section.appendChild(createSettingItem(setting));
+                });
+                
+                settingsContainer.appendChild(section);
+            }
+        }
+
+        function filterSettings(searchTerm) {
+            const filtered = {};
+            const term = searchTerm.toLowerCase();
+            
+            Object.keys(settingsData).forEach(category => {
+                const filteredSettings = settingsData[category].filter(setting =>
+                    setting.name.toLowerCase().includes(term) ||
+                    (setting.description && setting.description.toLowerCase().includes(term))
+                );
+                
+                if (filteredSettings.length > 0) {
+                    filtered[category] = filteredSettings;
+                }
+            });
+            
+            if (searchTerm && Object.keys(filtered).length > 0) {
+                const firstCategory = Object.keys(filtered)[0];
+                showCategory(firstCategory);
+            } else if (!searchTerm) {
+                showCategory(currentCategory);
+            }
+        }
+
         searchBox.addEventListener('input', (e) => {
-            renderSettings(fullSettingsData, e.target.value);
+            filterSettings(e.target.value);
         });
 
         window.addEventListener('message', event => {
             const message = event.data;
             switch (message.command) {
                 case 'loadSettings':
-                    fullSettingsData = message.data;
-                    renderCategories(fullSettingsData);
-                    renderSettings(fullSettingsData);
+                    settingsData = message.data;
+                    renderNavigation();
+                    showCategory(currentCategory);
                     break;
                 case 'set-theme':
                     document.documentElement.setAttribute('data-theme', message.theme);
@@ -179,109 +523,8 @@
             }
         });
 
-        // --- Functions ---
-        function renderCategories(settings) {
-            categoriesNav.innerHTML = '';
-            const ul = document.createElement('ul');
-            for (const categoryName in settings) {
-                const li = document.createElement('li');
-                li.textContent = categoryName;
-                li.dataset.category = categoryName;
-                li.addEventListener('click', () => {
-                    const categoryId = `category-anchor-${categoryName.replace(/\s+/g, '-')}`;
-                    const targetElement = document.getElementById(categoryId);
-                    if (targetElement) {
-                        targetElement.scrollIntoView({ behavior: 'smooth' });
-                    }
-                });
-                ul.appendChild(li);
-            }
-            categoriesNav.appendChild(ul);
-        }
-
-        function renderSettings(settings, filter = '') {
-            if (intersectionObserver) intersectionObserver.disconnect();
-            settingsMain.innerHTML = '';
-            const lowerCaseFilter = filter.toLowerCase();
-
-            intersectionObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    const id = entry.target.id;
-                    const categoryName = id.replace('category-anchor-', '').replace(/-/g, ' ');
-                    const navLink = categoriesNav.querySelector(`li[data-category="${categoryName}"]`);
-                    if (entry.isIntersecting && navLink) {
-                        let currentlyActive = categoriesNav.querySelector('li.active');
-                        if (currentlyActive) currentlyActive.classList.remove('active');
-                        navLink.classList.add('active');
-                    }
-                });
-            }, { root: settingsMain, threshold: 0.2 });
-
-            for (const categoryName in settings) {
-                const categoryData = settings[categoryName];
-                const filteredData = categoryData.filter(item =>
-                    item.name.toLowerCase().includes(lowerCaseFilter) ||
-                    (item.description && item.description.toLowerCase().includes(lowerCaseFilter))
-                );
-
-                if (filteredData.length === 0) continue;
-
-                const categoryTitle = document.createElement('h2');
-                categoryTitle.textContent = categoryName;
-                categoryTitle.id = `category-anchor-${categoryName.replace(/\s+/g, '-')}`;
-                settingsMain.appendChild(categoryTitle);
-                intersectionObserver.observe(categoryTitle);
-
-                filteredData.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'setting-item';
-
-                    const label = document.createElement('label');
-                    label.textContent = item.name;
-                    label.htmlFor = `setting-input-${item.vscode_setting_id}`;
-                    div.appendChild(label);
-
-                    if (item.type === 'fill') {
-                        const input = document.createElement('input');
-                        input.type = 'text';
-                        input.id = `setting-input-${item.vscode_setting_id}`;
-                        input.value = item.value || '';
-                        input.addEventListener('change', (e) => vscode.postMessage({ command: 'saveSetting', id: item.vscode_setting_id, value: e.target.value }));
-                        div.appendChild(input);
-                    } else if (item.type === 'select') {
-                        const select = document.createElement('select');
-                        select.id = `setting-input-${item.vscode_setting_id}`;
-                        item.options.forEach(opt => {
-                            const option = document.createElement('option');
-                            option.value = opt.value;
-                            option.textContent = opt.label;
-                            if (opt.value === item.value) option.selected = true;
-                            select.appendChild(option);
-                        });
-                        select.addEventListener('change', (e) => vscode.postMessage({ command: 'saveSetting', id: item.vscode_setting_id, value: e.target.value }));
-                        div.appendChild(select);
-                    }
-                    else if (item.type === 'search') {
-                        // search
-                    }
-
-                    const description = document.createElement('p');
-                    description.textContent = item.description;
-                    div.appendChild(description);
-
-                    settingsMain.appendChild(div);
-                });
-            }
-        }
-
-        // --- Initial Load ---
-        function initialLoad() {
-            vscode.postMessage({ command: 'getSettings' });
-            vscode.postMessage({ command: 'get-theme' });
-        }
-
-        initialLoad();
+        vscode.postMessage({ command: 'getSettings' });
+        vscode.postMessage({ command: 'get-theme' });
     </script>
 </body>
-
 </html>

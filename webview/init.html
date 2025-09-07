@@ -1,258 +1,587 @@
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="light">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OI-Code 初始化</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
-        html[data-theme='light'] {
-            --pico-background-color: #f9f9f9;
-            --pico-color: #111827;
-            --pico-h1-color: #111827;
-            --pico-muted-color: #6b7280;
-            --pico-contrast: #1f2937;
-            --pico-contrast-inverse: #ffffff;
-            --pico-primary: #43a047;
-            --pico-primary-inverse: #ffffff;
-            --pico-card-background-color: #ffffff;
-            --pico-card-border-color: #e5e7eb;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        html[data-theme='dark'] {
-            --pico-background-color: #1e1e1e;
-            --pico-color: #d4d4d4;
-            --pico-h1-color: #ffffff;
-            --pico-muted-color: #a5a5a5;
-            --pico-contrast: #ffffff;
-            --pico-contrast-inverse: #000000;
-            --pico-primary: #60a5fa;
-            --pico-primary-inverse: #000000;
-            --pico-card-background-color: #252526;
-            --pico-card-border-color: #3c3c3c;
+        :root {
+            --background-primary: #ffffff;
+            --background-secondary: #f8f9fa;
+            --background-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+            --border-color: #dee2e6;
+            --accent-color: #0066cc;
+            --accent-hover: #0052a3;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .hidden {
-            display: none;
+        [data-theme='dark'] {
+            --background-primary: #1a1a1a;
+            --background-secondary: #2d2d2d;
+            --background-tertiary: #404040;
+            --text-primary: #e4e4e4;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --border-color: #404040;
+            --accent-color: #4d9fff;
+            --accent-hover: #6bb1ff;
+            --success-color: #34ce57;
+            --success-hover: #2fb94e;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.5);
         }
 
-        .nav-buttons {
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
             display: flex;
-            justify-content: space-between;
-            margin-top: 2rem;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 2rem;
+        }
+
+        .welcome-card {
+            background: var(--background-secondary);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: -1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.125rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .progress-container {
+            padding: 2rem;
+            background: var(--background-primary);
         }
 
         .stepper {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .stepper::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            right: 50px;
+            height: 2px;
+            background: var(--border-color);
+            z-index: 1;
         }
 
         .step {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 0 1rem;
-            color: var(--pico-muted-color);
+            position: relative;
+            z-index: 2;
+            flex: 1;
         }
 
-        .step.active {
-            color: var(--pico-contrast);
-        }
-
-        .step-number {
-            font-size: 0.8em;
-            background-color: var(--pico-card-border-color);
-            color: var(--pico-muted-color);
+        .step-circle {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            width: 2em;
-            height: 2em;
-            line-height: 2em;
-            text-align: center;
+            background: var(--background-tertiary);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
             margin-bottom: 0.5rem;
+            transition: var(--transition);
+            border: 2px solid var(--border-color);
         }
 
-        .step.active .step-number {
-            background-color: var(--pico-primary);
-            color: var(--pico-primary-inverse);
+        .step.active .step-circle {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+            transform: scale(1.1);
         }
 
-        .arrow {
-            font-size: 2em;
-            color: var(--pico-card-border-color);
+        .step.completed .step-circle {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
         }
 
-        .nav-buttons button {
+        .step-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .step.active .step-label {
+            color: var(--accent-color);
+        }
+
+        .step.completed .step-label {
+            color: var(--success-color);
+        }
+
+        .content {
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .step-content {
+            display: none;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .step-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-content h2 {
+            font-size: 1.75rem;
+            font-weight: 300;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .step-content p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .language-options {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .language-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            background: var(--background-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .language-option:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .language-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-color);
+        }
+
+        .language-option label {
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.875rem 2rem;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            width: fit-content;
-            flex-grow: 0;
-            flex-shrink: 0;
-            --pico-form-element-spacing-vertical: 0.5rem;
-            --pico-form-element-spacing-horizontal: 1rem;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--background-tertiary);
+            border-color: var(--text-secondary);
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .workspace-selector {
+            background: var(--background-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .workspace-selector h3 {
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .workspace-path {
+            background: var(--background-primary);
+            border: 1px solid var(--border-color);
+            border-radius: calc(var(--radius) - 4px);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stepper {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .stepper::before {
+                display: none;
+            }
+            
+            .language-options {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .navigation {
+                flex-direction: column;
+                gap: 1rem;
+            }
         }
     </style>
 </head>
-
 <body>
-    <main class="container">
-        <header id="main-header">
-            <h1>欢迎使用 OI-Code</h1>
-            <p>请跟随以下步骤配置您的 OI 环境。</p>
-        </header>
+    <div class="container">
+        <div class="welcome-card">
+            <div class="header">
+                <h1>欢迎使用 OI-Code</h1>
+                <p>让我们为您配置一个完美的编程环境</p>
+            </div>
 
-        <div class="stepper">
-            <div id="step-indicator-0" class="step active">
-                <div class="step-number">1</div><strong>选择主题</strong>
-            </div>
-            <div class="arrow">→</div>
-            <div id="step-indicator-1" class="step">
-                <div class="step-number">2</div><strong>选择语言</strong>
-            </div>
-            <div class="arrow">→</div>
-            <div id="step-indicator-2" class="step">
-                <div class="step-number">3</div><strong>选择工作区</strong>
+            <div class="progress-container">
+                <div class="stepper">
+                    <div class="step active" data-step="0">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">选择主题</div>
+                    </div>
+                    <div class="step" data-step="1">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">配置语言</div>
+                    </div>
+                    <div class="step" data-step="2">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">选择工作区</div>
+                    </div>
+                </div>
+
+                <div class="content">
+                    <div class="step-content active" id="step-0">
+                        <h2>第一步：选择您喜欢的主题</h2>
+                        <p>选择一个舒适的视觉主题，这将直接影响您的编程体验</p>
+                        <button class="btn" id="select-theme-btn">
+                            <span>🎨</span> 打开主题选择器
+                        </button>
+                    </div>
+
+                    <div class="step-content" id="step-1">
+                        <h2>第二步：选择您需要的编程语言</h2>
+                        <p>我们会根据您的选择，自动配置相应的编译器和工具链</p>
+                        
+                        <div class="language-options" id="language-selection">
+                            <div class="language-option">
+                                <input type="checkbox" id="lang-c" name="language" value="c">
+                                <label for="lang-c">C 语言</label>
+                            </div>
+                            <div class="language-option">
+                                <input type="checkbox" id="lang-cpp" name="language" value="cpp">
+                                <label for="lang-cpp">C++</label>
+                            </div>
+                        </div>
+
+                        <div class="loading hidden" id="language-loading">
+                            <div class="spinner"></div>
+                            <p><strong>正在配置语言环境...</strong></p>
+                            <p>请在 VS Code 窗口顶部的弹出框中完成操作</p>
+                        </div>
+                    </div>
+
+                    <div class="step-content" id="step-2">
+                        <h2>第三步：选择您的工作区</h2>
+                        <p>选择一个文件夹作为您的编程工作区，所有项目文件将保存在此处</p>
+                        
+                        <div class="workspace-selector">
+                            <h3>工作区路径</h3>
+                            <div class="workspace-path" id="workspace-path">
+                                尚未选择工作区
+                            </div>
+                            <button class="btn" id="select-folder-btn">
+                                <span>📁</span> 选择文件夹
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="loading hidden" id="final-loading">
+                        <div class="spinner"></div>
+                        <h2>正在完成初始化...</h2>
+                        <p>请稍候，我们正在为您准备完美的编程环境</p>
+                    </div>
+                </div>
+
+                <div class="navigation">
+                    <button class="btn btn-secondary" id="prev-btn" disabled>
+                        <span>←</span> 上一步
+                    </button>
+                    <button class="btn" id="next-btn">
+                        下一步 <span>→</span>
+                    </button>
+                </div>
             </div>
         </div>
+    </div>
 
-        <section id="step-content">
-            <div id="content-0" class="content-panel">
-                <article>
-                    <h2>第一步：选择一个颜色主题</h2>
-                    <p>选择一个您喜欢的主题来开始编程，这会立即生效。</p>
-                    <button id="select-theme-btn">打开主题选择器</button>
-                </article>
-            </div>
-            <div id="content-1" class="content-panel hidden">
-                <article>
-                    <h2>第二步：选择您的常用语言</h2>
-                    <div id="language-selection">
-                        <p>我们会根据您的选择，为您配置编译器。</p>
-                        <label for="lang-c"><input type="checkbox" id="lang-c" name="language" value="c">
-                            c</label>
-                        <label for="lang-cpp"><input type="checkbox" id="lang-cpp" name="language" value="cpp">
-                            C++</label>
-
-                    </div>
-                    <div id="language-loading" class="hidden">
-                        <p><strong>正在配置语言环境...</strong></p>
-                        <p>请在 VS Code 窗口顶部的弹出框中完成操作。</p>
-                    </div>
-                </article>
-            </div>
-            <div id="content-2" class="content-panel hidden">
-                <article>
-                    <h2>第三步：选择工作区</h2>
-                    <p>请选择一个文件夹作为您的工作区。</p>
-                    <button id="select-folder-btn">选择文件夹</button>
-                </article>
-            </div>
-
-        </section>
-
-        <article id="loading-spinner" aria-busy="true" class="hidden"></article>
-
-        <div class="nav-buttons">
-            <button id="prev-btn" disabled><i data-feather="arrow-left"></i> 上一步</button>
-            <button id="next-btn">下一步 <i data-feather="arrow-right"></i></button>
-        </div>
-    </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <script>
-        feather.replace();
-
         const vscode = acquireVsCodeApi();
-
+        
         let currentStep = 0;
-        const contentPanels = document.querySelectorAll('.content-panel');
-        const stepIndicators = document.querySelectorAll('.step');
+        const totalSteps = 3;
+        
+        const steps = document.querySelectorAll('.step');
+        const stepContents = document.querySelectorAll('.step-content');
         const prevBtn = document.getElementById('prev-btn');
         const nextBtn = document.getElementById('next-btn');
+        
+        const languageSelection = document.getElementById('language-selection');
+        const languageLoading = document.getElementById('language-loading');
+        const workspacePath = document.getElementById('workspace-path');
+        const finalLoading = document.getElementById('final-loading');
 
-        const mainHeader = document.getElementById('main-header');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const stepContent = document.getElementById('step-content');
-        const navButtons = document.querySelector('.nav-buttons');
-        const stepper = document.querySelector('.stepper');
+        function updateStepUI() {
+            steps.forEach((step, index) => {
+                const stepNum = parseInt(step.dataset.step);
+                if (stepNum < currentStep) {
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                } else if (stepNum === currentStep) {
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                } else {
+                    step.classList.remove('active', 'completed');
+                }
+            });
 
-        const languageSelectionDiv = document.getElementById('language-selection');
-        const languageLoadingDiv = document.getElementById('language-loading');
+            stepContents.forEach((content, index) => {
+                content.classList.toggle('active', index === currentStep);
+            });
 
+            prevBtn.disabled = currentStep === 0;
+            
+            if (currentStep === totalSteps - 1) {
+                nextBtn.innerHTML = '<span>✓</span> 完成设置';
+            } else {
+                nextBtn.innerHTML = '下一步 <span>→</span>';
+            }
 
+            if (currentStep === 1) {
+                const selectedLanguages = getSelectedLanguages();
+                nextBtn.disabled = selectedLanguages.length === 0;
+            } else if (currentStep === 2) {
+                nextBtn.disabled = workspacePath.textContent === '尚未选择工作区';
+            } else {
+                nextBtn.disabled = false;
+            }
+        }
 
         function getSelectedLanguages() {
             const selected = [];
             const cCheckbox = document.getElementById('lang-c');
             const cppCheckbox = document.getElementById('lang-cpp');
-
+            
             if (cCheckbox && cCheckbox.checked) selected.push('c');
             if (cppCheckbox && cppCheckbox.checked) selected.push('cpp');
-
+            
             return selected;
         }
 
-        function updateUI() {
-            stepIndicators.forEach((indicator, index) => indicator.classList.toggle('active', index === currentStep));
-            contentPanels.forEach((panel, index) => panel.classList.toggle('hidden', index !== currentStep));
-
-            prevBtn.disabled = currentStep === 0;
-            nextBtn.disabled = false;
-
-            if (currentStep === 1 && getSelectedLanguages().length === 0) {
-                nextBtn.disabled = true;
+        function goToStep(step) {
+            if (step >= 0 && step < totalSteps) {
+                currentStep = step;
+                updateStepUI();
             }
-
-            if (currentStep === 2) { // Workspace
-                nextBtn.innerHTML = `完成 <i data-feather="check"></i>`;
-            } else {
-                nextBtn.innerHTML = `下一步 <i data-feather="arrow-right"></i>`;
-            }
-            feather.replace();
         }
 
-        const langCCheckbox = document.getElementById('lang-c');
-        const langCppCheckbox = document.getElementById('lang-cpp');
-        if (langCCheckbox) langCCheckbox.addEventListener('change', updateUI);
-        if (langCppCheckbox) langCppCheckbox.addEventListener('change', updateUI);
+        function nextStep() {
+            if (currentStep === totalSteps - 1) {
+                completeSetup();
+            } else if (currentStep === 1) {
+                configureLanguages();
+            } else {
+                goToStep(currentStep + 1);
+            }
+        }
 
+        function configureLanguages() {
+            const selectedLanguages = getSelectedLanguages();
+            if (selectedLanguages.length > 0) {
+                languageSelection.classList.add('hidden');
+                languageLoading.classList.remove('hidden');
+                
+                vscode.postMessage({
+                    command: 'configure-languages',
+                    languages: selectedLanguages
+                });
+            }
+        }
+
+        function completeSetup() {
+            document.querySelector('.content').classList.add('hidden');
+            document.querySelector('.navigation').classList.add('hidden');
+            finalLoading.classList.remove('hidden');
+            
+            vscode.postMessage({ command: 'initialize' });
+        }
 
         prevBtn.addEventListener('click', () => {
             if (currentStep > 0) {
-                currentStep--;
-                updateUI();
+                goToStep(currentStep - 1);
             }
         });
 
-        nextBtn.addEventListener('click', () => {
-            if (currentStep === 2) {
-                vscode.postMessage({ command: 'initialize' });
-                mainHeader.classList.add('hidden');
-                stepContent.classList.add('hidden');
-                navButtons.classList.add('hidden');
-                stepper.classList.add('hidden');
-                loadingSpinner.classList.remove('hidden');
-            } else if (currentStep === 1) {  // 语言选择步骤
-                const selectedLanguages = getSelectedLanguages();
-                if (selectedLanguages.length > 0) {
-                    languageSelectionDiv.classList.add('hidden');
-                    languageLoadingDiv.classList.remove('hidden');
-                    vscode.postMessage({
-                        command: 'configure-languages',
-                        languages: selectedLanguages
-                    });
-                }
-            } else if (currentStep < 2) {
-                currentStep++;
-                updateUI();
-            }
+        nextBtn.addEventListener('click', nextStep);
+
+        document.getElementById('select-theme-btn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'select-theme' });
         });
 
-        document.getElementById('select-theme-btn').addEventListener('click', () => vscode.postMessage({ command: 'select-theme' }));
-        document.getElementById('select-folder-btn').addEventListener('click', () => vscode.postMessage({ command: 'select-folder' }));
+        document.getElementById('select-folder-btn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'select-folder' });
+        });
+
+        document.getElementById('lang-c').addEventListener('change', updateStepUI);
+        document.getElementById('lang-cpp').addEventListener('change', updateStepUI);
 
         window.addEventListener('message', event => {
             const message = event.data;
@@ -261,18 +590,19 @@
                     document.documentElement.setAttribute('data-theme', message.theme);
                     break;
                 case 'go-to-step':
-                    currentStep = message.step;
-
-                    languageLoadingDiv.classList.add('hidden');
-                    updateUI();
+                    languageLoading.classList.add('hidden');
+                    languageSelection.classList.remove('hidden');
+                    goToStep(message.step);
                     break;
-
+                case 'workspace-selected':
+                    workspacePath.textContent = message.path;
+                    updateStepUI();
+                    break;
             }
         });
 
-        updateUI();
+        updateStepUI();
         vscode.postMessage({ command: 'get-theme' });
     </script>
 </body>
-
 </html>
