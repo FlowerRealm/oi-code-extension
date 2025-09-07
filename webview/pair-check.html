@@ -103,8 +103,8 @@
             const message = event.data;
             switch (message.command) {
                 case 'setOutputs':
-                    setSafeHtml('output1-content', message.output1, true);
-                    setSafeHtml('output2-content', message.output2, true);
+                    document.getElementById('output1-content').innerHTML = message.output1;
+                    document.getElementById('output2-content').innerHTML = message.output2;
                     break;
             }
         });

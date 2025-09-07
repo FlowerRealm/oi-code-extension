@@ -54,17 +54,3 @@ export async function getWebviewContent(context: vscode.ExtensionContext, fileNa
         return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
     }
 }
-
-export function setSafeHtmlContent(elementId: string, content: string): void {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = content;
-    }
-}
-
-export function setSafeHtmlContentWithFormatting(elementId: string, content: string): void {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.innerHTML = htmlEscape(content);
-    }
-}
