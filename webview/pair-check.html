@@ -81,11 +81,25 @@
         });
 
   
-        function setSafeHtml(elementId, htmlContent) {
+        function escapeHtml(str) {
+            return str.replace(/[&<>"'/]/g, match => {
+                const escape = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                    '/': '&#x2F;'
+                };
+                return escape[match];
+            });
+        }
+
+        function setSafeHtml(elementId, content) {
             const element = document.getElementById(elementId);
             if (element) {
-                // The HTML content is sanitized on the backend, so using innerHTML here is safe
-                element.innerHTML = htmlContent;
+                // Always escape HTML content to prevent XSS attacks
+                element.textContent = content;
             }
         }
 
