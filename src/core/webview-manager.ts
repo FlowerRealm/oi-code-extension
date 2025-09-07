@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { getTheme, postWebviewMessage } from '../utils/webview-utils';
+import { getTheme, postWebviewMessage, getWebviewContent } from '../utils/webview-utils';
 import { PairCheckManager } from './pair-check-manager';
 import { ProblemManager } from './problem-manager';
 
@@ -116,14 +115,6 @@ export class WebViewManager {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
-
-        const filePath = vscode.Uri.file(path.join(this.context.extensionPath, 'out', fileName));
-        try {
-            const content = await vscode.workspace.fs.readFile(filePath);
-            return content.toString();
-        } catch (e) {
-            console.error(`Failed to read ${fileName}`, e);
-            return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
-        }
+        return getWebviewContent(this.context, fileName);
     }
 }

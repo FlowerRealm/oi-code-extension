@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getLanguageIdFromEditor, toSafeName } from '../utils/webview-utils';
+import { getLanguageIdFromEditor, toSafeName, getWebviewContent } from '../utils/webview-utils';
 
 export class ProblemManager {
     private static instance: ProblemManager;
@@ -257,7 +257,7 @@ export class ProblemManager {
                     enableScripts: true,
                     localResourceRoots: [this.context.extensionUri]
                 };
-                webviewView.webview.html = await this.getWebviewContent(this.context, 'problem.html');
+                webviewView.webview.html = await this.getWebviewContent('problem.html');
 
                 webviewView.webview.onDidReceiveMessage(async (m: any) => {
                     const result = await this.handleProblemViewMessage(m);
@@ -269,14 +269,10 @@ export class ProblemManager {
         };
     }
 
-    private async getWebviewContent(context: vscode.ExtensionContext, fileName: string): Promise<string> {
-        const filePath = vscode.Uri.file(path.join(context.extensionPath, 'out', fileName));
-        try {
-            const content = await vscode.workspace.fs.readFile(filePath);
-            return content.toString();
-        } catch (e) {
-            console.error(`Failed to read ${fileName}`, e);
-            return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
+    private async getWebviewContent(fileName: string): Promise<string> {
+        if (!this.context) {
+            throw new Error('Context not initialized');
         }
+        return getWebviewContent(this.context, fileName);
     }
 }

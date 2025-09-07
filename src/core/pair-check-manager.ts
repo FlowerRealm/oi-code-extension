@@ -6,6 +6,7 @@ import { NativeCompilerManager } from '../native';
 import { CompilerInfo } from '../types';
 import { DEFAULT_PAIR_CHECK_TIME_LIMIT, DEFAULT_PAIR_CHECK_MEMORY_LIMIT, OI_CODE_TEST_BASE_PATH } from '../constants';
 import { htmlEscape, getLanguageIdFromEditor, normalizeOutput } from '../utils/webview-utils';
+import { getSuitableCompiler } from '../extension';
 
 export class PairCheckManager {
     private static instance: PairCheckManager;
@@ -125,31 +126,7 @@ export class PairCheckManager {
         context: vscode.ExtensionContext,
         languageId: 'c' | 'cpp'
     ): Promise<CompilerInfo> {
-        let compilerResult = await NativeCompilerManager.detectCompilers(context);
-        if (!compilerResult.success || compilerResult.compilers.length === 0) {
-            const choice = await vscode.window.showErrorMessage(
-                'No C/C++ compilers found. Please set up a compiler to proceed.',
-                'Setup Compiler'
-            );
-            if (choice === 'Setup Compiler') {
-                await vscode.commands.executeCommand('oicode.setupCompiler');
-                compilerResult = await NativeCompilerManager.forceRescanCompilers(context);
-            }
-
-            if (!compilerResult.success || compilerResult.compilers.length === 0) {
-                NativeCompilerManager.getOutputChannel().appendLine(
-                    `Compiler detection failed. Suggestions: ${compilerResult.suggestions.join(', ')}`
-                );
-                throw new Error('No compilers available. Please set up a compiler first.');
-            }
-        }
-
-        const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
-        if (suitableCompilers.length === 0) {
-            throw new Error(`No suitable compiler found for ${languageId}`);
-        }
-
-        return suitableCompilers[0];
+        return getSuitableCompiler(context, languageId);
     }
 
     private async runPairWithNativeCompilers(
@@ -228,23 +205,16 @@ export class PairCheckManager {
         }
     }
 
-    public async runPairCheck(
+    private async executePairCheck(
         context: vscode.ExtensionContext,
-        testInput?: string,
+        editor1: vscode.TextEditor,
+        editor2: vscode.TextEditor,
+        input: string,
         options?: { timeLimit?: number; memoryLimit?: number }
     ) {
-        const editors = vscode.window.visibleTextEditors.filter(
-            e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c')
-        );
-        if (editors.length < 2) {
-            vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
-            return { error: 'NEED_TWO_EDITORS' };
-        }
-        const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
         const langId = getLanguageIdFromEditor(editor1);
         if (editor2.document.languageId !== langId) {
-            vscode.window.showErrorMessage('Both code files must have the same language type.');
-            return { error: 'LANG_MISMATCH' };
+            throw new Error('Both code files must have the same language type.');
         }
 
         let attempts = 0;
@@ -264,8 +234,7 @@ export class PairCheckManager {
         const finalEditor1Content = editor1.document.getText();
         const finalEditor2Content = editor2.document.getText();
         if (finalEditor1Content.length === 0 || finalEditor2Content.length === 0) {
-            vscode.window.showErrorMessage('Editor content load timeout, please try again later.');
-            return { error: 'EDITOR_CONTENT_LOAD_TIMEOUT' };
+            throw new Error('Editor content load timeout, please try again later.');
         }
 
         await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
@@ -276,7 +245,6 @@ export class PairCheckManager {
             await fs.promises.writeFile(file1Path, finalEditor1Content);
             await fs.promises.writeFile(file2Path, finalEditor2Content);
 
-            const input = testInput ?? '';
             const timeLimit = options?.timeLimit ?? DEFAULT_PAIR_CHECK_TIME_LIMIT;
 
             const pairResult = await this.runPairWithNativeCompilers(context, file1Path, file2Path, langId, input, {
@@ -296,13 +264,34 @@ export class PairCheckManager {
             const output2 = toDisplay(result2 as any);
             const equal = normalizeOutput(output1) === normalizeOutput(output2);
 
-            this.setOutputs(htmlEscape(output1), htmlEscape(output2));
             return { output1, output2, equal };
+        } finally {
+            await fs.promises.rm(tempDir, { recursive: true, force: true });
+        }
+    }
+
+    public async runPairCheck(
+        context: vscode.ExtensionContext,
+        testInput?: string,
+        options?: { timeLimit?: number; memoryLimit?: number }
+    ) {
+        const editors = vscode.window.visibleTextEditors.filter(
+            e => !e.document.isUntitled && (e.document.languageId === 'cpp' || e.document.languageId === 'c')
+        );
+        if (editors.length < 2) {
+            vscode.window.showErrorMessage('Need to open at least two C/C++ code files to perform pair check.');
+            return { error: 'NEED_TWO_EDITORS' };
+        }
+        const [editor1, editor2] = editors.sort((a, b) => (a.viewColumn || 0) - (b.viewColumn || 0));
+
+        try {
+            const input = testInput ?? '';
+            const result = await this.executePairCheck(context, editor1, editor2, input, options);
+            this.setOutputs(htmlEscape(result.output1), htmlEscape(result.output2));
+            return result;
         } catch (e: any) {
             vscode.window.showErrorMessage(`Pair check execution error: ${e.message}`);
             return { error: e.message };
-        } finally {
-            await fs.promises.rm(tempDir, { recursive: true, force: true });
         }
     }
 
@@ -330,48 +319,32 @@ export class PairCheckManager {
                         return;
                     }
                     const [editor1, editor2] = editors.sort((a, b) => a.viewColumn! - b.viewColumn!);
-                    const langId = getLanguageIdFromEditor(editor1);
-                    if (editor2.document.languageId !== langId) {
-                        vscode.window.showErrorMessage('Both code files must have the same language type.');
-                        return;
-                    }
 
                     this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
-                    await fs.promises.mkdir(OI_CODE_TEST_BASE_PATH, { recursive: true });
-                    const tempDir = await fs.promises.mkdtemp(path.join(OI_CODE_TEST_BASE_PATH, 'pair-'));
 
-                    const file1Path = path.join(tempDir, `code1.${langId}`);
-                    const file2Path = path.join(tempDir, `code2.${langId}`);
-                    await fs.promises.writeFile(file1Path, editor1.document.getText());
-                    await fs.promises.writeFile(file2Path, editor2.document.getText());
+                    const result = await this.executePairCheck(context, editor1, editor2, message.input, {
+                        timeLimit: DEFAULT_PAIR_CHECK_TIME_LIMIT,
+                        memoryLimit: DEFAULT_PAIR_CHECK_MEMORY_LIMIT
+                    });
 
-                    const pairResult = await this.runPairWithNativeCompilers(
-                        context,
-                        file1Path,
-                        file2Path,
-                        langId,
-                        message.input,
-                        { timeLimit: DEFAULT_PAIR_CHECK_TIME_LIMIT, memoryLimit: DEFAULT_PAIR_CHECK_MEMORY_LIMIT }
-                    );
-                    const result1 = pairResult.result1;
-                    const result2 = pairResult.result2;
+                    const output1 = result.output1.includes('ERROR:')
+                        ? `<b>Error:</b>\n${htmlEscape(result.output1.replace('ERROR:\n', ''))}`
+                        : result.output1;
+                    const output2 = result.output2.includes('ERROR:')
+                        ? `<b>Error:</b>\n${htmlEscape(result.output2.replace('ERROR:\n', ''))}`
+                        : result.output2;
 
-                    const output1 = result1.stderr ? `<b>Error:</b>\n${htmlEscape(result1.stderr)}` : result1.stdout;
-                    const output2 = result2.stderr ? `<b>Error:</b>\n${htmlEscape(result2.stderr)}` : result2.stdout;
-
-                    if (result1.stderr || result2.stderr) {
+                    if (result.output1.includes('ERROR') || result.output2.includes('ERROR')) {
                         this.setOutputs(output1, output2);
-                    } else if (output1 === output2) {
+                    } else if (result.equal) {
                         this.setOutputs(
                             '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>',
                             '<span style="color:var(--vscode-terminal-ansiGreen);">Output matches (Accepted)</span>'
                         );
                     } else {
-                        const { html1, html2 } = this.createDiffHtml(output1, output2);
+                        const { html1, html2 } = this.createDiffHtml(result.output1, result.output2);
                         this.setOutputs(html1, html2);
                     }
-
-                    await fs.promises.rm(tempDir, { recursive: true, force: true });
                 } catch (e: any) {
                     vscode.window.showErrorMessage(`Pair check error: ${e.message}`);
                     this.setOutputs(

@@ -3,7 +3,14 @@ import * as path from 'path';
 import { NativeCompilerManager } from '../native';
 import { CompilerInfo } from '../types';
 import { DEFAULT_MEMORY_LIMIT, DEFAULT_SINGLE_RUN_TIME_LIMIT } from '../constants';
-import { htmlEscape, postWebviewMessage, getTheme, getLanguageIdFromEditor } from '../utils/webview-utils';
+import {
+    htmlEscape,
+    postWebviewMessage,
+    getTheme,
+    getLanguageIdFromEditor,
+    getWebviewContent
+} from '../utils/webview-utils';
+import { getSuitableCompiler } from '../extension';
 
 export class CommandManager {
     private static instance: CommandManager;
@@ -26,32 +33,7 @@ export class CommandManager {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
-
-        let compilerResult = await NativeCompilerManager.detectCompilers(this.context);
-        if (!compilerResult.success || compilerResult.compilers.length === 0) {
-            const choice = await vscode.window.showErrorMessage(
-                'No C/C++ compilers found. Please set up a compiler to proceed.',
-                'Setup Compiler'
-            );
-            if (choice === 'Setup Compiler') {
-                await vscode.commands.executeCommand('oicode.setupCompiler');
-                compilerResult = await NativeCompilerManager.forceRescanCompilers(this.context);
-            }
-
-            if (!compilerResult.success || compilerResult.compilers.length === 0) {
-                NativeCompilerManager.getOutputChannel().appendLine(
-                    `Compiler detection failed. Suggestions: ${compilerResult.suggestions.join(', ')}`
-                );
-                throw new Error('No compilers available. Please set up a compiler first.');
-            }
-        }
-
-        const suitableCompilers = NativeCompilerManager.filterSuitableCompilers(languageId, compilerResult.compilers);
-        if (suitableCompilers.length === 0) {
-            throw new Error(`No suitable compiler found for ${languageId}`);
-        }
-
-        return suitableCompilers[0];
+        return getSuitableCompiler(this.context, languageId);
     }
 
     public async runCode(testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) {
@@ -339,7 +321,7 @@ export class CommandManager {
             retainContextWhenHidden: true
         });
 
-        this.getWebviewContent(this.context, 'settings.html').then(html => (panel.webview.html = html));
+        this.getWebviewContent('settings.html').then(html => (panel.webview.html = html));
 
         const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
             postWebviewMessage(panel, 'set-theme', { theme: getTheme(e.kind) });
@@ -350,14 +332,10 @@ export class CommandManager {
         });
     }
 
-    private async getWebviewContent(context: vscode.ExtensionContext, fileName: string): Promise<string> {
-        const filePath = vscode.Uri.file(path.join(context.extensionPath, 'out', fileName));
-        try {
-            const content = await vscode.workspace.fs.readFile(filePath);
-            return content.toString();
-        } catch (e) {
-            console.error(`Failed to read ${fileName}`, e);
-            return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
+    private async getWebviewContent(fileName: string): Promise<string> {
+        if (!this.context) {
+            throw new Error('Context not initialized');
         }
+        return getWebviewContent(this.context, fileName);
     }
 }

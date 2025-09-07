@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 export function htmlEscape(str: string): string {
     return str.replace(/[&<>"'/]/g, match => {
@@ -41,4 +42,15 @@ export function toSafeName(input: string): string {
 
 export function normalizeOutput(output: string): string {
     return output.replace(/\r\n/g, '\n').trimEnd();
+}
+
+export async function getWebviewContent(context: vscode.ExtensionContext, fileName: string): Promise<string> {
+    const filePath = vscode.Uri.file(path.join(context.extensionPath, 'out', fileName));
+    try {
+        const content = await vscode.workspace.fs.readFile(filePath);
+        return content.toString();
+    } catch (e) {
+        console.error(`Failed to read ${fileName}`, e);
+        return `<h1>Error: Could not load page.</h1><p>${e}</p>`;
+    }
 }

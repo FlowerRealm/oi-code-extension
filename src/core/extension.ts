@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
         console.log('Extension path:', context.extensionPath);
 
         NativeCompilerManager.detectCompilers(context)
-            .then((result: any) => {
+            .then(result => {
                 if (result.success) {
                     console.log(`Detected ${result.compilers.length} compilers`);
                     if (result.recommended) {
@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
                     console.log('Compiler detection failed:', result.error);
                 }
             })
-            .catch((error: any) => {
+            .catch(error => {
                 console.error('Failed to detect compilers:', error);
             });
 
