@@ -79,6 +79,7 @@
             const inputData = document.getElementById('input-data').value;
             vscode.postMessage({ command: 'runPairCheck', input: inputData });
         });
+
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")
@@ -88,23 +89,19 @@
                 .replace(/'/g, "&#039;");
         }
 
-      function setSafeHtml(elementId, content, allowFormatting = false) {
+        function setSafeHtml(elementId, content) {
             const element = document.getElementById(elementId);
             if (element) {
-                if (allowFormatting) {
-                    element.innerHTML = escapeHtml(content);
-                } else {
-                    element.textContent = content;
-                }
+                element.textContent = content;
             }
         }
 
-      window.addEventListener('message', event => {
+        window.addEventListener('message', event => {
             const message = event.data;
             switch (message.command) {
                 case 'setOutputs':
-                    document.getElementById('output1-content').innerHTML = message.output1;
-                    document.getElementById('output2-content').innerHTML = message.output2;
+                    setSafeHtml('output1-content', message.output1);
+                    setSafeHtml('output2-content', message.output2);
                     break;
             }
         });

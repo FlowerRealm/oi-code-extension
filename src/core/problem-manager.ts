@@ -3,6 +3,48 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getLanguageIdFromEditor, toSafeName, getWebviewContent } from '../utils/webview-utils';
 
+interface ProblemViewMessage {
+    cmd: 'loadSamples' | 'run' | 'pair';
+    name?: string;
+    url?: string;
+    timeLimit?: number;
+    memoryLimit?: number;
+    opt?: string;
+    std?: string;
+    statement?: string;
+    samples?: string;
+}
+
+interface ProblemConfig {
+    name: string;
+    url: string;
+    timeLimit: number;
+    memoryLimit: number;
+    opt: string;
+    std: string;
+}
+
+interface ProblemStructure {
+    sourcePath: string;
+}
+
+interface CreateProblemPayload {
+    name?: string;
+    language?: 'c' | 'cpp';
+    baseDir?: string;
+}
+
+interface CreateProblemResult {
+    problemDir?: string;
+    sourcePath?: string;
+    error?: string;
+}
+
+interface LoadSamplesResult {
+    cmd: 'samplesLoaded';
+    text: string;
+}
+
 export class ProblemManager {
     private static instance: ProblemManager;
     private context: vscode.ExtensionContext | undefined;
@@ -58,7 +100,7 @@ export class ProblemManager {
         return baseDir;
     }
 
-    private async ensureProblemStructure(m: any): Promise<{ sourcePath: string }> {
+    private async ensureProblemStructure(m: ProblemViewMessage): Promise<ProblemStructure> {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
@@ -68,7 +110,7 @@ export class ProblemManager {
             throw new Error('Please open a source file in the editor first.');
         }
         const langId = getLanguageIdFromEditor(active);
-        const problemName = toSafeName(m.name);
+        const problemName = toSafeName(m.name || '');
 
         const baseDir = await this.pickProblemsBaseDir();
 
@@ -80,7 +122,7 @@ export class ProblemManager {
         const sourcePath = path.join(problemDir, `main.${langId}`);
         await fs.promises.writeFile(sourcePath, active.document.getText(), 'utf8');
 
-        const configJson = {
+        const configJson: ProblemConfig = {
             name: m.name || '',
             url: m.url || '',
             timeLimit: Number(m.timeLimit) || 5,
@@ -95,7 +137,7 @@ export class ProblemManager {
         return { sourcePath };
     }
 
-    public async createProblem(payload?: { name?: string; language?: 'c' | 'cpp'; baseDir?: string }) {
+    public async createProblem(payload?: CreateProblemPayload): Promise<CreateProblemResult | undefined> {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
@@ -200,13 +242,14 @@ export class ProblemManager {
                 vscode.window.showInformationMessage(`Problem created：${safe}`);
                 return { problemDir, sourcePath };
             }
-        } catch (e: any) {
-            vscode.window.showErrorMessage(`Failed to create problem：${e.message || e}`);
-            return { error: e?.message || String(e) };
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            vscode.window.showErrorMessage(`Failed to create problem：${errorMessage}`);
+            return { error: errorMessage };
         }
     }
 
-    public async handleProblemViewMessage(m: any) {
+    public async handleProblemViewMessage(m: ProblemViewMessage): Promise<LoadSamplesResult | null> {
         if (!this.context) {
             throw new Error('Context not initialized');
         }
@@ -230,8 +273,9 @@ export class ProblemManager {
                     timeLimit: m.timeLimit,
                     memoryLimit: m.memoryLimit
                 });
-            } catch (e: any) {
-                vscode.window.showErrorMessage(e.message || String(e));
+            } catch (e: unknown) {
+                const errorMessage = e instanceof Error ? e.message : String(e);
+                vscode.window.showErrorMessage(errorMessage);
             }
         } else if (m.cmd === 'pair') {
             await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '', {
@@ -259,7 +303,7 @@ export class ProblemManager {
                 };
                 webviewView.webview.html = await this.getWebviewContent('problem.html');
 
-                webviewView.webview.onDidReceiveMessage(async (m: any) => {
+                webviewView.webview.onDidReceiveMessage(async (m: ProblemViewMessage) => {
                     const result = await this.handleProblemViewMessage(m);
                     if (result) {
                         webviewView.webview.postMessage(result);
