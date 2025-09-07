@@ -14,8 +14,9 @@ OI-Code is a Visual Studio Code extension designed for competitive programmers a
 - **Problem Management**: Create and organize coding problems with their metadata.
 - **Pair Check Feature**: Compare outputs of two different implementations (e.g., brute force vs. optimized solutions).
 - **Resource Limits**: Enforce time and memory limits for fair evaluation.
-- **Webview Integration**: Rich UI for problem descriptions and settings.
+- **Webview Integration**: Rich UI for problem descriptions and settings with XSS-safe content handling.
 - **Compiler Installation**: One-click automatic LLVM installation when no compilers are detected.
+- **Security-First Design**: XSS prevention, type-safe error handling, and secure input sanitization.
 
 ## System Requirements
 
@@ -83,6 +84,13 @@ The extension has been completely redesigned to use native LLVM/GCC compilers wi
 - **Apple Clang**: Xcode bundled compilers (macOS only)
 
 ## Version Notes
+
+### 0.0.4 - Security and Architecture Improvements
+- **🔒 Critical Security Fix**: Fixed XSS vulnerability in WebView HTML content handling
+- **⚡ Promise Handling**: Improved extension activation with proper async/await patterns
+- **🏗️ Architecture Refactoring**: Eliminated circular dependencies and code duplication
+- **🎯 Type Safety**: Enhanced TypeScript typing with strict error handling
+- **🔧 Code Quality**: Reduced technical debt and improved maintainability
 
 ### 0.0.3 - Native LLVM Implementation
 - **Complete Architecture Overhaul**: Implemented modular compiler management system

@@ -62,18 +62,41 @@ This extension aims to provide OI competitors with a consistent and reliable loc
 
 ## Latest Improvements
 
-### Native Compiler Optimization
+### 🔒 Critical Security Fixes (2025-09-07)
+1. **XSS Vulnerability Fix**: Fixed critical client-side XSS in WebView HTML content handling
+   - **Issue**: Direct `innerHTML` assignment without sanitization in `webview/pair-check.html`
+   - **Solution**: Implemented `escapeHtml()` and `setSafeHtml()` functions for safe content handling
+   - **Impact**: Prevents malicious code execution in WebView panels
+
+2. **Promise Handling Improvement**: Fixed unhandled Promise in extension activation
+   - **Issue**: "Fire-and-forget" Promise pattern in `src/core/extension.ts`
+   - **Solution**: Converted to async/await with proper error handling
+   - **Impact**: Prevents silent failures during extension startup
+
+3. **Architecture Refactoring**: Eliminated circular dependencies and code duplication
+   - **Issue**: Circular dependency between commands.ts and extension.ts
+   - **Solution**: Created dedicated `src/utils/compiler-utils.ts` module
+   - **Impact**: Improved architecture and maintainability
+
+4. **Type Safety Enhancement**: Replaced `any` types with specific types
+   - **Files**: Multiple core files updated
+   - **Solution**: `any` → `unknown` and `Record<string, unknown>`
+   - **Impact**: Better TypeScript type safety and error handling
+
+### Previous Improvements
+
+#### Native Compiler Optimization
 1. **Performance Improvement**: Native compilation provides 3-5x performance improvement over containerized solutions
 2. **Resource Management**: Platform-specific resource limiting with proper cleanup and timeout handling
 3. **Fallback Mechanism**: Automatic compiler fallback when preferred compilers are unavailable
 4. **Installation Support**: One-click compiler installation with automatic detection and validation
 
-### Security Improvements
+#### Security Improvements
 1. **Shell Injection Protection**: Refactor code to avoid shell injection risks
 2. **Input Processing**: Use secure stdin method for input passing
 3. **Resource Restrictions**: Strictly enforce CPU, memory, and process number limits
 
-### Code Quality Improvement
+#### Code Quality Improvement
 1. **Error Handling**: Improve error handling mechanisms, avoid unhandled Promise rejections
 2. **Code Refactoring**: Eliminate duplicate code, improve maintainability
 3. **Type Safety**: Improve TypeScript type definitions
