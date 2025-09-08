@@ -6,6 +6,7 @@ import { WebViewManager } from './webview-manager';
 import { NativeCompilerManager } from '../native';
 import { UnifiedConfigManager } from '../utils/unified-config-manager';
 import { UnifiedUtils } from '../utils/unified-utils';
+import { CreateProblemPayload } from '../types/types';
 
 export async function activate(context: vscode.ExtensionContext) {
     await UnifiedUtils.safeExecute(
@@ -78,15 +79,24 @@ function registerWebViewProviders(context: vscode.ExtensionContext, webviewManag
 
 function registerCommands(context: vscode.ExtensionContext, managers: ExtensionManagers): void {
     const commandConfig: CommandPair[] = [
-        ['oicode.createProblem', payload => managers.problemManager.createProblem(payload as any)],
+        ['oicode.createProblem', payload => managers.problemManager.createProblem(payload as CreateProblemPayload)],
         [
             'oicode.runCode',
-            (testInput, options) => managers.commandManager.runCode(testInput as string, options as any)
+            (testInput, options) =>
+                managers.commandManager.runCode(
+                    testInput as string | undefined,
+                    options as { timeLimit?: number; memoryLimit?: number } | undefined
+                )
         ],
         ['oicode.startPairCheck', () => managers.pairCheckManager.startPairCheck()],
         [
             'oicode.runPairCheck',
-            (testInput, options) => managers.pairCheckManager.runPairCheck(context, testInput as string, options as any)
+            (testInput, options) =>
+                managers.pairCheckManager.runPairCheck(
+                    context,
+                    testInput as string | undefined,
+                    options as { timeLimit?: number; memoryLimit?: number } | undefined
+                )
         ],
         ['oicode.initializeEnvironment', () => managers.commandManager.initializeEnvironment()],
         ['oicode.rescanCompilers', () => managers.commandManager.rescanCompilers()],

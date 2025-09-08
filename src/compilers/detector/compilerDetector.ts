@@ -84,7 +84,7 @@ export class CompilerDetector {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
         const checkedRealPaths = new Set<string>();
-        const checkedCompilerTypes = new Map<string, string>();
+        const checkedCompilerTypes = new Map<string, { path: string; priority: number }>();
 
         // Search for common Windows compilers
         const searchPaths = [
@@ -155,7 +155,7 @@ export class CompilerDetector {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
         const checkedRealPaths = new Set<string>();
-        const checkedCompilerTypes = new Map<string, string>();
+        const checkedCompilerTypes = new Map<string, { path: string; priority: number }>();
 
         // Search PATH first
         const compilerNames = ['clang', 'clang++', 'gcc', 'g++'];
@@ -240,7 +240,7 @@ export class CompilerDetector {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
         const checkedRealPaths = new Set<string>();
-        const checkedCompilerTypes = new Map<string, string>();
+        const checkedCompilerTypes = new Map<string, { path: string; priority: number }>();
 
         // Search PATH first
         const compilerNames = ['clang', 'clang++', 'gcc', 'g++', 'cc', 'c++'];
@@ -324,7 +324,7 @@ export class CompilerDetector {
     private static async testCompiler(
         compilerPath: string,
         checkedRealPaths: Set<string> = new Set(),
-        checkedCompilerTypes: Map<string, string> = new Map()
+        checkedCompilerTypes: Map<string, { path: string; priority: number }> = new Map()
     ): Promise<CompilerInfo | null> {
         try {
             const outputChannel = this.getOutputChannel();
@@ -369,26 +369,37 @@ export class CompilerDetector {
             // Create a unique key for this compiler type and version
             const compilerKey = `${type}-${version}`;
 
+            // Calculate priority for this compiler
+            const priority = this.calculatePriority(type, version, compilerPath);
+
             // Check if we already have a compiler of this type and version with higher priority
             if (checkedCompilerTypes.has(compilerKey)) {
-                const existingPath = checkedCompilerTypes.get(compilerKey)!;
-                const existingPriority = this.calculatePriority(type, version, existingPath);
-                const newPriority = this.calculatePriority(type, version, compilerPath);
-
-                if (newPriority <= existingPriority) {
-                    outputChannel.appendLine(`[CompilerDetector] Skipping lower priority compiler: ${compilerPath}`);
+                const existing = checkedCompilerTypes.get(compilerKey)!;
+                if (priority <= existing.priority) {
+                    outputChannel.appendLine(
+                        `[CompilerDetector] Skipping lower priority compiler: ${compilerPath} ` +
+                            `(priority: ${priority}, existing: ${existing.path} with priority: ${existing.priority})`
+                    );
                     return null;
                 } else {
                     // Replace the existing one with this higher priority compiler
-                    outputChannel.appendLine(`[CompilerDetector] Replacing lower priority compiler: ${existingPath}`);
-                    checkedRealPaths.delete(existingPath);
+                    outputChannel.appendLine(
+                        `[CompilerDetector] Replacing lower priority compiler: ${existing.path} with ` +
+                            `${compilerPath} (priority: ${priority} > ${existing.priority})`
+                    );
+                    // Remove the old real path since we're replacing the compiler
+                    try {
+                        const oldRealPath = await fs.realpath(existing.path);
+                        checkedRealPaths.delete(oldRealPath);
+                    } catch {
+                        checkedRealPaths.delete(existing.path);
+                    }
                 }
             }
-            checkedCompilerTypes.set(compilerKey, compilerPath);
+            checkedCompilerTypes.set(compilerKey, { path: compilerPath, priority });
 
             const supportedStandards = this.getSupportedStandards(type, version);
             const is64Bit = await this.is64BitCompiler(compilerPath);
-            const priority = this.calculatePriority(type, version, compilerPath);
             const name = this.generateCompilerName(type, version, compilerPath);
 
             const compilerInfo: CompilerInfo = {
@@ -402,7 +413,8 @@ export class CompilerDetector {
             };
 
             outputChannel.appendLine(
-                `[CompilerDetector] Found compiler: ${name} (${type} ${version}) at ${compilerPath} (real: ${realPath})`
+                `[CompilerDetector] Found compiler: ${name} (${type} ${version}) at ${compilerPath} ` +
+                    `(real: ${realPath}, priority: ${priority})`
             );
             return compilerInfo;
         } catch (error) {

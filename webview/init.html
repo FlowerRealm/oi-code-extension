@@ -1051,9 +1051,9 @@
                             html += `
                                 <div class="compiler-item ${isSelected ? 'selected' : ''}" onclick="selectCompiler('${language}', ${index})">
                                     <div class="compiler-info">
-                                        <div class="compiler-name">${compiler.name}</div>
-                                        <div class="compiler-version">版本: ${compiler.version}</div>
-                                        <div class="compiler-path">${compiler.path}</div>
+                                        <div class="compiler-name">${escapeHtml(compiler.name)}</div>
+                                        <div class="compiler-version">版本: ${escapeHtml(compiler.version)}</div>
+                                        <div class="compiler-path">${escapeHtml(compiler.path)}</div>
                                     </div>
                                     <input type="radio" name="compiler-${language}" class="compiler-radio" ${isSelected ? 'checked' : ''}>
                                 </div>
@@ -1195,7 +1195,7 @@
                     compilerNoCompilers.innerHTML = `
                         <div style="color: var(--success-color);">
                             <h4>安装完成</h4>
-                            <p>${message.message}</p>
+                            <p>${escapeHtml(message.message)}</p>
                         </div>
                     `;
                     updateStepUI();
@@ -1204,7 +1204,7 @@
                     compilerNoCompilers.innerHTML = `
                         <div style="color: var(--danger-color);">
                             <h4>安装失败</h4>
-                            <p>${message.message}</p>
+                            <p>${escapeHtml(message.message)}</p>
                             <button class="btn" onclick="installCompiler('llvm')">重试安装</button>
                             <button class="btn btn-secondary" onclick="skipCompilerInstall()">跳过</button>
                         </div>

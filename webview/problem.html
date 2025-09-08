@@ -458,18 +458,18 @@
             const previewContent = document.getElementById('preview-content');
             
             const previewHtml = `
-题目名称: ${data.name}
-题目URL: ${data.url || '未提供'}
+题目名称: ${escapeHtml(data.name)}
+题目URL: ${escapeHtml(data.url || '未提供')}
 时间限制: ${data.timeLimit}秒
 内存限制: ${data.memoryLimit}MB
-优化级别: ${data.opt}
-语言标准: ${data.std}
+优化级别: ${escapeHtml(data.opt)}
+语言标准: ${escapeHtml(data.std)}
 
 测试样例:
-${data.samples || '未提供'}
+${escapeHtml(data.samples || '未提供')}
 
 题面描述:
-${data.statement}
+${escapeHtml(data.statement)}
             `;
             
             setSafeHtml(previewContent, previewHtml);
