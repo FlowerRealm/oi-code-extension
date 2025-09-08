@@ -83,6 +83,8 @@ export class CompilerDetector {
     private static async detectWindowsCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
+        const checkedRealPaths = new Set<string>();
+        const checkedCompilerTypes = new Map<string, string>();
 
         // Search for common Windows compilers
         const searchPaths = [
@@ -104,7 +106,7 @@ export class CompilerDetector {
                 for (const compilerPath of foundCompilers) {
                     if (!checked.has(compilerPath)) {
                         checked.add(compilerPath);
-                        const compiler = await this.testCompiler(compilerPath);
+                        const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                         if (compiler) {
                             compilers.push(compiler);
                         }
@@ -119,7 +121,7 @@ export class CompilerDetector {
             for (const msvcPath of msvcPaths) {
                 if (!checked.has(msvcPath)) {
                     checked.add(msvcPath);
-                    const compiler = await this.testCompiler(msvcPath);
+                    const compiler = await this.testCompiler(msvcPath, checkedRealPaths, checkedCompilerTypes);
                     if (compiler) {
                         compilers.push(compiler);
                     }
@@ -135,7 +137,7 @@ export class CompilerDetector {
             for (const compilerPath of deepScanCompilers) {
                 if (!checked.has(compilerPath)) {
                     checked.add(compilerPath);
-                    const compiler = await this.testCompiler(compilerPath);
+                    const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                     if (compiler) {
                         compilers.push(compiler);
                     }
@@ -152,6 +154,8 @@ export class CompilerDetector {
     private static async detectMacOSCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
+        const checkedRealPaths = new Set<string>();
+        const checkedCompilerTypes = new Map<string, string>();
 
         // Search PATH first
         const compilerNames = ['clang', 'clang++', 'gcc', 'g++'];
@@ -160,7 +164,7 @@ export class CompilerDetector {
         for (const compilerPath of pathCompilers) {
             if (!checked.has(compilerPath)) {
                 checked.add(compilerPath);
-                const compiler = await this.testCompiler(compilerPath);
+                const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                 if (compiler) {
                     compilers.push(compiler);
                 }
@@ -175,7 +179,7 @@ export class CompilerDetector {
                 for (const compilerPath of foundCompilers) {
                     if (!checked.has(compilerPath)) {
                         checked.add(compilerPath);
-                        const compiler = await this.testCompiler(compilerPath);
+                        const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                         if (compiler) {
                             compilers.push(compiler);
                         }
@@ -196,7 +200,11 @@ export class CompilerDetector {
                     for (const compilerPath of foundCompilers) {
                         if (!checked.has(compilerPath)) {
                             checked.add(compilerPath);
-                            const compiler = await this.testCompiler(compilerPath);
+                            const compiler = await this.testCompiler(
+                                compilerPath,
+                                checkedRealPaths,
+                                checkedCompilerTypes
+                            );
                             if (compiler) {
                                 compilers.push(compiler);
                             }
@@ -214,7 +222,7 @@ export class CompilerDetector {
             for (const compilerPath of deepScanCompilers) {
                 if (!checked.has(compilerPath)) {
                     checked.add(compilerPath);
-                    const compiler = await this.testCompiler(compilerPath);
+                    const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                     if (compiler) {
                         compilers.push(compiler);
                     }
@@ -231,6 +239,8 @@ export class CompilerDetector {
     private static async detectLinuxCompilers(performDeepScan: boolean = false): Promise<CompilerInfo[]> {
         const compilers: CompilerInfo[] = [];
         const checked = new Set<string>();
+        const checkedRealPaths = new Set<string>();
+        const checkedCompilerTypes = new Map<string, string>();
 
         // Search PATH first
         const compilerNames = ['clang', 'clang++', 'gcc', 'g++', 'cc', 'c++'];
@@ -239,7 +249,7 @@ export class CompilerDetector {
         for (const compilerPath of pathCompilers) {
             if (!checked.has(compilerPath)) {
                 checked.add(compilerPath);
-                const compiler = await this.testCompiler(compilerPath);
+                const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                 if (compiler) {
                     compilers.push(compiler);
                 }
@@ -255,7 +265,7 @@ export class CompilerDetector {
                 for (const compilerPath of foundCompilers) {
                     if (!checked.has(compilerPath)) {
                         checked.add(compilerPath);
-                        const compiler = await this.testCompiler(compilerPath);
+                        const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                         if (compiler) {
                             compilers.push(compiler);
                         }
@@ -275,7 +285,11 @@ export class CompilerDetector {
                     for (const compilerPath of foundCompilers) {
                         if (!checked.has(compilerPath)) {
                             checked.add(compilerPath);
-                            const compiler = await this.testCompiler(compilerPath);
+                            const compiler = await this.testCompiler(
+                                compilerPath,
+                                checkedRealPaths,
+                                checkedCompilerTypes
+                            );
                             if (compiler) {
                                 compilers.push(compiler);
                             }
@@ -293,7 +307,7 @@ export class CompilerDetector {
             for (const compilerPath of deepScanCompilers) {
                 if (!checked.has(compilerPath)) {
                     checked.add(compilerPath);
-                    const compiler = await this.testCompiler(compilerPath);
+                    const compiler = await this.testCompiler(compilerPath, checkedRealPaths, checkedCompilerTypes);
                     if (compiler) {
                         compilers.push(compiler);
                     }
@@ -307,7 +321,11 @@ export class CompilerDetector {
     /**
      * Test a specific compiler
      */
-    private static async testCompiler(compilerPath: string): Promise<CompilerInfo | null> {
+    private static async testCompiler(
+        compilerPath: string,
+        checkedRealPaths: Set<string> = new Set(),
+        checkedCompilerTypes: Map<string, string> = new Map()
+    ): Promise<CompilerInfo | null> {
         try {
             const outputChannel = this.getOutputChannel();
             outputChannel.appendLine(`[CompilerDetector] Testing compiler: ${compilerPath}`);
@@ -318,6 +336,23 @@ export class CompilerDetector {
             } catch {
                 return null;
             }
+
+            // Get the real path to avoid duplicates from symlinks
+            let realPath: string;
+            try {
+                realPath = await fs.realpath(compilerPath);
+            } catch {
+                realPath = compilerPath;
+            }
+
+            // Check if we've already processed this real path
+            if (checkedRealPaths.has(realPath)) {
+                outputChannel.appendLine(
+                    `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
+                );
+                return null;
+            }
+            checkedRealPaths.add(realPath);
 
             // Get version information
             const result = await ProcessRunner.executeCommand(compilerPath, ['--version']);
@@ -330,6 +365,27 @@ export class CompilerDetector {
             // Determine compiler type
             const type = this.determineCompilerType(compilerPath, versionOutput);
             const version = this.parseVersion(versionOutput);
+
+            // Create a unique key for this compiler type and version
+            const compilerKey = `${type}-${version}`;
+
+            // Check if we already have a compiler of this type and version with higher priority
+            if (checkedCompilerTypes.has(compilerKey)) {
+                const existingPath = checkedCompilerTypes.get(compilerKey)!;
+                const existingPriority = this.calculatePriority(type, version, existingPath);
+                const newPriority = this.calculatePriority(type, version, compilerPath);
+
+                if (newPriority <= existingPriority) {
+                    outputChannel.appendLine(`[CompilerDetector] Skipping lower priority compiler: ${compilerPath}`);
+                    return null;
+                } else {
+                    // Replace the existing one with this higher priority compiler
+                    outputChannel.appendLine(`[CompilerDetector] Replacing lower priority compiler: ${existingPath}`);
+                    checkedRealPaths.delete(existingPath);
+                }
+            }
+            checkedCompilerTypes.set(compilerKey, compilerPath);
+
             const supportedStandards = this.getSupportedStandards(type, version);
             const is64Bit = await this.is64BitCompiler(compilerPath);
             const priority = this.calculatePriority(type, version, compilerPath);
@@ -345,7 +401,9 @@ export class CompilerDetector {
                 priority
             };
 
-            outputChannel.appendLine(`[CompilerDetector] Found compiler: ${name} (${type} ${version})`);
+            outputChannel.appendLine(
+                `[CompilerDetector] Found compiler: ${name} (${type} ${version}) at ${compilerPath} (real: ${realPath})`
+            );
             return compilerInfo;
         } catch (error) {
             this.getOutputChannel().appendLine(`[CompilerDetector] Failed to test compiler ${compilerPath}: ${error}`);
