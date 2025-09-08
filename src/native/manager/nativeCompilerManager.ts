@@ -268,6 +268,17 @@ export class NativeCompilerManager {
             }
         }
 
+        // Get configuration settings
+        const debugConfig = vscode.workspace.getConfiguration('oicode.debug');
+        const warningsConfig = vscode.workspace.getConfiguration('oicode.warnings');
+
+        // Debug information
+        const includeDebugInfo = debugConfig.get<boolean>('includeDebugInfo', false);
+        if (includeDebugInfo) {
+            const debugLevel = debugConfig.get<string>('debugLevel', 'g1');
+            args.push(`-${debugLevel}`);
+        }
+
         // Compiler-specific flags
         if (compiler.type === 'msvc') {
             // MSVC-specific flags
@@ -278,18 +289,24 @@ export class NativeCompilerManager {
                 args.push('/TP');
             }
         } else {
-            // GCC/Clang flags
-            args.push('-Wall', '-Wextra');
+            // GCC/Clang flags - Warning settings
+            this.addWarningFlags(args, warningsConfig);
 
             // Enable colors in output
             if (compiler.type === 'clang' || compiler.type === 'apple-clang') {
                 args.push('-fcolor-diagnostics');
             }
 
+            // Sanitizer flags
+            this.addSanitizerFlags(args, debugConfig);
+
+            // Stack protection
+            this.addStackProtectionFlags(args, debugConfig);
+
             // Platform-specific flags
             if (process.platform === 'win32') {
-                const config = vscode.workspace.getConfiguration('oicode.compile');
-                const disableStackProtector = config.get<boolean>('disableStackProtector', false);
+                const compileConfig = vscode.workspace.getConfiguration('oicode.compile');
+                const disableStackProtector = compileConfig.get<boolean>('disableStackProtector', false);
                 if (disableStackProtector) {
                     args.push('-fno-stack-protector');
                 }
@@ -300,6 +317,101 @@ export class NativeCompilerManager {
         // Note: The source path will be added by the caller
 
         return args;
+    }
+
+    /**
+     * Add warning flags based on configuration
+     */
+    private static addWarningFlags(args: string[], warningsConfig: vscode.WorkspaceConfiguration): void {
+        const warningLevel = warningsConfig.get<string>('level', '普通');
+        const treatAsError = warningsConfig.get<boolean>('treatAsError', false);
+
+        // Base warning level
+        switch (warningLevel) {
+            case '无':
+                args.push('-w');
+                break;
+            case '普通':
+                args.push('-Wall');
+                break;
+            case '详细':
+                args.push('-Wall', '-Wextra');
+                break;
+            case '最严格':
+                args.push('-Wall', '-Wextra', '-Wpedantic');
+                break;
+        }
+
+        // Additional warning flags
+        if (warningsConfig.get<boolean>('extra', true)) {
+            args.push('-Wextra');
+        }
+
+        if (warningsConfig.get<boolean>('unusedParams', true)) {
+            args.push('-Wunused-parameter');
+        }
+
+        if (warningsConfig.get<boolean>('unusedVars', true)) {
+            args.push('-Wunused-variable');
+        }
+
+        if (warningsConfig.get<boolean>('formatSecurity', true)) {
+            args.push('-Wformat-security');
+        }
+
+        if (warningsConfig.get<boolean>('conversion', true)) {
+            args.push('-Wconversion');
+        }
+
+        // Treat warnings as errors
+        if (treatAsError && warningLevel !== '无') {
+            args.push('-Werror');
+        }
+    }
+
+    /**
+     * Add sanitizer flags based on configuration
+     */
+    private static addSanitizerFlags(args: string[], debugConfig: vscode.WorkspaceConfiguration): void {
+        const sanitizers: string[] = [];
+
+        if (debugConfig.get<boolean>('addressSanitizer', false)) {
+            sanitizers.push('address');
+        }
+
+        if (debugConfig.get<boolean>('memorySanitizer', false)) {
+            sanitizers.push('memory');
+        }
+
+        if (debugConfig.get<boolean>('ubSanitizer', false)) {
+            sanitizers.push('undefined');
+        }
+
+        if (sanitizers.length > 0) {
+            args.push(`-fsanitize=${sanitizers.join(',')}`);
+        }
+    }
+
+    /**
+     * Add stack protection flags based on configuration
+     */
+    private static addStackProtectionFlags(args: string[], debugConfig: vscode.WorkspaceConfiguration): void {
+        const stackProtector = debugConfig.get<string>('stackProtector', '基本');
+
+        switch (stackProtector) {
+            case '无':
+                args.push('-fno-stack-protector');
+                break;
+            case '基本':
+                args.push('-fstack-protector');
+                break;
+            case '全部':
+                args.push('-fstack-protector-strong');
+                break;
+            case '严格':
+                args.push('-fstack-protector-all');
+                break;
+        }
     }
 
     /**

@@ -41,6 +41,10 @@
         "title": "OI-Code: 运行"
       },
       {
+        "command": "oicode.setupCompiler",
+        "title": "OI-Code: 设置编译器"
+      },
+      {
         "command": "oicode.initializeEnvironment",
         "title": "OI-Code: 初始化编译环境"
       },
@@ -124,6 +128,78 @@
           "default": false,
           "description": "在 Windows 上禁用堆栈保护器 (-fno-stack-protector)。这可能提供轻微的性能提升，但会降低安全性。仅在竞技编程环境中启用。"
         },
+        "oicode.run.timeLimit": {
+          "type": "number",
+          "default": 5,
+          "description": "程序运行的最大时间限制（秒）。"
+        },
+        "oicode.run.memoryLimit": {
+          "type": "number",
+          "default": 256,
+          "description": "程序运行的最大内存限制（MB）。"
+        },
+        "oicode.run.autoOpenOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "运行代码后自动显示输出面板。"
+        },
+        "oicode.run.autoCleanup": {
+          "type": "boolean",
+          "default": true,
+          "description": "运行完成后自动删除临时文件。"
+        },
+        "oicode.debug.includeDebugInfo": {
+          "type": "boolean",
+          "default": false,
+          "description": "编译时添加调试信息（-g 标志）。"
+        },
+        "oicode.debug.verboseErrors": {
+          "type": "boolean",
+          "default": true,
+          "description": "运行时显示详细的错误信息和堆栈跟踪。"
+        },
+        "oicode.debug.saveTestCases": {
+          "type": "boolean",
+          "default": true,
+          "description": "自动保存运行过的测试用例供后续使用。"
+        },
+        "oicode.debug.debugLevel": {
+          "type": "string",
+          "enum": [
+            "g0",
+            "g1",
+            "g2",
+            "g3"
+          ],
+          "default": "g1",
+          "description": "调试信息的详细程度（g0=无，g3=最详细）。"
+        },
+        "oicode.debug.addressSanitizer": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用AddressSanitizer检测内存错误。"
+        },
+        "oicode.debug.memorySanitizer": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用MemorySanitizer检测未初始化内存访问。"
+        },
+        "oicode.debug.ubSanitizer": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用UndefinedBehaviorSanitizer检测未定义行为。"
+        },
+        "oicode.debug.stackProtector": {
+          "type": "string",
+          "enum": [
+            "无",
+            "基本",
+            "全部",
+            "严格"
+          ],
+          "default": "基本",
+          "description": "栈保护级别。"
+        },
         "oi-code.language.c.Command": {
           "type": "string",
           "description": "Path to the C compiler (e.g., /usr/bin/gcc)."
@@ -145,6 +221,69 @@
             "type": "string"
           },
           "description": "Arguments for the C++ compiler (e.g., -Wall -O2 -std=c++17)."
+        },
+        "oicode.language.c.command": {
+          "type": "string",
+          "description": "Path to the C compiler (e.g., /usr/bin/gcc)."
+        },
+        "oicode.language.c.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments for the C compiler (e.g., -Wall -O2 -std=c11)."
+        },
+        "oicode.language.cpp.command": {
+          "type": "string",
+          "description": "Path to the C++ compiler (e.g., /usr/bin/g++)."
+        },
+        "oicode.language.cpp.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments for the C++ compiler (e.g., -Wall -O2 -std=c++17)."
+        },
+        "oicode.warnings.level": {
+          "type": "string",
+          "enum": [
+            "无",
+            "普通",
+            "详细",
+            "最严格"
+          ],
+          "default": "普通",
+          "description": "编译器警告级别。"
+        },
+        "oicode.warnings.treatAsError": {
+          "type": "boolean",
+          "default": false,
+          "description": "将所有警告当作错误处理。"
+        },
+        "oicode.warnings.extra": {
+          "type": "boolean",
+          "default": true,
+          "description": "显示额外的有用警告信息。"
+        },
+        "oicode.warnings.unusedParams": {
+          "type": "boolean",
+          "default": true,
+          "description": "警告未使用的函数参数。"
+        },
+        "oicode.warnings.unusedVars": {
+          "type": "boolean",
+          "default": true,
+          "description": "警告未使用的变量。"
+        },
+        "oicode.warnings.formatSecurity": {
+          "type": "boolean",
+          "default": true,
+          "description": "警告printf/scanf等格式字符串安全问题。"
+        },
+        "oicode.warnings.conversion": {
+          "type": "boolean",
+          "default": true,
+          "description": "警告可能的类型转换问题。"
         }
       }
     }

@@ -15,7 +15,11 @@ export function htmlEscape(str: string): string {
     });
 }
 
-export function postWebviewMessage(panel: vscode.WebviewPanel, command: string, data: Record<string, unknown> = {}) {
+export function postWebviewMessage(
+    panel: vscode.WebviewPanel | vscode.WebviewView,
+    command: string,
+    data: Record<string, unknown> = {}
+) {
     try {
         panel.webview.postMessage({ command, ...data });
     } catch (e) {

@@ -2,54 +2,28 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getLanguageIdFromEditor, toSafeName, getWebviewContent } from '../utils/webview-utils';
+import { WebViewThemeManager } from '../utils/webview-theme-manager';
+import { UnifiedConfigManager } from '../utils/unified-config-manager';
+import { AdvancedBaseManager } from './advanced-base-manager';
+import {
+    ProblemViewMessage,
+    ProblemConfig,
+    ProblemStructure,
+    CreateProblemPayload,
+    CreateProblemResult,
+    LoadSamplesResult
+} from '../types';
 
-interface ProblemViewMessage {
-    cmd: 'loadSamples' | 'run' | 'pair';
-    name?: string;
-    url?: string;
-    timeLimit?: number;
-    memoryLimit?: number;
-    opt?: string;
-    std?: string;
-    statement?: string;
-    samples?: string;
-}
-
-interface ProblemConfig {
-    name: string;
-    url: string;
-    timeLimit: number;
-    memoryLimit: number;
-    opt: string;
-    std: string;
-}
-
-interface ProblemStructure {
-    sourcePath: string;
-}
-
-interface CreateProblemPayload {
-    name?: string;
-    language?: 'c' | 'cpp';
-    baseDir?: string;
-}
-
-interface CreateProblemResult {
-    problemDir?: string;
-    sourcePath?: string;
-    error?: string;
-}
-
-interface LoadSamplesResult {
-    cmd: 'samplesLoaded';
-    text: string;
-}
-
-export class ProblemManager {
+export class ProblemManager extends AdvancedBaseManager {
     private static instance: ProblemManager;
-    private context: vscode.ExtensionContext | undefined;
+    private themeManager: WebViewThemeManager;
+    private configManager: UnifiedConfigManager;
 
-    private constructor() {}
+    private constructor() {
+        super();
+        this.themeManager = WebViewThemeManager.getInstance();
+        this.configManager = UnifiedConfigManager.getInstance();
+    }
 
     public static getInstance(): ProblemManager {
         if (!ProblemManager.instance) {
@@ -58,20 +32,8 @@ export class ProblemManager {
         return ProblemManager.instance;
     }
 
-    public setContext(context: vscode.ExtensionContext) {
-        this.context = context;
-    }
-
-    private getContext(): vscode.ExtensionContext {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-        return this.context;
-    }
-
     private async pickProblemsBaseDir(): Promise<string> {
-        const context = this.getContext();
-        const saved = context.globalState.get<string>('oicode.lastProblemsBaseDir');
+        const saved = this.configManager.getGlobalState<string>('oicode.lastProblemsBaseDir');
         if (saved) {
             try {
                 await fs.promises.access(saved);
@@ -100,13 +62,11 @@ export class ProblemManager {
             throw new Error('Problem root directory not selected');
         }
         const baseDir = pick[0].fsPath;
-        context.globalState.update('oicode.lastProblemsBaseDir', baseDir);
+        await this.configManager.updateGlobalState('oicode.lastProblemsBaseDir', baseDir);
         return baseDir;
     }
 
     private async ensureProblemStructure(m: ProblemViewMessage): Promise<ProblemStructure> {
-        this.getContext();
-
         const active = vscode.window.activeTextEditor;
         if (!active) {
             throw new Error('Please open a source file in the editor first.');
@@ -155,12 +115,12 @@ export class ProblemManager {
     }
 
     private async getOrCreateBaseDir(payload?: CreateProblemPayload): Promise<string> {
-        let baseDir = payload?.baseDir || this.getContext().globalState.get<string>('oicode.lastProblemsBaseDir');
+        let baseDir = payload?.baseDir || this.configManager.getGlobalState<string>('oicode.lastProblemsBaseDir') || '';
         if (baseDir) {
             try {
                 await fs.promises.access(baseDir);
             } catch {
-                baseDir = undefined;
+                baseDir = '';
             }
         }
         if (!baseDir) {
@@ -175,7 +135,7 @@ export class ProblemManager {
             }
             baseDir = pick[0].fsPath;
         }
-        this.getContext().globalState.update('oicode.lastProblemsBaseDir', baseDir);
+        await this.configManager.updateGlobalState('oicode.lastProblemsBaseDir', baseDir);
         return baseDir;
     }
 
@@ -238,8 +198,6 @@ export class ProblemManager {
     }
 
     public async createProblem(payload?: CreateProblemPayload): Promise<CreateProblemResult | undefined> {
-        this.getContext();
-
         try {
             const safeName = await this.getProblemName(payload);
             const baseDir = await this.getOrCreateBaseDir(payload);
@@ -253,14 +211,12 @@ export class ProblemManager {
             return { problemDir, sourcePath };
         } catch (e: unknown) {
             const errorMessage = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage(`Failed to create problem：${errorMessage}`);
+            this.handleError(e, 'Failed to create problem');
             return { error: errorMessage };
         }
     }
 
     public async handleProblemViewMessage(m: ProblemViewMessage): Promise<LoadSamplesResult | null> {
-        this.getContext();
-
         if (m.cmd === 'loadSamples') {
             const uris = await vscode.window.showOpenDialog({
                 canSelectMany: false,
@@ -281,8 +237,7 @@ export class ProblemManager {
                     memoryLimit: m.memoryLimit
                 });
             } catch (e: unknown) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                vscode.window.showErrorMessage(errorMessage);
+                this.handleError(e, 'Problem execution error');
             }
         } else if (m.cmd === 'pair') {
             await vscode.commands.executeCommand('oicode.runPairCheck', m.samples || '', {
@@ -307,6 +262,9 @@ export class ProblemManager {
                     localResourceRoots: [context.extensionUri]
                 };
                 webviewView.webview.html = await this.getWebviewContent('problem.html');
+
+                // 使用统一的主题管理器
+                this.themeManager.setupThemeHandling(webviewView.webview);
 
                 webviewView.webview.onDidReceiveMessage(async (m: ProblemViewMessage) => {
                     const result = await this.handleProblemViewMessage(m);

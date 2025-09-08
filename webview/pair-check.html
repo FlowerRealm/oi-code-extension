@@ -479,7 +479,7 @@
 
             if (hasDiff) {
                 const diffedContent = highlightDifferences(content);
-                outputElement.innerHTML = diffedContent;
+                setSafeHtml(outputElement, diffedContent);
             } else {
                 outputElement.textContent = content;
             }

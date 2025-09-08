@@ -42,3 +42,115 @@ export async function getSuitableCompiler(
 
     return suitableCompilers[0];
 }
+
+/**
+ * Detect compilers with progress reporting
+ * @param context VS Code extension context
+ * @param title Progress title
+ * @param forceRescan Whether to force rescan
+ * @param deepScan Whether to perform deep scan
+ * @param successMessage Optional success message
+ */
+export async function detectCompilersWithProgress(
+    context: vscode.ExtensionContext,
+    title: string,
+    forceRescan: boolean = false,
+    _deepScan: boolean = false,
+    successMessage?: string
+): Promise<void> {
+    return await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title,
+            cancellable: false
+        },
+        async progress => {
+            progress.report({ increment: 0 });
+
+            const result = forceRescan
+                ? await NativeCompilerManager.forceRescanCompilers(context)
+                : await NativeCompilerManager.detectCompilers(context);
+
+            progress.report({ increment: 100 });
+
+            if (result.success && result.compilers.length > 0) {
+                const message = successMessage || 'Compiler detection complete!';
+                vscode.window.showInformationMessage(message);
+            } else {
+                vscode.window.showWarningMessage('No available compilers detected');
+            }
+        }
+    );
+}
+
+/**
+ * Setup compiler with language filter
+ * @param context VS Code extension context
+ * @param options Setup options
+ */
+export async function setupLanguageCompiler(context: vscode.ExtensionContext, language: 'c' | 'cpp'): Promise<void> {
+    const languageName = language === 'c' ? 'C' : 'C++';
+    const title = `选择${languageName}编译器`;
+    const placeholder = `检测到${languageName}编译器，请选择要使用的编译器`;
+
+    const languageFilter = (compiler: CompilerInfo) => {
+        const name = compiler.name.toLowerCase();
+        if (language === 'c') {
+            return (
+                (name.includes('gcc') && !name.includes('g++')) ||
+                (name.includes('clang') && !name.includes('clang++')) ||
+                (name.includes('cc') && !name.includes('g++'))
+            );
+        } else {
+            return name.includes('g++') || name.includes('clang++');
+        }
+    };
+
+    try {
+        const result = await NativeCompilerManager.detectCompilers(context);
+
+        if (result.success && result.compilers.length > 0) {
+            const compilers = result.compilers.filter(languageFilter);
+
+            if (compilers.length === 0) {
+                vscode.window.showWarningMessage(`No ${languageName} compilers found`);
+                return;
+            }
+
+            const compilerOptions = compilers.map(compiler => ({
+                label: `${compiler.name} ${compiler.version}`,
+                description: compiler.path,
+                detail: compiler === result.recommended ? '推荐编译器' : undefined,
+                compiler
+            }));
+
+            const selected = await vscode.window.showQuickPick(compilerOptions, {
+                title,
+                placeHolder: placeholder,
+                canPickMany: false
+            });
+
+            if (selected && selected.compiler) {
+                vscode.window.showInformationMessage(`已选择编译器: ${selected.label}`);
+            }
+        } else {
+            const choice = await vscode.window.showInformationMessage(
+                'No C/C++ compilers detected. Would you like to install LLVM?',
+                { modal: true },
+                'Install LLVM'
+            );
+
+            if (choice === 'Install LLVM') {
+                const installResult = await NativeCompilerManager.installLLVM();
+                if (installResult.success) {
+                    vscode.window.showInformationMessage(installResult.message);
+                } else {
+                    vscode.window.showErrorMessage(installResult.message);
+                }
+            }
+        }
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Compiler setup failed: ${errorMessage}`);
+    }
+}
