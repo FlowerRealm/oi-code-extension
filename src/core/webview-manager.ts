@@ -239,6 +239,7 @@ export class WebViewManager extends BaseManager {
 
                 case 'initialize':
                     console.log('初始化环境...');
+                    await this.saveInitializationSettings(message.settings);
                     setTimeout(() => {
                         panel.dispose();
                         UnifiedUtils.showInfo('环境初始化完成！');
@@ -258,6 +259,46 @@ export class WebViewManager extends BaseManager {
             UnifiedUtils.showError(
                 `WebView message handling failed: ${error instanceof Error ? error.message : String(error)}`
             );
+        }
+    }
+
+    private async saveInitializationSettings(settings: {
+        languages?: string[];
+        compilers?: Record<string, number>;
+        workspace?: string;
+        theme?: string;
+    }): Promise<void> {
+        if (!this.context) {
+            throw new Error('Context not initialized');
+        }
+
+        try {
+            const config = vscode.workspace.getConfiguration();
+
+            // 保存语言设置
+            if (settings.languages && Array.isArray(settings.languages)) {
+                await config.update('oicode.languages', settings.languages, vscode.ConfigurationTarget.Global);
+            }
+
+            // 保存编译器设置
+            if (settings.compilers && typeof settings.compilers === 'object') {
+                await config.update('oicode.compilers', settings.compilers, vscode.ConfigurationTarget.Global);
+            }
+
+            // 保存工作区设置
+            if (settings.workspace && settings.workspace !== '尚未选择工作区') {
+                await config.update('oicode.workspace', settings.workspace, vscode.ConfigurationTarget.Global);
+            }
+
+            // 保存主题设置
+            if (settings.theme) {
+                await config.update('oicode.theme', settings.theme, vscode.ConfigurationTarget.Global);
+            }
+
+            console.log('初始化设置已保存到 settings.json:', settings);
+        } catch (error) {
+            console.error('保存初始化设置失败:', error);
+            UnifiedUtils.showError(`保存初始化设置失败: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

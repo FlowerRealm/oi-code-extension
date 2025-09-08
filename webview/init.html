@@ -1150,7 +1150,18 @@
             document.querySelector('.navigation').classList.add('hidden');
             finalLoading.classList.remove('hidden');
             
-            vscode.postMessage({ command: 'initialize' });
+            // 收集所有设置并保存到settings.json
+            const settings = {
+                languages: selectedLanguages,
+                compilers: selectedCompilers,
+                workspace: workspacePath.textContent,
+                theme: document.documentElement.getAttribute('data-theme') || 'light'
+            };
+            
+            vscode.postMessage({ 
+                command: 'initialize',
+                settings: settings
+            });
         }
 
         prevBtn.addEventListener('click', () => {
