@@ -9,6 +9,8 @@ import { WebViewThemeManager } from '../utils/webview-theme-manager';
 import { UnifiedUtils } from '../utils/unified-utils';
 import { NativeCompilerManager } from '../native/manager/nativeCompilerManager';
 import { CompilerInfo } from '../types/types';
+import { ExtensionSettings } from '../utils/extension-settings';
+import { LLVMInstaller } from '../utils/llvm-installer';
 
 export class WebViewManager extends BaseManager {
     private static instance: WebViewManager;
@@ -245,7 +247,37 @@ export class WebViewManager extends BaseManager {
                         workspace?: string;
                         theme?: string;
                     };
+
+                    // 保存初始化设置
                     await this.saveInitializationSettings(settings);
+
+                    // 标记初始化完成
+                    if (this.context) {
+                        await ExtensionSettings.initialize(this.context);
+                        await ExtensionSettings.markInitialized();
+
+                        // 保存编译器和工作区设置到扩展设置
+                        if (settings.compilers) {
+                            if (settings.compilers.c) {
+                                await ExtensionSettings.setCompiler('c', String(settings.compilers.c));
+                            }
+                            if (settings.compilers.cpp) {
+                                await ExtensionSettings.setCompiler('cpp', String(settings.compilers.cpp));
+                            }
+                        }
+
+                        if (settings.workspace) {
+                            await ExtensionSettings.setWorkspace(settings.workspace);
+                        }
+
+                        // 保存语言偏好
+                        if (settings.languages) {
+                            await ExtensionSettings.updatePreferences({
+                                defaultLanguage: settings.languages.includes('cpp') ? 'cpp' : 'c'
+                            });
+                        }
+                    }
+
                     setTimeout(() => {
                         panel.dispose();
                         UnifiedUtils.showInfo('环境初始化完成！');
@@ -525,15 +557,34 @@ export class WebViewManager extends BaseManager {
     private async installCompiler(panel: vscode.WebviewPanel, type: string, _languages: string[]): Promise<void> {
         try {
             if (type === 'llvm') {
-                const installResult = await NativeCompilerManager.installLLVM();
+                // 初始化LLVM安装器
+                if (this.context) {
+                    LLVMInstaller.initialize(this.context);
+                }
 
-                if (installResult.success) {
+                // 使用新的LLVM安装器
+                const success = await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: '安装LLVM编译器',
+                        cancellable: true
+                    },
+                    async (progress, token) => {
+                        token.onCancellationRequested(() => {
+                            console.log('用户取消了LLVM安装');
+                        });
+
+                        return await LLVMInstaller.installLLVM(progress);
+                    }
+                );
+
+                if (success) {
                     postWebviewMessage(panel, 'compiler-install-complete', {
-                        message: installResult.message
+                        message: 'LLVM安装成功！请重新扫描编译器。'
                     });
                 } else {
                     postWebviewMessage(panel, 'compiler-install-error', {
-                        message: installResult.message
+                        message: 'LLVM安装失败，请检查网络连接或手动安装。'
                     });
                 }
             } else {

@@ -6,6 +6,7 @@ import { WebViewManager } from './webview-manager';
 import { NativeCompilerManager } from '../native';
 import { UnifiedConfigManager } from '../utils/unified-config-manager';
 import { UnifiedUtils } from '../utils/unified-utils';
+import { ExtensionSettings } from '../utils/extension-settings';
 import { CreateProblemPayload } from '../types/types';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -13,6 +14,9 @@ export async function activate(context: vscode.ExtensionContext) {
         async () => {
             console.log('OI-Code extension is now active!');
             console.log('Extension path:', context.extensionPath);
+
+            // 初始化扩展设置
+            await ExtensionSettings.initialize(context);
 
             await detectCompilers(context);
 
@@ -115,17 +119,21 @@ function registerCommands(context: vscode.ExtensionContext, managers: ExtensionM
 }
 
 async function setupInitialPages(context: vscode.ExtensionContext, configManager: UnifiedConfigManager): Promise<void> {
+    const isInitialized = ExtensionSettings.isInitialized();
     const hasLaunchedBefore = configManager.getGlobalState<boolean>('hasLaunchedBefore');
-    const initializationComplete = configManager.getGlobalState<boolean>('initializationComplete');
 
-    if (!hasLaunchedBefore) {
+    // 检查是否需要初始化
+    if (!isInitialized) {
+        // 显示初始化面板
         await vscode.commands.executeCommand('oi-code.showWelcomePage');
-        await configManager.updateGlobalState('hasLaunchedBefore', true);
+    } else {
+        // 已经初始化过，显示完成页面或其他适当的页面
+        await vscode.commands.executeCommand('oi-code.showCompletionPage');
     }
 
-    if (initializationComplete) {
-        await configManager.updateGlobalState('initializationComplete', false);
-        await vscode.commands.executeCommand('oi-code.showCompletionPage');
+    // 首次启动显示欢迎页面
+    if (!hasLaunchedBefore) {
+        await configManager.updateGlobalState('hasLaunchedBefore', true);
     }
 }
 

@@ -301,11 +301,17 @@
     "test:log": "npm test > test-output.log 2>&1",
     "prepare": "husky"
   },
+  "dependencies": {
+    "unzipper": "^0.10.14",
+    "tar": "^6.2.0"
+  },
   "devDependencies": {
     "@types/diff": "^5.0.9",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "16.x",
+    "@types/tar": "^6.1.12",
+    "@types/unzipper": "^0.10.8",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
     "@typescript-eslint/parser": "^6.4.1",
