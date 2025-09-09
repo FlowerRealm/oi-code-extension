@@ -980,8 +980,14 @@
                 const languages = getSelectedLanguages();
                 nextBtn.disabled = languages.length === 0;
             } else if (currentStep === 2) {
-                nextBtn.disabled = !hasSelectedCompilers();
+                // C编译器选择步骤
+                const cSelected = selectedCompilers['c'] !== undefined || !selectedLanguages.includes('c');
+                nextBtn.disabled = !cSelected;
             } else if (currentStep === 3) {
+                // C++编译器选择步骤
+                const cppSelected = selectedCompilers['cpp'] !== undefined || !selectedLanguages.includes('cpp');
+                nextBtn.disabled = !cppSelected;
+            } else if (currentStep === 4) {
                 nextBtn.disabled = workspacePath.textContent === '尚未选择工作区';
             } else {
                 nextBtn.disabled = false;
@@ -1286,8 +1292,7 @@
             // 更新UI
             const items = cAvailableCompilers.querySelectorAll(`.compiler-item`);
             items.forEach((item, index) => {
-                const itemIndex = parseInt(item.getAttribute('onclick').match(/selectCCompiler\(\s*(\d+)\s*\)/)[1]);
-                if (itemIndex === compilerIndex) {
+                if (index === compilerIndex) {
                     item.classList.add('selected');
                     item.querySelector('.compiler-radio').checked = true;
                 } else {
@@ -1305,8 +1310,7 @@
             // 更新UI
             const items = cppAvailableCompilers.querySelectorAll(`.compiler-item`);
             items.forEach((item, index) => {
-                const itemIndex = parseInt(item.getAttribute('onclick').match(/selectCppCompiler\(\s*(\d+)\s*\)/)[1]);
-                if (itemIndex === compilerIndex) {
+                if (index === compilerIndex) {
                     item.classList.add('selected');
                     item.querySelector('.compiler-radio').checked = true;
                 } else {
