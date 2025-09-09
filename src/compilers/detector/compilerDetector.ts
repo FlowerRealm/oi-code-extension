@@ -405,15 +405,6 @@ export class CompilerDetector {
                 realPath = compilerPath;
             }
 
-            // Check if we've already processed this real path
-            if (checkedRealPaths.has(realPath)) {
-                outputChannel.appendLine(
-                    `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
-                );
-                return null;
-            }
-            checkedRealPaths.add(realPath);
-
             // Get version information
             const result = await ProcessRunner.executeCommand(compilerPath, ['--version']);
             const versionOutput = result.stdout || result.stderr;
@@ -425,6 +416,25 @@ export class CompilerDetector {
             // Determine compiler type
             const type = this.determineCompilerType(compilerPath, versionOutput);
             const version = this.parseVersion(versionOutput);
+
+            // Check if we've already processed this real path
+            // Special case: allow clang and clang++ with same realpath but different types
+            if (checkedRealPaths.has(realPath)) {
+                const tempCompilerKey = `${type}-${version}`;
+
+                // Check if we already have this exact compiler type and version
+                if (checkedCompilerTypes.has(tempCompilerKey)) {
+                    outputChannel.appendLine(
+                        `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
+                    );
+                    return null;
+                }
+
+                outputChannel.appendLine(
+                    `[CompilerDetector] Allowing additional compiler type for same realpath: ${compilerPath} (${type})`
+                );
+            }
+            checkedRealPaths.add(realPath);
 
             // Create a unique key for this compiler type and version
             const compilerKey = `${type}-${version}`;
