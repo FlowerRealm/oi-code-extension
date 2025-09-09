@@ -383,8 +383,8 @@ export class CompilerDetector {
      */
     private static async testCompiler(
         compilerPath: string,
-        checkedRealPaths: Set<string> = new Set(),
-        checkedCompilerTypes: Map<string, { path: string; priority: number }> = new Map()
+        checkedRealPaths: Set<string>,
+        checkedCompilerTypes: Map<string, { path: string; priority: number }>
     ): Promise<CompilerInfo | null> {
         try {
             const outputChannel = this.getOutputChannel();
