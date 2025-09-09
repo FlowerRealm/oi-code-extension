@@ -459,7 +459,7 @@ export class WebViewManager extends BaseManager {
             // 执行真实的编译器检测
             this.reportScanProgress(panel, 50, '正在检测系统编译器...');
 
-            const detectionResult = await NativeCompilerManager.detectCompilers(this.context);
+            const detectionResult = await NativeCompilerManager.detectCompilers(this.context, true);
 
             this.reportScanProgress(panel, 80, '正在分析编译器信息...');
 
