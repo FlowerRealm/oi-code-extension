@@ -423,7 +423,7 @@ export class CompilerDetector {
                 const currentKey = `${type}-${version}`;
                 if (checkedCompilerTypes.has(currentKey)) {
                     outputChannel.appendLine(
-                        `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
+                        `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} (${type}) -> ${realPath}`
                     );
                     return null;
                 }
@@ -486,6 +486,13 @@ export class CompilerDetector {
                 `[CompilerDetector] Found compiler: ${name} (${type} ${version}) at ${compilerPath} ` +
                     `(real: ${realPath}, priority: ${priority})`
             );
+
+            // Add debug info for C vs C++ compilers
+            if (type === 'clang' || type === 'gcc') {
+                outputChannel.appendLine(`[CompilerDetector] *** C COMPILER DETECTED: ${name} ***`);
+            } else if (type === 'clang++' || type === 'g++') {
+                outputChannel.appendLine(`[CompilerDetector] *** C++ COMPILER DETECTED: ${name} ***`);
+            }
             return compilerInfo;
         } catch (error) {
             this.getOutputChannel().appendLine(`[CompilerDetector] Failed to test compiler ${compilerPath}: ${error}`);
