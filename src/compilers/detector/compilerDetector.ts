@@ -418,22 +418,54 @@ export class CompilerDetector {
             const version = this.parseVersion(versionOutput);
 
             // Check if we've already processed this real path
-            // Special case: allow different compiler names with same realpath
             if (checkedRealPaths.has(realPath)) {
-                // Allow different compiler names even with same realpath
-                // This handles cases where /bin/gcc and /usr/bin/gcc both point to the same real binary
-                const currentKey = `${type}-${version}`;
+                // If this is the same realpath but different compiler path,
+                // search for all symlinks to find the best one
+                const searchPaths = ['/bin', '/usr/bin', '/usr/local/bin', '/opt/homebrew/bin'];
+                const allSymlinks = await this.findAllSymlinks(realPath, searchPaths);
 
-                // If we already have the same compiler type and version, skip
-                if (checkedCompilerTypes.has(currentKey)) {
+                // Find the best compiler among all symlinks
+                let bestPath = compilerPath;
+                let bestPriority = this.calculatePriority(type, version, compilerPath);
+
+                for (const symlinkPath of allSymlinks) {
+                    if (symlinkPath === compilerPath) continue;
+
+                    try {
+                        const symlinkResult = await ProcessRunner.executeCommand(symlinkPath, ['--version']);
+                        const symlinkVersionOutput = symlinkResult.stdout || symlinkResult.stderr;
+
+                        if (symlinkVersionOutput) {
+                            const symlinkType = this.determineCompilerType(symlinkPath, symlinkVersionOutput);
+                            const symlinkVersion = this.parseVersion(symlinkVersionOutput);
+
+                            if (symlinkType === type && symlinkVersion === version) {
+                                const symlinkPriority = this.calculatePriority(
+                                    symlinkType,
+                                    symlinkVersion,
+                                    symlinkPath
+                                );
+                                if (symlinkPriority > bestPriority) {
+                                    bestPriority = symlinkPriority;
+                                    bestPath = symlinkPath;
+                                }
+                            }
+                        }
+                    } catch {
+                        // Ignore errors when testing symlinks
+                    }
+                }
+
+                // If current path is not the best, skip it
+                if (bestPath !== compilerPath) {
                     outputChannel.appendLine(
-                        `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
+                        `[CompilerDetector] Skipping ${compilerPath}, keeping better alternative: ${bestPath}`
                     );
                     return null;
                 }
 
                 outputChannel.appendLine(
-                    `[CompilerDetector] Allowing additional compiler: ${compilerPath} (${type}) -> ${realPath}`
+                    `[CompilerDetector] Keeping best compiler for realpath: ${compilerPath} -> ${realPath}`
                 );
             }
             checkedRealPaths.add(realPath);
@@ -589,6 +621,48 @@ export class CompilerDetector {
         }
 
         return compilers;
+    }
+
+    /**
+     * Find all symlinks pointing to the same realpath
+     */
+    private static async findAllSymlinks(realPath: string, searchPaths: string[]): Promise<string[]> {
+        const symlinks: string[] = [];
+        const outputChannel = this.getOutputChannel();
+
+        outputChannel.appendLine(`[CompilerDetector] Searching for symlinks to: ${realPath}`);
+
+        // Common compiler names to search for
+        const compilerNames = ['gcc', 'g++', 'clang', 'clang++', 'cc', 'c++'];
+
+        for (const searchPath of searchPaths) {
+            try {
+                await fs.access(searchPath, fs.constants.F_OK);
+
+                for (const compilerName of compilerNames) {
+                    const potentialPath = path.join(searchPath, compilerName);
+
+                    try {
+                        await fs.access(potentialPath, fs.constants.F_OK | fs.constants.X_OK);
+
+                        // Check if this path is a symlink to our target
+                        const symlinkRealPath = await fs.realpath(potentialPath);
+                        if (symlinkRealPath === realPath) {
+                            symlinks.push(potentialPath);
+                            outputChannel.appendLine(
+                                `[CompilerDetector] Found symlink: ${potentialPath} -> ${realPath}`
+                            );
+                        }
+                    } catch {
+                        // Path doesn't exist or isn't accessible, skip
+                    }
+                }
+            } catch {
+                // Search path doesn't exist, skip
+            }
+        }
+
+        return symlinks;
     }
 
     /**
