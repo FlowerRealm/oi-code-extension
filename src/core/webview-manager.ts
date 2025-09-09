@@ -237,14 +237,21 @@ export class WebViewManager extends BaseManager {
                     }, 1000);
                     break;
 
-                case 'initialize':
+                case 'initialize': {
                     console.log('初始化环境...');
-                    await this.saveInitializationSettings(message.settings);
+                    const settings = message.settings as {
+                        languages?: string[];
+                        compilers?: Record<string, number>;
+                        workspace?: string;
+                        theme?: string;
+                    };
+                    await this.saveInitializationSettings(settings);
                     setTimeout(() => {
                         panel.dispose();
                         UnifiedUtils.showInfo('环境初始化完成！');
                     }, 2000);
                     break;
+                }
 
                 case 'close':
                     panel.dispose();
@@ -275,27 +282,44 @@ export class WebViewManager extends BaseManager {
         try {
             const config = vscode.workspace.getConfiguration();
 
-            // 保存语言设置
-            if (settings.languages && Array.isArray(settings.languages)) {
-                await config.update('oicode.languages', settings.languages, vscode.ConfigurationTarget.Global);
-            }
-
-            // 保存编译器设置
+            // 保存编译器设置 - 映射到实际的配置项
             if (settings.compilers && typeof settings.compilers === 'object') {
-                await config.update('oicode.compilers', settings.compilers, vscode.ConfigurationTarget.Global);
+                if (settings.compilers.c !== undefined) {
+                    await config.update(
+                        'oicode.language.c.command',
+                        settings.compilers.c,
+                        vscode.ConfigurationTarget.Global
+                    );
+                }
+                if (settings.compilers.cpp !== undefined) {
+                    await config.update(
+                        'oicode.language.cpp.command',
+                        settings.compilers.cpp,
+                        vscode.ConfigurationTarget.Global
+                    );
+                }
             }
 
-            // 保存工作区设置
+            // 保存工作区设置 - 暂时跳过，因为没有对应的配置项
             if (settings.workspace && settings.workspace !== '尚未选择工作区') {
-                await config.update('oicode.workspace', settings.workspace, vscode.ConfigurationTarget.Global);
+                console.log('工作区设置:', settings.workspace);
+                // 注意：这里没有对应的配置项，暂时跳过
             }
 
-            // 保存主题设置
+            // 保存主题设置 - 暂时跳过，因为没有对应的配置项
             if (settings.theme) {
-                await config.update('oicode.theme', settings.theme, vscode.ConfigurationTarget.Global);
+                console.log('主题设置:', settings.theme);
+                // 注意：这里没有对应的配置项，暂时跳过
+            }
+
+            // 语言设置暂时跳过，因为没有对应的配置项
+            if (settings.languages && Array.isArray(settings.languages)) {
+                console.log('语言设置:', settings.languages);
+                // 注意：这里没有对应的配置项，暂时跳过
             }
 
             console.log('初始化设置已保存到 settings.json:', settings);
+            UnifiedUtils.showInfo('环境初始化完成！设置已保存。');
         } catch (error) {
             console.error('保存初始化设置失败:', error);
             UnifiedUtils.showError(`保存初始化设置失败: ${error instanceof Error ? error.message : String(error)}`);

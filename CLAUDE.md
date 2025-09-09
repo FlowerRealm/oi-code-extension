@@ -1,142 +1,154 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 在此代码库中工作时提供指导。
 
-## Development Commands
+## 开发命令
 
-### Build and Development
+### 构建和开发
 ```bash
-npm run compile          # Build in development mode
-npm run watch           # Watch mode for development
-npm run package         # Production build
-npm run lint            # Run ESLint
-npm test                # Run all tests
-npm run test:log       # Run tests with output logging
+npm run compile          # 开发模式构建
+npm run watch           # 开发监视模式
+npm run package         # 生产构建
+npm run lint            # 运行 ESLint
+npm test                # 运行所有测试
+npm run test:log       # 运行测试并输出日志
 ```
 
-### Testing
+### 测试
 ```bash
-npm test                # Full test suite
-npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js  # Manual test execution
+npm test                # 完整测试套件
+npm run compile && tsc -p ./src/test/tsconfig.json && node ./out/test/runTest.js  # 手动执行测试
 ```
 
-## Architecture Overview
+## 架构概览
 
-### Core Components
+### 核心组件
 
-**NativeCompilerManager** (`src/native/manager/nativeCompilerManager.ts`): Central native compiler operations hub
-- Manages compiler detection, prioritization, and execution
-- Handles secure compilation with resource limits and timeout enforcement
-- Implements automatic LLVM installation when no compilers are available
-- Supports C/C++ compilation and execution with system compilers
-- Fixed critical exit code handling bug (prevents `0 || -1` issue)
+**NativeCompilerManager** (`src/native/manager/nativeCompilerManager.ts`): 原生编译器操作中心
+- 管理编译器检测、优先级排序和执行
+- 处理安全编译，包含资源限制和超时强制
+- 在没有可用编译器时实现自动LLVM安装
+- 支持使用系统编译器进行C/C++编译和执行
+- 修复了关键的退出码处理bug（防止 `0 || -1` 问题）
 
-**Compiler Detection Architecture** (`src/compilers/detector/compilerDetector.ts`):
-- System-wide PATH scanning for available compilers
-- Platform-specific detection (Windows: MSVC/MinGW/LLVM, macOS: Xcode/LLVM, Linux: GCC/LLVM)
-- Intelligent compiler prioritization based on version and type
-- Fallback mechanisms when preferred compilers are unavailable
-- Automatic permission handling for executable binaries
+**编译器检测架构** (`src/compilers/detector/compilerDetector.ts`):
+- 系统级PATH扫描可用编译器
+- 平台特定检测（Windows: MSVC/MinGW/LLVM, macOS: Xcode/LLVM, Linux: GCC/LLVM）
+- 基于版本和类型的智能编译器优先级排序
+- 首选编译器不可用时的回退机制
+- 可执行二进制文件的自动权限处理
 
-**WebView Integration** (`src/core/webview-manager.ts` and `src/utils/webview-utils.ts`):
-- Multiple HTML panels for problem management, settings, and pair checking
-- Uses `postWebviewMessage()` for communication with extension
-- Theme-aware rendering (dark/light support)
-- Rich diff visualization for pair check results
-- Centralized HTML content loading utilities
-- **Security**: XSS-safe HTML content handling with `escapeHtml()` and `setSafeHtml()` functions
+**WebView集成** (`src/core/webview-manager.ts` 和 `src/utils/webview-utils.ts`):
+- 题目管理、设置和对拍的多个HTML面板
+- 使用 `postWebviewMessage()` 与扩展通信
+- 主题感知渲染（深色/浅色支持）
+- 对拍结果的丰富diff可视化
+- 集中化HTML内容加载工具
+- **安全**: 使用 `escapeHtml()` 和 `setSafeHtml()` 函数进行XSS安全的HTML内容处理
 
-**Compiler Utilities** (`src/utils/compiler-utils.ts`):
-- Centralized compiler selection logic to avoid circular dependencies
-- Safe compiler detection with automatic fallback and error handling
-- Modular architecture for better maintainability
-- Backward compatibility through re-exports from main extension entry point
+**编译器工具** (`src/utils/compiler-utils.ts`):
+- 集中化编译器选择逻辑，避免循环依赖
+- 安全的编译器检测，带有自动回退和错误处理
+- 模块化架构，提高可维护性
+- 通过主扩展入口点的重新导出保持向后兼容性
 
-### Extension Entry Point
+### 扩展入口点
 
-**Main Extension** (`src/core/extension.ts`):
-- **Async activation**: Uses `export async function activate()` for proper Promise handling
-- Central activation point with comprehensive error handling
-- Commands: `oicode.createProblem`, `oicode.runCode`, `oicode.startPairCheck`, `oicode.setupCompiler`
-- WebView panels for problem view and pair check view
-- Integration with VS Code activity bar and panel containers
-- Secure input handling and HTML escaping
-- Automatic compiler detection on extension activation with proper await handling
-- Backward compatibility through `src/extension.ts` re-exports
-- **Type Safety**: Strict TypeScript typing with `unknown` instead of `any` for error handling
+**主扩展** (`src/core/extension.ts`):
+- **异步激活**: 使用 `export async function activate()` 进行正确的Promise处理
+- 集中激活点，包含全面的错误处理
+- 命令: `oicode.createProblem`, `oicode.runCode`, `oicode.startPairCheck`, `oicode.setupCompiler`, `oicode.initializeEnvironment`, `oicode.rescanCompilers`, `oicode.deepScanCompilers`
+- 题目视图和对拍视图的WebView面板
+- 与VS Code活动栏和面板容器的集成
+- 安全输入处理和HTML转义
+- 扩展激活时的自动编译器检测，带有正确的await处理
+- 通过 `src/extension.ts` 重新导出保持向后兼容性
+- **类型安全**: 严格的TypeScript类型检查，错误处理使用 `unknown` 而非 `any`
 
-### Native Compiler Integration
+### 原生编译器集成
 
-**Compiler Detection** (`src/compilers/detector/compilerDetector.ts`):
-- Cross-platform compiler discovery (Windows, macOS, Linux)
-- Support for multiple compiler types: Clang, GCC, MSVC, Apple Clang
-- Version parsing and compiler capability assessment
-- Automatic fallback to system package managers for installation
+**编译器检测** (`src/compilers/detector/compilerDetector.ts`):
+- 跨平台编译器发现（Windows、macOS、Linux）
+- 支持多种编译器类型：Clang、GCC、MSVC、Apple Clang
+- 版本解析和编译器能力评估
+- 自动回退到系统包管理器进行安装
 
-**Automatic Installation**:
-- One-click LLVM installation when no compilers detected
-- Platform-specific installation methods (Homebrew, apt, dnf, pacman, Windows installer)
-- Progress tracking and user feedback during installation
-- Post-installation validation and configuration
+**自动安装**:
+- 检测不到编译器时一键安装LLVM
+- 平台特定安装方法（Homebrew、apt、dnf、pacman、Windows安装程序）
+- 安装过程中的进度跟踪和用户反馈
+- 安装后验证和配置
 
-### Configuration System
+### 配置系统
 
-**Settings**:
-- `oicode.compile.opt`: Optimization level (O0-O3)
-- `oicode.compile.std`: C++ standard (c++17/c++14/c++11/c11/c99)
+**设置**:
+- `oicode.compile.opt`: 优化等级 (O0-O3)
+- `oicode.compile.std`: C++标准 (c++17/c++14/c++11/c11/c99)
+- `oicode.compile.autoDowngradeClang20`: 自动降级Clang 20+的C++17到C++14
+- `oicode.compile.disableStackProtector`: 在Windows上禁用堆栈保护器
+- `oicode.run.timeLimit`: 程序执行时间限制（秒）
+- `oicode.run.memoryLimit`: 程序执行内存限制（MB）
+- `oicode.debug.*`: 各种调试和sanitizer选项
 
-**Constants** (`src/constants/constants.ts`):
-- Test directory: `~/.oi-code-tests/tmp`
-- Problem management base paths
+**常量** (`src/constants/constants.ts`):
+- 测试目录: `~/.oi-code-tests/tmp`
+- 题目管理基础路径
 
-### Test Architecture
+### 测试架构
 
-**Test Suite** (`src/test/suite/`):
-- Mocha-based testing with VS Code API integration
-- Strict validation tests with actual compilation/execution verification
-- Helper functions for problem creation and testing
-- Test problems stored in `~/.oi-code-tests/problems-ut`
-- Comprehensive error handling and timeout detection tests
+**测试套件** (`src/test/suite/`):
+- 基于Mocha的测试，集成VS Code API
+- 严格验证测试，包含实际编译/执行验证
+- 题目创建和测试的辅助函数
+- 测试题目存储在 `~/.oi-code-tests/problems-ut`
+- 全面的错误处理和超时检测测试
 
-## Key Features
+## 关键功能
 
-### Pair Check System
-- Compares two implementations (brute force vs optimized)
-- Side-by-side output with highlighted differences
-- Input injection and result validation
-- Catalan number sequence validation for algorithmic correctness
+### 对拍系统
+- 比较两个实现（暴力算法 vs 优化算法）
+- 并排输出，高亮显示差异
+- 输入注入和结果验证
+- 卡塔兰数序列验证算法正确性
 
-### Problem Management
-- Structured problem directories with metadata
-- Language-specific template generation
-- WebView-based problem description editor
+### 题目管理
+- 结构化题目目录，包含元数据
+- 语言特定模板生成
+- 基于WebView的题目描述编辑器
 
-### Security and Performance
-- **XSS Prevention**: WebView content sanitized using `escapeHtml()` and `setSafeHtml()` functions
-- **Type Safety**: Strict TypeScript typing with `unknown` and `Record<string, unknown>` instead of `any`
-- **Error Handling**: Comprehensive error handling with proper type checking using `instanceof Error`
-- Native process execution with proper resource limits
-- Time and memory constraints enforcement
-- Secure input sanitization to prevent injection
-- Temporary file cleanup and sandboxing
-- 3-5x performance improvement over traditional solutions
+### 安全和性能
+- **XSS防护**: WebView内容使用 `escapeHtml()` 和 `setSafeHtml()` 函数进行清理
+- **类型安全**: 严格的TypeScript类型检查，使用 `unknown` 和 `Record<string, unknown>` 替代 `any`
+- **错误处理**: 全面的错误处理，使用 `instanceof Error` 进行正确的类型检查
+- 带有适当资源限制的原生进程执行
+- 时间和内存约束强制
+- 安全输入清理，防止注入
+- 临时文件清理和沙箱化
+- 比传统解决方案性能提升3-5倍
 
-## Build System
+## 构建系统
 
-**Webpack Configuration** (`webpack.config.js`):
-- CommonJS2 library target for VS Code extension
-- Copies WebView HTML files to output
-- Source maps for debugging
-- Excludes vscode module from bundling
+**Webpack配置** (`webpack.config.js`):
+- VS Code扩展的CommonJS2库目标
+- 将WebView HTML文件复制到输出
+- 调试源映射
+- 从打包中排除vscode模块
 
 **TypeScript** (`tsconfig.json`):
-- ES6 target with CommonJS modules
-- Strict type checking enabled
-- OutDir: `/out`
+- ES6目标，CommonJS模块
+- 启用严格类型检查
+- 输出目录: `/out`
 
-## Development Workflow and Best Practices
+**包脚本**:
+- `npm test`: 运行包含编译的全面测试套件
+- `npm run lint`: ESLint代码检查，集成prettier
+- `npm run compile`: 使用webpack进行开发构建
+- `npm run package`: 生产构建，隐藏源映射
+- `npm run watch`: 开发监视模式，支持实时编码
 
-### Git Workflow
+## 开发工作流程和最佳实践
+
+### Git工作流程
 ```bash
 # 开发工作流程
 npm test                    # 始终先运行测试确保功能正常
@@ -151,11 +163,11 @@ git push origin <branch-name>  # 🔄 立即推送到远程仓库
 ### 代码质量检查清单
 - [ ] 运行 `npm test` - 确保所有测试通过
 - [ ] 运行 `npm run lint` - 确保代码符合规范（无错误，警告数量可控）
-- [ ] 检查 TypeScript 编译错误
+- [ ] 检查TypeScript编译错误
 - [ ] 验证功能完整性
-- [ ] **安全检查**: WebView 内容使用安全的 HTML 处理函数
+- [ ] **安全检查**: WebView内容使用安全的HTML处理函数
 - [ ] **类型检查**: 避免使用 `any` 类型，优先使用 `unknown` 或具体类型
-- [ ] **Promise 处理**: 使用 async/await 而非 "fire-and-forget" 模式
+- [ ] **Promise处理**: 使用 async/await 而非 "fire-and-forget" 模式
 - [ ] **循环依赖**: 确保模块间没有循环导入
 - [ ] 提交信息清晰描述更改内容
 
@@ -165,114 +177,51 @@ git push origin <branch-name>  # 🔄 立即推送到远程仓库
 - 保持代码整洁和一致性
 - 添加适当的注释和文档
 
-## Recent Improvements (2025-09-07)
+## 重要开发说明
 
-### 🔒 Critical Security and Architecture Fixes
+- **原生系统编译器**: 此扩展现在使用原生系统编译器
+- **编译器依赖**: 需要C/C++编译器（LLVM/GCC），但缺失时会自动安装
+- **跨平台**: 扩展在Windows、macOS和Linux上工作，具有适当的编译器支持
+- **性能**: 原生编译提供显著的性能优势
+- **测试**: 提交前始终运行 `npm test` 确保所有功能正常工作
+- **退出码处理**: 处理进程退出码时小心JavaScript假值
+- **使用中文**: 请在开发期间用中文与我交流。
+- **当前分支**: 正在 `refactor/ui-rewrite` 分支上进行UI和架构改进。
 
-#### **High Priority Security Vulnerability Fixes**
-1. **XSS Security Vulnerability**: Fixed critical client-side XSS in WebView HTML content
-   - **Location**: `webview/pair-check.html:82-83` (CodeQL identified)
-   - **Issue**: Direct `innerHTML` assignment without sanitization
-   - **Fix**: Implemented `escapeHtml()` and `setSafeHtml()` functions
-   - **Impact**: Prevents malicious code execution in WebView panels
+### 🔒 安全要求
+- **WebView安全**: 所有HTML内容必须使用 `escapeHtml()` 和 `setSafeHtml()` 函数进行清理
+- **XSS防护**: 切勿对用户提供的内容使用直接 `innerHTML` 赋值
+- **类型安全**: 错误处理使用 `unknown` 而非 `any`，并进行适当的 `instanceof` 检查
 
-2. **Promise Handling Issue**: Fixed unhandled Promise in extension activation
-   - **Location**: `src/core/extension.ts:13-26`
-   - **Issue**: "Fire-and-forget" Promise pattern
-   - **Fix**: Converted to async/await with proper error handling
-   - **Impact**: Prevents silent failures during extension startup
+### 🏗️ 架构指导原则
+- **模块依赖**: 通过为共享函数创建工具模块避免循环依赖
+- **Promise处理**: 使用async/await模式而非 "fire-and-forget" Promise
+- **代码重复消除**: 将通用功能提取到可重用的辅助函数中
+- **错误处理**: 实现具有类型安全模式的全面错误处理
 
-#### **Code Quality Improvements**
-3. **Code Deduplication**: Refactored WebViewManager
-   - **Location**: `src/core/webview-manager.ts:49-112`
-   - **Issue**: Duplicate panel creation logic in three methods
-   - **Fix**: Extracted `createWebviewPanel()` helper function
-   - **Impact**: Reduced code duplication from 60+ lines to 15 lines
+## 常见问题和解决方案
 
-4. **Circular Dependency Resolution**: Fixed module import cycles
-   - **Issue**: getSuitableCompiler creating circular dependency between commands.ts and extension.ts
-   - **Fix**: Created dedicated `src/utils/compiler-utils.ts` module
-   - **Impact**: Improved architecture and maintainability
+### 编译器检测问题
+- 运行 `oicode.setupCompiler` 手动触发编译器检测
+- 检查系统PATH并确保编译器正确安装
+- 在Windows上，确保LLVM/MinGW在PATH中或通过Visual Studio安装
 
-5. **Type Safety Enhancement**: Replaced `any` types with specific types
-   - **Files**: `src/core/commands.ts`, `src/native/manager/nativeCompilerManager.ts`, `src/utils/webview-utils.ts`
-   - **Fix**: `any` → `unknown` and `Record<string, unknown>`
-   - **Impact**: Better TypeScript type safety and error handling
+### 测试失败
+- 验证系统上有可用的C/C++编译器
+- 检查编译器可执行文件是否具有适当权限
+- 查看测试输出以了解特定的编译或执行错误
 
-#### **Previous Improvements (2025-09-06)**
-6. **Clang 20+ Compatibility**: Added configurable auto-downgrade from C++17 to C++14
-   - New setting: `oicode.compile.autoDowngradeClang20` (default: true)
-   - User can disable via settings if needed
+### 性能优化
+- 原生编译已经优化，但确保系统有足够资源
+- 编译器缓存和进程管理自动处理
+- 大输出仍可能导致输出面板性能问题
 
-7. **Windows Memory Limit Enhancement**: 
-   - Replaced wmic with PowerShell for better reliability
-   - Implemented adaptive polling (checks more frequently near limits)
-   - Reduced check interval from 200ms to 100ms
-   - Added timeout protection for memory check commands
-
-8. **WebView API Compliance**: Fixed `resolveWebviewView` method signatures
-   - Added missing `_context` and `_token` parameters
-   - Ensures compatibility with VS Code API contract
-
-9. **Test Infrastructure**: Optimized `normalizeOutput` function
-   - Fixed operation order: replace line endings first, then trim
-   - Ensures proper output comparison
-
-10. **Code Architecture**: Refactored compiler workaround logic
-    - Extracted `applyCompilerWorkarounds` helper function
-    - Improved maintainability and extensibility
-    - Better separation of concerns
-
-11. **System Compatibility**: Increased command timeout
-    - Extended `executeCommand` timeout from 10s to 30s
-    - Better reliability on slow systems or under heavy load
-
-12. **Documentation**: Enhanced Windows Job Objects TODO
-    - Detailed current implementation limitations
-    - Specific implementation guidance and required APIs
-    - Clear benefits of native OS-level enforcement
-
-## Important Development Notes
-
-- **Native System Compilers**: This extension now uses native system compilers
-- **Compiler Dependencies**: C/C++ compilers (LLVM/GCC) are required but automatically installed if missing
-- **Cross-Platform**: The extension works on Windows, macOS, and Linux with appropriate compiler support
-- **Performance**: Native compilation provides significant performance benefits
-- **Testing**: Always run `npm test` before committing to ensure all functionality works correctly
-- **Exit Code Handling**: Be careful with JavaScript falsy values when handling process exit codes
-- **Use Chinese**: Please communicate with me in Chinese during development.
-
-### 🔒 Security Requirements
-- **WebView Safety**: All HTML content must be sanitized using `escapeHtml()` and `setSafeHtml()` functions
-- **XSS Prevention**: Never use direct `innerHTML` assignment with user-provided content
-- **Type Safety**: Use `unknown` instead of `any` for error handling, with proper `instanceof` checks
-
-### 🏗️ Architecture Guidelines
-- **Module Dependencies**: Avoid circular dependencies by creating utility modules for shared functions
-- **Promise Handling**: Use async/await pattern instead of "fire-and-forget" Promises
-- **Code Deduplication**: Extract common functionality into reusable helper functions
-- **Error Handling**: Implement comprehensive error handling with type-safe patterns
-
-## Common Issues and Solutions
-
-### Compiler Detection Issues
-- Run `oicode.setupCompiler` to manually trigger compiler detection
-- Check system PATH and ensure compilers are properly installed
-- On Windows, ensure LLVM/MinGW is in PATH or installed via Visual Studio
-
-### Test Failures
-- Verify C/C++ compilers are available on the system
-- Check that compiler executables have proper permissions
-- Review test output for specific compilation or execution errors
-
-### Performance Optimization
-- Native compilation is already optimized, but ensure system has sufficient resources
-- Compiler caching and process management are handled automatically
-- Large outputs may still cause performance issues in the output panel
-
-### 🔧 Security Best Practices
-- **WebView Content**: Always use `setSafeHtml()` instead of direct `innerHTML` assignment
-- **Error Handling**: Use `unknown` type with `instanceof Error` checks for better type safety
-- **Input Validation**: Sanitize all user inputs before processing or displaying
-- **Module Architecture**: Keep modules independent to avoid circular dependencies
-- **Async Patterns**: Prefer async/await over Promise chains for better error handling
+### 🔧 安全最佳实践
+- **WebView内容**: 始终使用 `setSafeHtml()` 而非直接 `innerHTML` 赋值
+- **错误处理**: 使用 `unknown` 类型和 `instanceof Error` 检查以获得更好的类型安全
+- **输入验证**: 处理或显示前清理所有用户输入
+- **模块架构**: 保持模块独立以避免循环依赖
+- **异步模式**: 优先使用async/await而非Promise链以获得更好的错误处理
+- 永远使用英文编写注释
+- 不允许跳过ESlint的检查, 遇到问题应该修复
+- 每添加一个vscode设置项时, 首先评估这是不是必要的, 如果这必要, 添加进你需要的代码, package.json, webview下的设置列表, 修正claude.md与其余文档

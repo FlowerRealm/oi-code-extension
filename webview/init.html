@@ -817,26 +817,26 @@
                     </div>
 
                     <div class="step-content" id="step-2">
-                        <h2>第三步：选择编译器</h2>
-                        <p>根据您选择的语言，我们为您找到了以下可用的编译器。请为每种语言选择一个编译器，或选择跳过稍后配置。</p>
+                        <h2>第三步：选择C语言编译器</h2>
+                        <p>我们为您找到了以下可用的C语言编译器。请选择一个，或选择跳过稍后配置。</p>
                         
-                        <div class="compiler-selection-section" id="compiler-selection-section">
-                            <div class="compiler-scan-status hidden" id="compiler-scan-status">
+                        <div class="compiler-selection-section" id="c-compiler-selection-section">
+                            <div class="compiler-scan-status hidden" id="c-compiler-scan-status">
                                 <div class="spinner"></div>
-                                <p>正在扫描编译器...</p>
+                                <p>正在扫描C语言编译器...</p>
                             </div>
                             
-                            <div class="compiler-selection-content hidden" id="compiler-selection-content">
-                                <h3>可用编译器</h3>
-                                <div class="compiler-list" id="available-compilers">
-                                    <!-- 编译器列表将在这里动态生成 -->
+                            <div class="compiler-selection-content hidden" id="c-compiler-selection-content">
+                                <h3>可用C语言编译器</h3>
+                                <div class="compiler-list" id="c-available-compilers">
+                                    <!-- C编译器列表将在这里动态生成 -->
                                 </div>
                                 
-                                <div class="compiler-no-compilers hidden" id="compiler-no-compilers">
-                                    <p>未找到适合的编译器</p>
+                                <div class="compiler-no-compilers hidden" id="c-compiler-no-compilers">
+                                    <p>未找到适合的C语言编译器</p>
                                     <div class="compiler-install-options">
-                                        <button class="btn" onclick="installCompiler('llvm')">安装 LLVM</button>
-                                        <button class="btn btn-secondary" onclick="skipCompilerSelection()">跳过</button>
+                                        <button class="btn" onclick="installCompiler('llvm', 'c')">安装 LLVM</button>
+                                        <button class="btn btn-secondary" onclick="skipCCompilerSelection()">跳过</button>
                                     </div>
                                 </div>
                             </div>
@@ -844,7 +844,34 @@
                     </div>
 
                     <div class="step-content" id="step-3">
-                        <h2>第四步：选择您的工作区</h2>
+                        <h2>第四步：选择C++语言编译器</h2>
+                        <p>我们为您找到了以下可用的C++语言编译器。请选择一个，或选择跳过稍后配置。</p>
+                        
+                        <div class="compiler-selection-section" id="cpp-compiler-selection-section">
+                            <div class="compiler-scan-status hidden" id="cpp-compiler-scan-status">
+                                <div class="spinner"></div>
+                                <p>正在扫描C++语言编译器...</p>
+                            </div>
+                            
+                            <div class="compiler-selection-content hidden" id="cpp-compiler-selection-content">
+                                <h3>可用C++语言编译器</h3>
+                                <div class="compiler-list" id="cpp-available-compilers">
+                                    <!-- C++编译器列表将在这里动态生成 -->
+                                </div>
+                                
+                                <div class="compiler-no-compilers hidden" id="cpp-compiler-no-compilers">
+                                    <p>未找到适合的C++语言编译器</p>
+                                    <div class="compiler-install-options">
+                                        <button class="btn" onclick="installCompiler('llvm', 'cpp')">安装 LLVM</button>
+                                        <button class="btn btn-secondary" onclick="skipCppCompilerSelection()">跳过</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-content" id="step-4">
+                        <h2>第五步：选择您的工作区</h2>
                         <p>选择一个文件夹作为您的编程工作区，所有项目文件将保存在此处</p>
                         
                         <div class="workspace-selector">
@@ -891,7 +918,7 @@
         }
         
         let currentStep = 0;
-        const totalSteps = 4;
+        const totalSteps = 5;
         
         const steps = document.querySelectorAll('.step');
         const stepContents = document.querySelectorAll('.step-content');
@@ -902,10 +929,23 @@
         const languageLoading = document.getElementById('language-loading');
         const workspacePath = document.getElementById('workspace-path');
         const finalLoading = document.getElementById('final-loading');
+        // 原有的编译器选择元素（保持向后兼容）
         const compilerScanStatus = document.getElementById('compiler-scan-status');
         const compilerSelectionContent = document.getElementById('compiler-selection-content');
         const availableCompilers = document.getElementById('available-compilers');
         const compilerNoCompilers = document.getElementById('compiler-no-compilers');
+        
+        // 新的分离式编译器选择元素
+        const cCompilerScanStatus = document.getElementById('c-compiler-scan-status');
+        const cCompilerSelectionContent = document.getElementById('c-compiler-selection-content');
+        const cAvailableCompilers = document.getElementById('c-available-compilers');
+        const cCompilerNoCompilers = document.getElementById('c-compiler-no-compilers');
+        
+        const cppCompilerScanStatus = document.getElementById('cpp-compiler-scan-status');
+        const cppCompilerSelectionContent = document.getElementById('cpp-compiler-selection-content');
+        const cppAvailableCompilers = document.getElementById('cpp-available-compilers');
+        const cppCompilerNoCompilers = document.getElementById('cpp-compiler-no-compilers');
+        
         let selectedLanguages = [];
         let selectedCompilers = {};
         let compilerScanResult = null;
@@ -978,7 +1018,16 @@
             } else if (currentStep === 1) {
                 configureLanguages();
             } else if (currentStep === 2) {
-                goToStep(currentStep + 1);
+                // 从C语言编译器选择到C++编译器选择
+                if (selectedLanguages.includes('cpp')) {
+                    goToStep(3);
+                    startCppCompilerScan();
+                } else {
+                    // 如果没有选择C++，直接跳到工作区选择
+                    goToStep(4);
+                }
+            } else if (currentStep === 3) {
+                goToStep(4);
             } else {
                 goToStep(currentStep + 1);
             }
@@ -987,9 +1036,17 @@
         function configureLanguages() {
             selectedLanguages = getSelectedLanguages();
             if (selectedLanguages.length > 0) {
-                // 直接进入编译器选择步骤，开始扫描
-                goToStep(2);
-                startCompilerScan();
+                // 根据选择的语言决定下一步
+                if (selectedLanguages.includes('c')) {
+                    goToStep(2);
+                    startCCompilerScan();
+                } else if (selectedLanguages.includes('cpp')) {
+                    goToStep(3);
+                    startCppCompilerScan();
+                } else {
+                    // 如果没有选择C或C++，直接跳到工作区选择
+                    goToStep(4);
+                }
             }
         }
 
@@ -1002,6 +1059,30 @@
             vscode.postMessage({
                 command: 'check-compilers',
                 languages: selectedLanguages
+            });
+        }
+        
+        function startCCompilerScan() {
+            // 显示扫描状态
+            cCompilerScanStatus.classList.remove('hidden');
+            cCompilerSelectionContent.classList.add('hidden');
+            
+            // 发送C编译器检查请求
+            vscode.postMessage({
+                command: 'check-compilers',
+                languages: ['c']
+            });
+        }
+        
+        function startCppCompilerScan() {
+            // 显示扫描状态
+            cppCompilerScanStatus.classList.remove('hidden');
+            cppCompilerSelectionContent.classList.add('hidden');
+            
+            // 发送C++编译器检查请求
+            vscode.postMessage({
+                command: 'check-compilers',
+                languages: ['cpp']
             });
         }
 
@@ -1069,6 +1150,94 @@
             
             updateStepUI();
         }
+        
+        function showCCompilerSelectionResult(result) {
+            compilerScanResult = result;
+            
+            // 隐藏扫描状态，显示选择界面
+            cCompilerScanStatus.classList.add('hidden');
+            cCompilerSelectionContent.classList.remove('hidden');
+            
+            const cCompilers = result.compilers.filter(compiler => {
+                const name = compiler.name.toLowerCase();
+                return (name.includes('gcc') && !name.includes('g++')) ||
+                       (name.includes('clang') && !name.includes('clang++')) ||
+                       (name.includes('cc') && !name.includes('g++'));
+            });
+            
+            if (cCompilers.length === 0) {
+                // 没有找到C编译器，显示安装选项
+                cAvailableCompilers.classList.add('hidden');
+                cCompilerNoCompilers.classList.remove('hidden');
+            } else {
+                // 找到编译器，显示选择列表
+                cAvailableCompilers.classList.remove('hidden');
+                cCompilerNoCompilers.classList.add('hidden');
+                
+                // 生成C编译器选择HTML
+                let html = '';
+                cCompilers.forEach((compiler, index) => {
+                    const isSelected = selectedCompilers['c'] === index;
+                    html += `
+                        <div class="compiler-item ${isSelected ? 'selected' : ''}" onclick="selectCCompiler(${index})">
+                            <div class="compiler-info">
+                                <div class="compiler-name">${escapeHtml(compiler.name)}</div>
+                                <div class="compiler-version">版本: ${escapeHtml(compiler.version)}</div>
+                                <div class="compiler-path">${escapeHtml(compiler.path)}</div>
+                            </div>
+                            <input type="radio" name="compiler-c" class="compiler-radio" ${isSelected ? 'checked' : ''}>
+                        </div>
+                    `;
+                });
+                
+                cAvailableCompilers.innerHTML = html;
+            }
+            
+            updateStepUI();
+        }
+        
+        function showCppCompilerSelectionResult(result) {
+            compilerScanResult = result;
+            
+            // 隐藏扫描状态，显示选择界面
+            cppCompilerScanStatus.classList.add('hidden');
+            cppCompilerSelectionContent.classList.remove('hidden');
+            
+            const cppCompilers = result.compilers.filter(compiler => {
+                const name = compiler.name.toLowerCase();
+                return name.includes('g++') || name.includes('clang++') || name.includes('cpp');
+            });
+            
+            if (cppCompilers.length === 0) {
+                // 没有找到C++编译器，显示安装选项
+                cppAvailableCompilers.classList.add('hidden');
+                cppCompilerNoCompilers.classList.remove('hidden');
+            } else {
+                // 找到编译器，显示选择列表
+                cppAvailableCompilers.classList.remove('hidden');
+                cppCompilerNoCompilers.classList.add('hidden');
+                
+                // 生成C++编译器选择HTML
+                let html = '';
+                cppCompilers.forEach((compiler, index) => {
+                    const isSelected = selectedCompilers['cpp'] === index;
+                    html += `
+                        <div class="compiler-item ${isSelected ? 'selected' : ''}" onclick="selectCppCompiler(${index})">
+                            <div class="compiler-info">
+                                <div class="compiler-name">${escapeHtml(compiler.name)}</div>
+                                <div class="compiler-version">版本: ${escapeHtml(compiler.version)}</div>
+                                <div class="compiler-path">${escapeHtml(compiler.path)}</div>
+                            </div>
+                            <input type="radio" name="compiler-cpp" class="compiler-radio" ${isSelected ? 'checked' : ''}>
+                        </div>
+                    `;
+                });
+                
+                cppAvailableCompilers.innerHTML = html;
+            }
+            
+            updateStepUI();
+        }
 
         function groupCompilersByLanguage(compilers) {
             const grouped = { c: [], cpp: [] };
@@ -1110,23 +1279,85 @@
             
             updateStepUI();
         }
+        
+        function selectCCompiler(compilerIndex) {
+            selectedCompilers['c'] = compilerIndex;
+            
+            // 更新UI
+            const items = cAvailableCompilers.querySelectorAll(`.compiler-item`);
+            items.forEach((item, index) => {
+                const itemIndex = parseInt(item.getAttribute('onclick').match(/selectCCompiler\(\s*(\d+)\s*\)/)[1]);
+                if (itemIndex === compilerIndex) {
+                    item.classList.add('selected');
+                    item.querySelector('.compiler-radio').checked = true;
+                } else {
+                    item.classList.remove('selected');
+                    item.querySelector('.compiler-radio').checked = false;
+                }
+            });
+            
+            updateStepUI();
+        }
+        
+        function selectCppCompiler(compilerIndex) {
+            selectedCompilers['cpp'] = compilerIndex;
+            
+            // 更新UI
+            const items = cppAvailableCompilers.querySelectorAll(`.compiler-item`);
+            items.forEach((item, index) => {
+                const itemIndex = parseInt(item.getAttribute('onclick').match(/selectCppCompiler\(\s*(\d+)\s*\)/)[1]);
+                if (itemIndex === compilerIndex) {
+                    item.classList.add('selected');
+                    item.querySelector('.compiler-radio').checked = true;
+                } else {
+                    item.classList.remove('selected');
+                    item.querySelector('.compiler-radio').checked = false;
+                }
+            });
+            
+            updateStepUI();
+        }
 
         function skipCompilerSelection() {
             // 清空选择，允许跳过
             selectedCompilers = {};
             updateStepUI();
         }
+        
+        function skipCCompilerSelection() {
+            // 清空C编译器选择，允许跳过
+            delete selectedCompilers['c'];
+            updateStepUI();
+        }
+        
+        function skipCppCompilerSelection() {
+            // 清空C++编译器选择，允许跳过
+            delete selectedCompilers['cpp'];
+            updateStepUI();
+        }
 
-        function installCompiler(type) {
-            compilerNoCompilers.innerHTML = `
-                <div class="spinner"></div>
-                <p>正在安装 ${escapeHtml(type)} 编译器...</p>
-            `;
+      function installCompiler(type, language = null) {
+            if (language === 'c') {
+                cCompilerNoCompilers.innerHTML = `
+                    <div class="spinner"></div>
+                    <p>正在安装 ${type} 编译器...</p>
+                `;
+            } else if (language === 'cpp') {
+                cppCompilerNoCompilers.innerHTML = `
+                    <div class="spinner"></div>
+                    <p>正在安装 ${type} 编译器...</p>
+                `;
+            } else {
+                compilerNoCompilers.innerHTML = `
+                    <div class="spinner"></div>
+                    <p>正在安装 ${type} 编译器...</p>
+                `;
+            }
             
             vscode.postMessage({
                 command: 'install-compiler',
                 type: type,
-                languages: selectedLanguages
+                languages: language ? [language] : selectedLanguages
             });
         }
 
@@ -1150,10 +1381,23 @@
             document.querySelector('.navigation').classList.add('hidden');
             finalLoading.classList.remove('hidden');
             
+            // 将编译器索引转换为实际路径
+            const compilerPaths = {};
+            if (compilerScanResult && compilerScanResult.compilers) {
+                const compilersByLanguage = groupCompilersByLanguage(compilerScanResult.compilers);
+                
+                selectedLanguages.forEach(language => {
+                    const compilerIndex = selectedCompilers[language];
+                    if (compilerIndex !== undefined && compilersByLanguage[language] && compilersByLanguage[language][compilerIndex]) {
+                        compilerPaths[language] = compilersByLanguage[language][compilerIndex].path;
+                    }
+                });
+            }
+            
             // 收集所有设置并保存到settings.json
             const settings = {
                 languages: selectedLanguages,
-                compilers: selectedCompilers,
+                compilers: compilerPaths,
                 workspace: workspacePath.textContent,
                 theme: document.documentElement.getAttribute('data-theme') || 'light'
             };
@@ -1199,27 +1443,69 @@
                     updateStepUI();
                     break;
                 case 'compiler-check-result':
-                    // 显示编译器选择结果
-                    showCompilerSelectionResult(message.result);
+                    // 根据当前步骤显示编译器选择结果
+                    if (currentStep === 2) {
+                        showCCompilerSelectionResult(message.result);
+                    } else if (currentStep === 3) {
+                        showCppCompilerSelectionResult(message.result);
+                    } else {
+                        showCompilerSelectionResult(message.result);
+                    }
                     break;
                 case 'compiler-install-complete':
-                    compilerNoCompilers.innerHTML = `
-                        <div style="color: var(--success-color);">
-                            <h4>安装完成</h4>
-                            <p>${escapeHtml(message.message)}</p>
-                        </div>
-                    `;
+                    if (currentStep === 2) {
+                        cCompilerNoCompilers.innerHTML = `
+                            <div style="color: var(--success-color);">
+                                <h4>安装完成</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                            </div>
+                        `;
+                    } else if (currentStep === 3) {
+                        cppCompilerNoCompilers.innerHTML = `
+                            <div style="color: var(--success-color);">
+                                <h4>安装完成</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                            </div>
+                        `;
+                    } else {
+                        compilerNoCompilers.innerHTML = `
+                            <div style="color: var(--success-color);">
+                                <h4>安装完成</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                            </div>
+                        `;
+                    }
                     updateStepUI();
                     break;
                 case 'compiler-install-error':
-                    compilerNoCompilers.innerHTML = `
-                        <div style="color: var(--danger-color);">
-                            <h4>安装失败</h4>
-                            <p>${escapeHtml(message.message)}</p>
-                            <button class="btn" onclick="installCompiler('llvm')">重试安装</button>
-                            <button class="btn btn-secondary" onclick="skipCompilerInstall()">跳过</button>
-                        </div>
-                    `;
+                    if (currentStep === 2) {
+                        cCompilerNoCompilers.innerHTML = `
+                            <div style="color: var(--danger-color);">
+                                <h4>安装失败</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                                <button class="btn" onclick="installCompiler('llvm', 'c')">重试安装</button>
+                                <button class="btn btn-secondary" onclick="skipCCompilerSelection()">跳过</button>
+                            </div>
+                        `;
+                    } else if (currentStep === 3) {
+                        cppCompilerNoCompilers.innerHTML = `
+                            <div style="color: var(--danger-color);">
+                                <h4>安装失败</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                                <button class="btn" onclick="installCompiler('llvm', 'cpp')">重试安装</button>
+                                <button class="btn btn-secondary" onclick="skipCppCompilerSelection()">跳过</button>
+                            </div>
+                        `;
+                    } else {
+                        compilerNoCompilers.innerHTML = `
+                            <div style="color: var(--danger-color);">
+                                <h4>安装失败</h4>
+                                <p>${escapeHtml(message.message)}</p>
+                                <button class="btn" onclick="installCompiler('llvm')">重试安装</button>
+                                <button class="btn btn-secondary" onclick="skipCompilerInstall()">跳过</button>
+                            </div>
+                        `;
+                    }
                     break;
             }
         });
