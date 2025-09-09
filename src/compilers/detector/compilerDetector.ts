@@ -743,7 +743,7 @@ export class CompilerDetector {
             return 'clang';
         }
 
-        if (filename.includes('g++')) {
+        if (filename.includes('g++') || filename === 'c++') {
             return 'g++';
         }
 
@@ -756,7 +756,12 @@ export class CompilerDetector {
             return versionOutput.includes('Apple') ? 'apple-clang' : 'clang';
         }
 
-        if (versionOutput.includes('GCC') || versionOutput.includes('gcc')) {
+        if (
+            versionOutput.includes('GCC') ||
+            versionOutput.includes('gcc') ||
+            versionOutput.includes('Ubuntu') ||
+            versionOutput.includes('Copyright (C)')
+        ) {
             return filename.includes('++') ? 'g++' : 'gcc';
         }
 
