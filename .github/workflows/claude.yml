@@ -39,7 +39,7 @@ jobs:
             "log": true,
             "NON_INTERACTIVE_MODE": true,
             "OPENAI_API_KEY": "${{ secrets.ZHIPU_API_KEY }}",
-            "OPENAI_BASE_URL": "https://api.z.ai/api/anthropic",
+            "OPENAI_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
             "OPENAI_MODEL": "glm-4.5"
           }
           EOF
