@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { NativeCompilerManager } from '../native';
-import { DEFAULT_OPTIMIZATION_LEVEL, DEFAULT_CPP_STANDARD, DEFAULT_C_STANDARD } from '../constants';
+import { DEFAULT_OPTIMIZATION_LEVEL, DEFAULT_CPP_STANDARD, DEFAULT_C_STANDARD, ERROR_MESSAGES } from '../constants';
 import { getSuitableCompiler, detectCompilersWithProgress, setupLanguageCompiler } from '../utils/compiler-utils';
 import { UnifiedUtils } from '../utils/unified-utils';
 import { BaseManager } from './base-manager';
@@ -35,7 +35,7 @@ export class CommandManager extends BaseManager {
     public async runCode(testInput?: string, options?: { timeLimit?: number; memoryLimit?: number }) {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            this.handleError(null, 'No active editor');
+            this.handleError(new Error(ERROR_MESSAGES.NO_ACTIVE_EDITOR), '运行代码');
             return;
         }
 
@@ -91,7 +91,7 @@ export class CommandManager extends BaseManager {
                     spaceExceeded: result.spaceExceeded || false
                 };
             },
-            { errorMessage: 'An unexpected error occurred' }
+            { errorMessage: '运行代码时发生未知错误' }
         );
     }
 

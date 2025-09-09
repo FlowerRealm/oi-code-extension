@@ -1120,7 +1120,7 @@
         function installCompiler(type) {
             compilerNoCompilers.innerHTML = `
                 <div class="spinner"></div>
-                <p>正在安装 ${type} 编译器...</p>
+                <p>正在安装 ${escapeHtml(type)} 编译器...</p>
             `;
             
             vscode.postMessage({

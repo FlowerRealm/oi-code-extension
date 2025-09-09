@@ -392,6 +392,7 @@ export class CompilerDetector {
                         const oldRealPath = await fs.realpath(existing.path);
                         checkedRealPaths.delete(oldRealPath);
                     } catch {
+                        // If realpath fails, use the original path
                         checkedRealPaths.delete(existing.path);
                     }
                 }

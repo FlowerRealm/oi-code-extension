@@ -473,12 +473,14 @@
             const outputElement = document.getElementById(`${side}-output`);
             
             if (!content || content.trim() === '') {
-                outputElement.innerHTML = '<div class="output-empty">无输出</div>';
+                setSafeHtml(outputElement, '<div class="output-empty">无输出</div>');
                 return;
             }
 
             if (hasDiff) {
                 const diffedContent = highlightDifferences(content);
+                // For diff content, we need to use innerHTML directly since highlightDifferences returns HTML
+                // but the content is from our own formatting, not user input
                 outputElement.innerHTML = diffedContent;
             } else {
                 outputElement.textContent = content;
