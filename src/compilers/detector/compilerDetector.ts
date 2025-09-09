@@ -418,12 +418,12 @@ export class CompilerDetector {
             const version = this.parseVersion(versionOutput);
 
             // Check if we've already processed this real path
-            // Special case: allow clang and clang++ with same realpath but different types
+            // Special case: allow different compiler names (clang vs clang++) with same realpath
             if (checkedRealPaths.has(realPath)) {
-                const tempCompilerKey = `${type}-${version}`;
-
-                // Check if we already have this exact compiler type and version
-                if (checkedCompilerTypes.has(tempCompilerKey)) {
+                // If the original compiler path is different from the realpath,
+                // it's likely a symlink (like clang -> /usr/lib/llvm-18/bin/clang)
+                // Allow different compiler names even with same realpath
+                if (compilerPath === realPath) {
                     outputChannel.appendLine(
                         `[CompilerDetector] Skipping duplicate compiler: ${compilerPath} -> ${realPath}`
                     );
@@ -431,7 +431,7 @@ export class CompilerDetector {
                 }
 
                 outputChannel.appendLine(
-                    `[CompilerDetector] Allowing additional compiler type for same realpath: ${compilerPath} (${type})`
+                    `[CompilerDetector] Allowing symlinked compiler: ${compilerPath} -> ${realPath}`
                 );
             }
             checkedRealPaths.add(realPath);
