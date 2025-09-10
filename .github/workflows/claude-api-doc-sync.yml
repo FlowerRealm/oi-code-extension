@@ -1,0 +1,43 @@
+name: Sync API Documentation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "src/api/**/*.ts"
+      - "src/routes/**/*.ts"
+
+jobs:
+  doc-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+        with:
+          anthropic_api_key: ${{ secrets.ZHIPU_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            This PR modifies API endpoints. Please:
+
+            1. Review the API changes in src/api and src/routes
+            2. Update API.md to document any new or changed endpoints
+            3. Ensure OpenAPI spec is updated if needed
+            4. Update example requests/responses
+
+            Use standard REST API documentation format.
+            Commit any documentation updates to this PR branch.
+
+          claude_args: |
+            --allowedTools "Read,Write,Edit,Bash(git:*)"
