@@ -110,7 +110,19 @@ export async function setupLanguageCompiler(context: vscode.ExtensionContext, la
         const result = await NativeCompilerManager.detectCompilers(context);
 
         if (result.success && result.compilers.length > 0) {
+            // Debug: Show all detected compilers
+            console.log('[DEBUG] All detected compilers:');
+            result.compilers.forEach(compiler => {
+                console.log(`[DEBUG] - ${compiler.name} (${compiler.type}) at ${compiler.path}`);
+            });
+
             const compilers = result.compilers.filter(languageFilter);
+
+            // Debug: Show filtered compilers
+            console.log(`[DEBUG] Filtered ${languageName} compilers:`);
+            compilers.forEach(compiler => {
+                console.log(`[DEBUG] - ${compiler.name} (${compiler.type}) at ${compiler.path}`);
+            });
 
             if (compilers.length === 0) {
                 vscode.window.showWarningMessage(`No ${languageName} compilers found`);
