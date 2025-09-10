@@ -817,17 +817,18 @@
                     </div>
 
                     <div class="step-content" id="step-2">
-                        <h2>第三步：选择C语言编译器</h2>
-                        <p>我们为您找到了以下可用的C语言编译器。请选择一个，或选择跳过稍后配置。</p>
+                        <h2>第三步：选择编译器</h2>
+                        <p>我们为您找到了以下可用的编译器。请根据您选择的语言配置相应的编译器。</p>
                         
-                        <div class="compiler-selection-section" id="c-compiler-selection-section">
+                        <!-- C编译器选择区域 -->
+                        <div class="compiler-selection-section" id="c-compiler-selection-section" style="display: none;">
+                            <h3>C语言编译器</h3>
                             <div class="compiler-scan-status hidden" id="c-compiler-scan-status">
                                 <div class="spinner"></div>
                                 <p>正在扫描C语言编译器...</p>
                             </div>
                             
                             <div class="compiler-selection-content hidden" id="c-compiler-selection-content">
-                                <h3>可用C语言编译器</h3>
                                 <div class="compiler-list" id="c-available-compilers">
                                     <!-- C编译器列表将在这里动态生成 -->
                                 </div>
@@ -841,20 +842,16 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="step-content" id="step-3">
-                        <h2>第四步：选择C++语言编译器</h2>
-                        <p>我们为您找到了以下可用的C++语言编译器。请选择一个，或选择跳过稍后配置。</p>
                         
-                        <div class="compiler-selection-section" id="cpp-compiler-selection-section">
+                        <!-- C++编译器选择区域 -->
+                        <div class="compiler-selection-section" id="cpp-compiler-selection-section" style="display: none;">
+                            <h3>C++语言编译器</h3>
                             <div class="compiler-scan-status hidden" id="cpp-compiler-scan-status">
                                 <div class="spinner"></div>
                                 <p>正在扫描C++语言编译器...</p>
                             </div>
                             
                             <div class="compiler-selection-content hidden" id="cpp-compiler-selection-content">
-                                <h3>可用C++语言编译器</h3>
                                 <div class="compiler-list" id="cpp-available-compilers">
                                     <!-- C++编译器列表将在这里动态生成 -->
                                 </div>
@@ -870,8 +867,8 @@
                         </div>
                     </div>
 
-                    <div class="step-content" id="step-4">
-                        <h2>第五步：选择您的工作区</h2>
+                    <div class="step-content" id="step-3">
+                        <h2>第四步：选择您的工作区</h2>
                         <p>选择一个文件夹作为您的编程工作区，所有项目文件将保存在此处</p>
                         
                         <div class="workspace-selector">
@@ -918,7 +915,7 @@
         }
         
         let currentStep = 0;
-        const totalSteps = 5;
+        const totalSteps = 4;
         
         const steps = document.querySelectorAll('.step');
         const stepContents = document.querySelectorAll('.step-content');
@@ -980,14 +977,11 @@
                 const languages = getSelectedLanguages();
                 nextBtn.disabled = languages.length === 0;
             } else if (currentStep === 2) {
-                // C编译器选择步骤
+                // 编译器选择步骤
                 const cSelected = selectedCompilers['c'] !== undefined || !selectedLanguages.includes('c');
-                nextBtn.disabled = !cSelected;
-            } else if (currentStep === 3) {
-                // C++编译器选择步骤
                 const cppSelected = selectedCompilers['cpp'] !== undefined || !selectedLanguages.includes('cpp');
-                nextBtn.disabled = !cppSelected;
-            } else if (currentStep === 4) {
+                nextBtn.disabled = !cSelected || !cppSelected;
+            } else if (currentStep === 3) {
                 nextBtn.disabled = workspacePath.textContent === '尚未选择工作区';
             } else {
                 nextBtn.disabled = false;
@@ -1024,16 +1018,8 @@
             } else if (currentStep === 1) {
                 configureLanguages();
             } else if (currentStep === 2) {
-                // 从C语言编译器选择到C++编译器选择
-                if (selectedLanguages.includes('cpp')) {
-                    goToStep(3);
-                    startCppCompilerScan();
-                } else {
-                    // 如果没有选择C++，直接跳到工作区选择
-                    goToStep(4);
-                }
-            } else if (currentStep === 3) {
-                goToStep(4);
+                // 从编译器选择到工作区选择
+                goToStep(3);
             } else {
                 goToStep(currentStep + 1);
             }
@@ -1042,17 +1028,29 @@
         function configureLanguages() {
             selectedLanguages = getSelectedLanguages();
             if (selectedLanguages.length > 0) {
-                // 根据选择的语言决定下一步
-                if (selectedLanguages.includes('c')) {
-                    goToStep(2);
-                    startCCompilerScan();
-                } else if (selectedLanguages.includes('cpp')) {
-                    goToStep(3);
-                    startCppCompilerScan();
-                } else {
-                    // 如果没有选择C或C++，直接跳到工作区选择
-                    goToStep(4);
-                }
+                // 跳转到编译器选择步骤
+                goToStep(2);
+                startCombinedCompilerScan();
+            }
+        }
+
+        function startCombinedCompilerScan() {
+            // 根据选择的语言显示相应的编译器选择区域
+            const cSection = document.getElementById('c-compiler-selection-section');
+            const cppSection = document.getElementById('cpp-compiler-selection-section');
+            
+            if (selectedLanguages.includes('c')) {
+                cSection.style.display = 'block';
+                startCCompilerScan();
+            } else {
+                cSection.style.display = 'none';
+            }
+            
+            if (selectedLanguages.includes('cpp')) {
+                cppSection.style.display = 'block';
+                startCppCompilerScan();
+            } else {
+                cppSection.style.display = 'none';
             }
         }
 
@@ -1447,32 +1445,24 @@
                     updateStepUI();
                     break;
                 case 'compiler-check-result':
-                    // 根据当前步骤显示编译器选择结果
-                    if (currentStep === 2) {
+                    // 根据消息中的语言类型显示相应的编译器选择结果
+                    if (message.languages && message.languages.includes('c')) {
                         showCCompilerSelectionResult(message.result);
-                    } else if (currentStep === 3) {
+                    }
+                    if (message.languages && message.languages.includes('cpp')) {
                         showCppCompilerSelectionResult(message.result);
-                    } else {
-                        showCompilerSelectionResult(message.result);
                     }
                     break;
                 case 'compiler-install-complete':
-                    if (currentStep === 2) {
+                    if (message.language === 'c') {
                         cCompilerNoCompilers.innerHTML = `
                             <div style="color: var(--success-color);">
                                 <h4>安装完成</h4>
                                 <p>${escapeHtml(message.message)}</p>
                             </div>
                         `;
-                    } else if (currentStep === 3) {
+                    } else if (message.language === 'cpp') {
                         cppCompilerNoCompilers.innerHTML = `
-                            <div style="color: var(--success-color);">
-                                <h4>安装完成</h4>
-                                <p>${escapeHtml(message.message)}</p>
-                            </div>
-                        `;
-                    } else {
-                        compilerNoCompilers.innerHTML = `
                             <div style="color: var(--success-color);">
                                 <h4>安装完成</h4>
                                 <p>${escapeHtml(message.message)}</p>
@@ -1482,7 +1472,7 @@
                     updateStepUI();
                     break;
                 case 'compiler-install-error':
-                    if (currentStep === 2) {
+                    if (message.language === 'c') {
                         cCompilerNoCompilers.innerHTML = `
                             <div style="color: var(--danger-color);">
                                 <h4>安装失败</h4>
@@ -1491,22 +1481,13 @@
                                 <button class="btn btn-secondary" onclick="skipCCompilerSelection()">跳过</button>
                             </div>
                         `;
-                    } else if (currentStep === 3) {
+                    } else if (message.language === 'cpp') {
                         cppCompilerNoCompilers.innerHTML = `
                             <div style="color: var(--danger-color);">
                                 <h4>安装失败</h4>
                                 <p>${escapeHtml(message.message)}</p>
                                 <button class="btn" onclick="installCompiler('llvm', 'cpp')">重试安装</button>
                                 <button class="btn btn-secondary" onclick="skipCppCompilerSelection()">跳过</button>
-                            </div>
-                        `;
-                    } else {
-                        compilerNoCompilers.innerHTML = `
-                            <div style="color: var(--danger-color);">
-                                <h4>安装失败</h4>
-                                <p>${escapeHtml(message.message)}</p>
-                                <button class="btn" onclick="installCompiler('llvm')">重试安装</button>
-                                <button class="btn btn-secondary" onclick="skipCompilerInstall()">跳过</button>
                             </div>
                         `;
                     }
