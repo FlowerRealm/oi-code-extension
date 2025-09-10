@@ -474,6 +474,10 @@ int main() {
     if(!(cin >> n)) {
         return 1;
     }
+    if (n < 0 || n >= 1000) {
+        cout << 0 << endl;
+        return 0;
+    }
     C[0] = 1;
     for (int i = 1; i <= n; i++) {
         C[i] = 0;

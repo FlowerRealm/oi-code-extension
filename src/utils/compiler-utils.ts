@@ -94,15 +94,10 @@ export async function setupLanguageCompiler(context: vscode.ExtensionContext, la
     const placeholder = `检测到${languageName}编译器，请选择要使用的编译器`;
 
     const languageFilter = (compiler: CompilerInfo) => {
-        const name = compiler.name.toLowerCase();
         if (language === 'c') {
-            return (
-                (name.includes('gcc') && !name.includes('g++')) ||
-                (name.includes('clang') && !name.includes('clang++')) ||
-                (name.includes('cc') && !name.includes('g++'))
-            );
+            return compiler.type === 'gcc' || compiler.type === 'clang' || compiler.type === 'apple-clang';
         } else {
-            return name.includes('g++') || name.includes('clang++');
+            return compiler.type === 'g++' || compiler.type === 'clang++';
         }
     };
 
