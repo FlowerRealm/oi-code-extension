@@ -452,16 +452,22 @@ export class CompilerDetector {
                     return null;
                 } else {
                     // Replace the existing one with this higher priority compiler
+                    // This ensures we always use the best available compiler for each type-version combination
                     outputChannel.appendLine(
                         `[CompilerDetector] Replacing lower priority compiler: ${existing.path} with ` +
                             `${compilerPath} (priority: ${priority} > ${existing.priority})`
                     );
-                    // Remove the old real path since we're replacing the compiler
+
+                    // Remove the old compiler from our real paths tracking to prevent conflicts
+                    // This is critical for maintaining accurate deduplication state
                     try {
+                        // Try to get the real path of the old compiler for proper cleanup
                         const oldRealPath = await fs.realpath(existing.path);
                         checkedRealPaths.delete(oldRealPath);
                     } catch {
-                        // If realpath fails, use the original path
+                        // If realpath fails (e.g., file doesn't exist or permissions issue),
+                        // fall back to using the original path. This ensures we don't leave
+                        // orphaned entries in our tracking set.
                         checkedRealPaths.delete(existing.path);
                     }
                 }
@@ -843,29 +849,48 @@ export class CompilerDetector {
 
     /**
      * Calculate priority for compiler selection
+     *
+     * This algorithm determines which compiler to use when multiple compilers
+     * of the same type and version are available. Higher priority values
+     * indicate preferred compilers.
+     *
+     * Priority scoring:
+     * - Base score from compiler type (Clang > GCC > MSVC)
+     * - Bonus points for newer versions
+     * - Total priority typically ranges from 70-200+
+     *
+     * @param type - Compiler type (clang, gcc, msvc, etc.)
+     * @param version - Compiler version string
+     * @param _path - Compiler path (unused but kept for future extensibility)
+     * @returns Priority score (higher = better)
      */
     private static calculatePriority(type: string, version: string, _path: string): number {
         let priority = 0;
 
-        // Type-based priority
+        // Type-based priority: Clang-family compilers get highest priority
+        // due to better standards compliance and error messages
         const typePriority: { [key: string]: number } = {
-            clang: 100,
-            'clang++': 100,
-            'apple-clang': 90,
-            gcc: 80,
-            'g++': 80,
-            msvc: 70
+            clang: 100, // Modern Clang - highest priority
+            'clang++': 100, // Clang C++ - same priority
+            'apple-clang': 90, // Apple's Clang - slightly lower due to potential delays
+            gcc: 80, // GCC - reliable but sometimes slower
+            'g++': 80, // GCC C++ - same priority
+            msvc: 70 // MSVC - lowest priority, Windows-specific
         };
 
         priority += typePriority[type] || 0;
 
-        // Version-based priority (newer versions get higher priority)
+        // Version-based priority: Newer versions get significant bonus
+        // This ensures users get the latest features and bug fixes
+        // Major version number * 10 means v19 >> v18 by 10 points
         const versionMatch = version.match(/(\d+)/);
         if (versionMatch) {
             priority += parseInt(versionMatch[1]) * 10;
         }
 
-        // Path-based priority (system paths get lower priority)
+        // Path-based priority: System compilers get lower priority
+        // This prefers user-installed compilers over system ones
+        // System compilers might be outdated or have restricted functionality
         if (_path.includes('/usr/bin') || _path.includes('C:\\Windows')) {
             priority -= 20;
         }

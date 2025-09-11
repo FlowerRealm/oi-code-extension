@@ -506,7 +506,7 @@
                 // 创建类别标题
                 const categoryHeader = document.createElement('div');
                 categoryHeader.className = 'category-header';
-                categoryHeader.innerHTML = `<h3>${category}</h3>`;
+                categoryHeader.innerHTML = `<h3>${escapeHtml(category)}</h3>`;
                 categorySection.appendChild(categoryHeader);
                 
                 // 创建类别内容区域
@@ -620,7 +620,7 @@
                     // 创建类别标题
                     const categoryHeader = document.createElement('div');
                     categoryHeader.className = 'category-header';
-                    categoryHeader.innerHTML = `<h3>${category}</h3>`;
+                    categoryHeader.innerHTML = `<h3>${escapeHtml(category)}</h3>`;
                     categorySection.appendChild(categoryHeader);
                     
                     // 创建类别内容区域
