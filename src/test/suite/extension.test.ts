@@ -462,6 +462,10 @@ int main(){
     if(!(cin >> n)) {
         return 1;
     }
+    if (n < 0 || n > 20) {
+        cout << 0 << endl;
+        return 0;
+    }
     cout << C(n) << endl;
     return 0;
 }`;
