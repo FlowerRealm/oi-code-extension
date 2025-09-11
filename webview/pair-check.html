@@ -479,16 +479,17 @@
 
             if (hasDiff) {
                 const diffedContent = highlightDifferences(content);
-                // For diff content, we need to use innerHTML directly since highlightDifferences returns HTML
-                // but the content is from our own formatting, not user input
-                outputElement.innerHTML = diffedContent;
+                // Use setSafeHtml to safely set the diff-highlighted content
+                setSafeHtml(outputElement, diffedContent);
             } else {
                 outputElement.textContent = content;
             }
         }
 
         function highlightDifferences(text) {
-            return text
+            // First escape the text to prevent XSS, then apply diff highlighting
+            const escapedText = escapeHtml(text);
+            return escapedText
                 .replace(/^[+](.*)$/gm, '<span class="diff-highlight diff-added">+$1</span>')
                 .replace(/^[-](.*)$/gm, '<span class="diff-highlight diff-removed">-$1</span>');
         }
