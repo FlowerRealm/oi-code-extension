@@ -65,8 +65,8 @@ export class UnifiedUtils {
      * 显示确认对话框
      */
     static async showConfirmation(message: string, modal: boolean = false): Promise<boolean> {
-        const result = await vscode.window.showWarningMessage(message, { modal }, 'Yes', 'No');
-        return result === 'Yes';
+        const result = await vscode.window.showWarningMessage(message, { modal }, '是', '否');
+        return result === '是';
     }
 
     /**
@@ -99,7 +99,7 @@ export class UnifiedUtils {
     static async showErrorWithDetails(
         error: unknown,
         message: string,
-        detailsAction: string = 'View Details'
+        detailsAction: string = '查看详情'
     ): Promise<void> {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const choice = await vscode.window.showErrorMessage(`${message}: ${errorMessage}`, detailsAction);

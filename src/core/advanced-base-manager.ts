@@ -30,7 +30,7 @@ export abstract class AdvancedBaseManager {
     }
 
     protected async showConfirmation(message: string, modal: boolean = false): Promise<boolean> {
-        const result = await vscode.window.showWarningMessage(message, { modal }, 'Yes', 'No');
-        return result === 'Yes';
+        const result = await vscode.window.showWarningMessage(message, { modal }, '是', '否');
+        return result === '是';
     }
 }

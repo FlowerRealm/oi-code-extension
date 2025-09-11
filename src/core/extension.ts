@@ -21,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
             await detectCompilers(context);
 
             const configManager = UnifiedConfigManager.getInstance();
+            configManager.setContext(context);
             const managers = initializeManagers(context);
 
             registerWebViewProviders(context, managers.webviewManager);

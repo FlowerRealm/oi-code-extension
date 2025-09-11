@@ -910,10 +910,7 @@
             return div.innerHTML;
         }
 
-        function setSafeHtml(element, html) {
-            element.innerHTML = escapeHtml(html);
-        }
-        
+                
         let currentStep = 0;
         const totalSteps = 4;
         
@@ -1342,17 +1339,17 @@
             if (language === 'c') {
                 cCompilerNoCompilers.innerHTML = `
                     <div class="spinner"></div>
-                    <p>正在安装 ${type} 编译器...</p>
+                    <p>正在安装 ${escapeHtml(type)} 编译器...</p>
                 `;
             } else if (language === 'cpp') {
                 cppCompilerNoCompilers.innerHTML = `
                     <div class="spinner"></div>
-                    <p>正在安装 ${type} 编译器...</p>
+                    <p>正在安装 ${escapeHtml(type)} 编译器...</p>
                 `;
             } else {
                 compilerNoCompilers.innerHTML = `
                     <div class="spinner"></div>
-                    <p>正在安装 ${type} 编译器...</p>
+                    <p>正在安装 ${escapeHtml(type)} 编译器...</p>
                 `;
             }
             

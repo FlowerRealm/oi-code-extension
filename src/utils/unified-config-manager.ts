@@ -4,8 +4,13 @@ import { CompilerConfig, ExtensionConfig } from '../types';
 export class UnifiedConfigManager {
     private static instance: UnifiedConfigManager;
     private configCache: Map<string, unknown> = new Map();
+    private context: vscode.ExtensionContext | null = null;
 
     private constructor() {}
+
+    public setContext(context: vscode.ExtensionContext): void {
+        this.context = context;
+    }
 
     public static getInstance(): UnifiedConfigManager {
         if (!UnifiedConfigManager.instance) {
@@ -98,16 +103,23 @@ export class UnifiedConfigManager {
     }
 
     public getGlobalState<T>(key: string, defaultValue?: T): T {
-        // Fallback to workspace configuration for now
+        if (this.context) {
+            return this.context.globalState.get(key, defaultValue) as T;
+        }
+        // Fallback to workspace configuration for backward compatibility
         return this.get(`oicode.${key}`, defaultValue) as T;
     }
 
     public async updateGlobalState<T>(key: string, value: T): Promise<void> {
-        // In test environment, just skip the update to avoid configuration errors
-        try {
-            await this.set(`oicode.${key}`, value);
-        } catch {
-            // Silently ignore configuration errors in tests
+        if (this.context) {
+            await this.context.globalState.update(key, value);
+        } else {
+            // Fallback to workspace configuration for backward compatibility
+            try {
+                await this.set(`oicode.${key}`, value);
+            } catch {
+                // Silently ignore configuration errors in tests
+            }
         }
     }
 }
