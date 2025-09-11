@@ -113,11 +113,7 @@ export class PerformanceMonitor {
      * @param success - Whether operation succeeded
      * @param metadata - Additional data about the operation
      */
-    public endTiming(
-        operationId: string, 
-        success: boolean = true, 
-        metadata?: Record<string, unknown>
-    ): void {
+    public endTiming(operationId: string, success: boolean = true, metadata?: Record<string, unknown>): void {
         if (!this.config.enabled || !operationId) {
             return;
         }
@@ -175,9 +171,7 @@ export class PerformanceMonitor {
      */
     public getStats(timeRange?: number): PerformanceStats {
         const now = Date.now();
-        const relevantMetrics = timeRange
-            ? this.metrics.filter(m => now - m.timestamp <= timeRange)
-            : this.metrics;
+        const relevantMetrics = timeRange ? this.metrics.filter(m => now - m.timestamp <= timeRange) : this.metrics;
 
         if (relevantMetrics.length === 0) {
             return {
@@ -194,14 +188,15 @@ export class PerformanceMonitor {
         const durations = relevantMetrics.map(m => m.duration);
         const successfulOperations = relevantMetrics.filter(m => m.success);
 
-        const operationCounts = relevantMetrics.reduce((acc, m) => {
-            acc[m.operation] = (acc[m.operation] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
+        const operationCounts = relevantMetrics.reduce(
+            (acc, m) => {
+                acc[m.operation] = (acc[m.operation] || 0) + 1;
+                return acc;
+            },
+            {} as Record<string, number>
+        );
 
-        const slowestOperations = relevantMetrics
-            .sort((a, b) => b.duration - a.duration)
-            .slice(0, 10);
+        const slowestOperations = relevantMetrics.sort((a, b) => b.duration - a.duration).slice(0, 10);
 
         return {
             totalOperations: relevantMetrics.length,
@@ -222,10 +217,7 @@ export class PerformanceMonitor {
      */
     public getMetricsByOperation(operation: string, timeRange?: number): PerformanceMetrics[] {
         const now = Date.now();
-        return this.metrics.filter(m =>
-            m.operation === operation &&
-            (!timeRange || now - m.timestamp <= timeRange)
-        );
+        return this.metrics.filter(m => m.operation === operation && (!timeRange || now - m.timestamp <= timeRange));
     }
 
     /**
@@ -260,12 +252,16 @@ export class PerformanceMonitor {
      * @returns JSON string of all metrics
      */
     public exportMetrics(): string {
-        return JSON.stringify({
-            metrics: this.metrics,
-            stats: this.getStats(),
-            config: this.config,
-            exportedAt: new Date().toISOString()
-        }, null, 2);
+        return JSON.stringify(
+            {
+                metrics: this.metrics,
+                stats: this.getStats(),
+                config: this.config,
+                exportedAt: new Date().toISOString()
+            },
+            null,
+            2
+        );
     }
 
     /**
@@ -309,20 +305,16 @@ export class PerformanceMonitor {
      * @param metadata - Optional metadata to record
      * @returns Result of the function
      */
-    public async timeAsync<T>(
-        operation: string,
-        fn: () => Promise<T>,
-        metadata?: Record<string, unknown>
-    ): Promise<T> {
+    public async timeAsync<T>(operation: string, fn: () => Promise<T>, metadata?: Record<string, unknown>): Promise<T> {
         const operationId = this.startTiming(operation);
         try {
             const result = await fn();
             this.endTiming(operationId, true, metadata);
             return result;
         } catch (error) {
-            this.endTiming(operationId, false, { 
-                ...metadata, 
-                error: error instanceof Error ? error.message : String(error) 
+            this.endTiming(operationId, false, {
+                ...metadata,
+                error: error instanceof Error ? error.message : String(error)
             });
             throw error;
         }
@@ -335,20 +327,16 @@ export class PerformanceMonitor {
      * @param metadata - Optional metadata to record
      * @returns Result of the function
      */
-    public timeSync<T>(
-        operation: string,
-        fn: () => T,
-        metadata?: Record<string, unknown>
-    ): T {
+    public timeSync<T>(operation: string, fn: () => T, metadata?: Record<string, unknown>): T {
         const operationId = this.startTiming(operation);
         try {
             const result = fn();
             this.endTiming(operationId, true, metadata);
             return result;
         } catch (error) {
-            this.endTiming(operationId, false, { 
-                ...metadata, 
-                error: error instanceof Error ? error.message : String(error) 
+            this.endTiming(operationId, false, {
+                ...metadata,
+                error: error instanceof Error ? error.message : String(error)
             });
             throw error;
         }
@@ -384,7 +372,7 @@ export class PerformanceMonitor {
     }
 
     private cleanupOldMetrics(): void {
-        const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days
+        const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
         const oldCount = this.metrics.length;
 
         this.metrics = this.metrics.filter(m => m.timestamp > oneWeekAgo);
@@ -439,13 +427,34 @@ export async function measureAsync<T>(
  * });
  * ```
  */
-export function measureSync<T>(
-    operation: string,
-    fn: () => T,
-    metadata?: Record<string, unknown>
-): T {
+export function measureSync<T>(operation: string, fn: () => T, metadata?: Record<string, unknown>): T {
     const monitor = PerformanceMonitor.getInstance();
     return monitor.timeSync(operation, fn, metadata);
+}
+
+/**
+ * Legacy compatibility function for backward compatibility
+ * @deprecated Use measureAsync for async operations and measureSync for sync operations
+ */
+// eslint-disable-next-line no-redeclare
+export async function measure<T>(
+    operation: string,
+    fn: () => Promise<T>,
+    metadata?: Record<string, unknown>
+): Promise<T>;
+// eslint-disable-next-line no-redeclare
+export function measure<T>(operation: string, fn: () => T, metadata?: Record<string, unknown>): T;
+// eslint-disable-next-line no-redeclare
+export function measure<T>(
+    operation: string,
+    fn: (() => Promise<T>) | (() => T),
+    metadata?: Record<string, unknown>
+): Promise<T> | T {
+    if (fn.constructor.name === 'AsyncFunction') {
+        return measureAsync(operation, fn as () => Promise<T>, metadata);
+    } else {
+        return measureSync(operation, fn as () => T, metadata);
+    }
 }
 
 /**
@@ -457,33 +466,7 @@ export function measureFn<T extends(...args: unknown[]) => unknown>(
     metadata?: Record<string, unknown>
 ): T {
     return (async (...args: Parameters<T>) => {
-        const result = await measure(operation, () => fn(...args), metadata);
+        const result = await measureAsync(operation, () => fn(...args), metadata);
         return result;
     }) as T;
-}
-
-/**
- * Legacy compatibility function for backward compatibility
- * @deprecated Use measureAsync for async operations and measureSync for sync operations
- */
-export async function measure<T>(
-    operation: string,
-    fn: () => Promise<T>,
-    metadata?: Record<string, unknown>
-): Promise<T>;
-export function measure<T>(
-    operation: string,
-    fn: () => T,
-    metadata?: Record<string, unknown>
-): T;
-export function measure<T>(
-    operation: string,
-    fn: (() => Promise<T>) | (() => T),
-    metadata?: Record<string, unknown>
-): Promise<T> | T {
-    if (fn.constructor.name === 'AsyncFunction') {
-        return measureAsync(operation, fn as () => Promise<T>, metadata);
-    } else {
-        return measureSync(operation, fn as () => T, metadata);
-    }
 }
