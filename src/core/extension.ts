@@ -8,6 +8,7 @@ import { UnifiedConfigManager } from '../utils/unified-config-manager';
 import { UnifiedUtils } from '../utils/unified-utils';
 import { ExtensionSettings } from '../utils/extension-settings';
 import { CreateProblemPayload } from '../types/types';
+import { PerformanceMonitor } from '../utils/performance-monitor';
 
 export async function activate(context: vscode.ExtensionContext) {
     await UnifiedUtils.safeExecute(
@@ -111,7 +112,22 @@ function registerCommands(context: vscode.ExtensionContext, managers: ExtensionM
         ['oicode.deepScanCompilers', () => managers.commandManager.deepScanCompilers()],
         ['oi-code.showSettingsPage', () => managers.webviewManager.showSettingsPage()],
         ['oi-code.showCompletionPage', () => managers.webviewManager.showCompletionPage()],
-        ['oi-code.showWelcomePage', () => managers.webviewManager.showWelcomePage()]
+        ['oi-code.showWelcomePage', () => managers.webviewManager.showWelcomePage()],
+        ['oicode.showPerformanceReport', () => {
+            const monitor = PerformanceMonitor.getInstance();
+            monitor.showReport();
+        }],
+        ['oicode.clearPerformanceMetrics', () => {
+            const monitor = PerformanceMonitor.getInstance();
+            monitor.clear();
+            vscode.window.showInformationMessage('Performance metrics cleared');
+        }],
+        ['oicode.exportPerformanceMetrics', () => {
+            const monitor = PerformanceMonitor.getInstance();
+            const metrics = monitor.exportMetrics();
+            vscode.workspace.openTextDocument({ content: metrics, language: 'json' })
+                .then(doc => vscode.window.showTextDocument(doc));
+        }]
     ];
 
     commandConfig.forEach(([command, handler]) => {

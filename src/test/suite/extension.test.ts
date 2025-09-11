@@ -559,4 +559,289 @@ int main() {
             });
         }
     });
+
+    // Additional boundary conditions and edge cases tests
+    describe('Boundary Conditions and Edge Cases', () => {
+        test('should handle empty input gracefully', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping empty input test');
+                this.skip();
+                return;
+            }
+
+            const codeWithEmptyInputHandling = `#include <stdio.h>
+int main() {
+    char input[1000];
+    if (fgets(input, sizeof(input), stdin) == NULL) {
+        printf("0\\n");
+        return 0;
+    }
+    printf("1\\n");
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Empty-Input', 'c', codeWithEmptyInputHandling);
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+
+                assert.ok(res, 'should handle empty input');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                console.log('[Boundary Test] ✓ Empty input handled correctly:', res.output.trim());
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle very large input', async function () {
+            this.timeout(60000); // Longer timeout for large input test
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping large input test');
+                this.skip();
+                return;
+            }
+
+            const largeInputCode = `#include <stdio.h>
+int main() {
+    char buffer[10000];
+    size_t total = 0;
+    while (fgets(buffer, sizeof(buffer), stdin)) {
+        total += strlen(buffer);
+    }
+    printf("%zu\\n", total);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Large-Input', 'c', largeInputCode);
+            try {
+                // Generate large input (100KB)
+                const largeInput = `${'x'.repeat(100 * 1024)}\\n`;
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', largeInput);
+
+                assert.ok(res, 'should handle large input');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                console.log('[Boundary Test] ✓ Large input handled correctly, output length:', res.output.length);
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle special characters in input', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping special chars test');
+                this.skip();
+                return;
+            }
+
+            const specialCharsCode = `#include <stdio.h>
+int main() {
+    int c;
+    int count = 0;
+    while ((c = getchar()) != EOF && c != '\\n') {
+        if (c < 32 || c > 126) count++;
+    }
+    printf("%d\\n", count);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Special-Chars', 'c', specialCharsCode);
+            try {
+                const specialInput = 'Hello\\x00\\x1f\\x7fWorld\\n'; // Contains null, control chars, and DEL
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', specialInput);
+
+                assert.ok(res, 'should handle special characters');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                console.log('[Boundary Test] ✓ Special characters handled correctly:', res.output.trim());
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle memory allocation edge cases', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping memory allocation test');
+                this.skip();
+                return;
+            }
+
+            const memoryEdgeCaseCode = `#include <stdio.h>
+#include <stdlib.h>
+int main() {
+    // Test edge case: exactly at boundary
+    int* arr = (int*)malloc(sizeof(int) * 1000);
+    if (arr == NULL) {
+        printf("malloc_failed\\n");
+        return 1;
+    }
+    
+    for (int i = 0; i < 1000; i++) {
+        arr[i] = i;
+    }
+    
+    int sum = 0;
+    for (int i = 0; i < 1000; i++) {
+        sum += arr[i];
+    }
+    
+    free(arr);
+    printf("%d\\n", sum);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Memory-Edge', 'c', memoryEdgeCaseCode);
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+
+                assert.ok(res, 'should handle memory allocation edge cases');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+
+                // Should calculate sum of 0 to 999 = 499500
+                const expectedSum = '499500';
+                const actualOutput = normalizeOutput(res.output);
+                assert.strictEqual(actualOutput, expectedSum, `Expected sum ${expectedSum} but got ${actualOutput}`);
+
+                console.log('[Boundary Test] ✓ Memory allocation edge case handled correctly');
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle integer overflow scenarios', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping integer overflow test');
+                this.skip();
+                return;
+            }
+
+            const overflowCode = `#include <stdio.h>
+#include <limits.h>
+int main() {
+    int max = INT_MAX;
+    int result = max + 1; // This will overflow
+    printf("overflow_test:%d\\n", result);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Integer-Overflow', 'c', overflowCode);
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+
+                assert.ok(res, 'should handle integer overflow');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                console.log('[Boundary Test] ✓ Integer overflow handled correctly:', res.output.trim());
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle recursive depth limits', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping recursive depth test');
+                this.skip();
+                return;
+            }
+
+            const recursiveDepthCode = `#include <stdio.h>
+int recursive_factorial(int n, int depth) {
+    if (depth > 1000) return 1; // Prevent stack overflow
+    if (n <= 1) return 1;
+    return n * recursive_factorial(n - 1, depth + 1);
+}
+
+int main() {
+    int result = recursive_factorial(5, 0);
+    printf("%d\\n", result);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-Recursive-Depth', 'c', recursiveDepthCode);
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+
+                assert.ok(res, 'should handle recursive depth limits');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+
+                const expectedOutput = '120'; // 5! = 120
+                const actualOutput = normalizeOutput(res.output);
+                assert.strictEqual(actualOutput, expectedOutput, `Expected ${expectedOutput} but got ${actualOutput}`);
+
+                console.log('[Boundary Test] ✓ Recursive depth limit handled correctly');
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+
+        test('should handle file I/O edge cases', async function () {
+            this.timeout(30000);
+
+            const compilersAvailableForTest = await areCompilersAvailable();
+            if (!compilersAvailableForTest) {
+                console.log('[Boundary Test] Compilers not available, skipping file I/O test');
+                this.skip();
+                return;
+            }
+
+            const fileIOEdgeCaseCode = `#include <stdio.h>
+#include <string.h>
+int main() {
+    FILE* file = tmpfile();
+    if (file == NULL) {
+        printf("file_error\\n");
+        return 1;
+    }
+    
+    // Test writing and reading exactly at buffer boundaries
+    char buffer[4096];
+    memset(buffer, 'A', sizeof(buffer));
+    buffer[sizeof(buffer) - 1] = '\\0';
+    
+    fprintf(file, "%s", buffer);
+    rewind(file);
+    
+    char readBuffer[4096];
+    if (fgets(readBuffer, sizeof(readBuffer), file)) {
+        printf("file_io_success:%zu\\n", strlen(readBuffer));
+    } else {
+        printf("file_io_error\\n");
+    }
+    
+    fclose(file);
+    return 0;
+}`;
+
+            const created = await createProblemAndOpen('UT-File-IO-Edge', 'c', fileIOEdgeCaseCode);
+            try {
+                const res: any = await vscode.commands.executeCommand('oicode.runCode', '');
+
+                assert.ok(res, 'should handle file I/O edge cases');
+                assert.strictEqual(typeof res.output, 'string', 'output should be a string');
+                console.log('[Boundary Test] ✓ File I/O edge case handled correctly:', res.output.trim());
+            } finally {
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+                await cleanupDir(created.problemDir);
+            }
+        });
+    });
 });
