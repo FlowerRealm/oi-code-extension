@@ -8,6 +8,7 @@ import * as os from 'os';
 import * as https from 'https';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { IncomingMessage } from 'http';
 import { ProcessRunner } from '../../process';
 import { LLVMInstallResult } from '../../types';
 
@@ -56,7 +57,7 @@ export class CompilerInstaller {
                 default:
                     return await this.showInstallationGuide();
             }
-        } catch (error: any) {
+        } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             const errorResult: LLVMInstallResult = {
                 success: false,
                 message: `Installation failed: ${error.message}`
@@ -107,16 +108,16 @@ export class CompilerInstaller {
                     title: 'Downloading LLVM Installer...',
                     cancellable: true
                 },
-                async (progress, _token) => {
+                async (progress) => {
                     try {
                         return new Promise<void>((resolve, reject) => {
                             const file = fs.createWriteStream(installerPath);
                             https
-                                .get(installerUrl, (response: any) => {
+                                .get(installerUrl, (response: IncomingMessage) => {
                                     const totalSize = parseInt(response.headers['content-length'] || '0');
                                     let downloadedSize = 0;
 
-                                    response.on('data', (chunk: any) => {
+                                    response.on('data', (chunk: Buffer) => {
                                         downloadedSize += chunk.length;
                                         const percent = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
                                         progress.report({ increment: percent, message: `${Math.round(percent)}%` });
@@ -130,7 +131,7 @@ export class CompilerInstaller {
                                 })
                                 .on('error', reject);
                         });
-                    } catch (error: any) {
+                    } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
                         throw new Error(`Failed to download LLVM installer: ${error.message}`);
                     }
                 }
@@ -172,7 +173,7 @@ export class CompilerInstaller {
             } else {
                 throw new Error(`Installer failed with exit code: ${installResult.exitCode}`);
             }
-        } catch (error: any) {
+        } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             output.appendLine(`[CompilerInstaller] Windows installation failed: ${error.message}`);
             return {
                 success: false,
@@ -242,7 +243,7 @@ export class CompilerInstaller {
             } else {
                 throw new Error(`Homebrew install failed with exit code: ${installResult.exitCode}`);
             }
-        } catch (error: any) {
+        } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             output.appendLine(`[CompilerInstaller] macOS installation failed: ${error.message}`);
             return {
                 success: false,
@@ -323,7 +324,7 @@ export class CompilerInstaller {
                     'Verify installation with: clang --version'
                 ]
             };
-        } catch (error: any) {
+        } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             output.appendLine(`[CompilerInstaller] Linux installation failed: ${error.message}`);
             return {
                 success: false,
@@ -481,10 +482,10 @@ Common installation methods:
                     }
                 };
 
-                const req = https.request(options, (res: any) => {
+                const req = https.request(options, (res: IncomingMessage) => {
                     let data = '';
 
-                    res.on('data', (chunk: any) => {
+                    res.on('data', (chunk: Buffer) => {
                         data += chunk;
                     });
 
@@ -498,7 +499,7 @@ Common installation methods:
                     });
                 });
 
-                req.on('error', (error: any) => {
+                req.on('error', (error: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                     reject(error);
                 });
 
@@ -522,7 +523,7 @@ Common installation methods:
             const hash = crypto.createHash('sha256');
             const stream = fs.createReadStream(filePath);
 
-            stream.on('data', (chunk: any) => {
+            stream.on('data', (chunk: Buffer) => {
                 hash.update(chunk);
             });
 
@@ -531,7 +532,7 @@ Common installation methods:
                 resolve(actualChecksum.toLowerCase() === expectedChecksum.toLowerCase());
             });
 
-            stream.on('error', (error: any) => {
+            stream.on('error', (error: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                 reject(error);
             });
         });
@@ -555,10 +556,10 @@ Common installation methods:
                     }
                 };
 
-                const req = https.request(options, (res: any) => {
+                const req = https.request(options, (res: IncomingMessage) => {
                     let data = '';
 
-                    res.on('data', (chunk: any) => {
+                    res.on('data', (chunk: Buffer) => {
                         data += chunk;
                     });
 
@@ -578,7 +579,7 @@ Common installation methods:
                     });
                 });
 
-                req.on('error', (error: any) => {
+                req.on('error', (error: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                     reject(error);
                 });
 

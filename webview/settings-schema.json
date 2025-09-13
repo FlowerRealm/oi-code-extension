@@ -9,50 +9,232 @@
         },
         {
             "name": "字体",
-            "description": "修改 OI-Code 的主题",
+            "description": "修改编辑器字体设置",
             "type": "search",
             "search_thing": "font",
             "value": "",
-            "vscode_setting_id": ""
+            "vscode_setting_id": "editor.fontFamily"
         },
         {
             "name": "保存时格式化文件",
             "description": "在保存时自动格式化文件",
-            "type": "",
-            "value": "",
+            "type": "boolean",
+            "value": true,
             "vscode_setting_id": "editor.formatOnSave"
+        }
+    ],
+    "编译优化设置": [
+        {
+            "name": "优化级别",
+            "description": "选择编译优化级别, O0 无优化, O3 最高优化",
+            "type": "select",
+            "options": ["O0", "O1", "O2", "O3"],
+            "value": "O2",
+            "vscode_setting_id": "oicode.compile.opt"
+        },
+        {
+            "name": "语言标准",
+            "description": "选择 C/C++ 语言标准",
+            "type": "select",
+            "options": ["c++23", "c++20", "c++17", "c++14", "c++11", "c11", "c99"],
+            "value": "c++17",
+            "vscode_setting_id": "oicode.compile.std"
+        },
+        {
+            "name": "Clang 20+ 自动降级",
+            "description": "自动降级 Clang 20+ 的 C++17 标准到 C++14 以避免兼容性问题",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.compile.autoDowngradeClang20"
+        }
+    ],
+    "运行行为设置": [
+        {
+            "name": "运行时时间限制",
+            "description": "程序运行的最大时间限制(秒)",
+            "type": "number",
+            "value": 5,
+            "vscode_setting_id": "oicode.run.timeLimit"
+        },
+        {
+            "name": "运行时内存限制",
+            "description": "程序运行的最大内存限制(MB)",
+            "type": "number",
+            "value": 4096,
+            "vscode_setting_id": "oicode.run.memoryLimit"
+        },
+        {
+            "name": "自动打开输出面板",
+            "description": "运行代码后自动显示输出面板",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.run.autoOpenOutput"
+        },
+        {
+            "name": "运行后自动清理临时文件",
+            "description": "运行完成后自动删除临时文件",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.run.autoCleanup"
+        }
+    ],
+      "调试设置": [
+        {
+            "name": "编译时包含调试信息",
+            "description": "编译时添加调试信息(-g 标志)",
+            "type": "boolean",
+            "value": false,
+            "vscode_setting_id": "oicode.debug.includeDebugInfo"
+        },
+        {
+            "name": "调试信息级别",
+            "description": "选择调试信息的详细程度",
+            "type": "select",
+            "options": [
+                "g0",
+                "g1",
+                "g2",
+                "g3"
+            ],
+            "value": "g1",
+            "vscode_setting_id": "oicode.debug.debugLevel"
+        },
+        {
+            "name": "运行时显示详细错误",
+            "description": "运行时显示详细的错误信息和堆栈跟踪",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.debug.verboseErrors"
+        },
+        {
+            "name": "地址检查器 (ASan)",
+            "description": "启用AddressSanitizer检测内存错误",
+            "type": "boolean",
+            "value": false,
+            "vscode_setting_id": "oicode.debug.addressSanitizer"
+        },
+        {
+            "name": "内存检查器 (MSan)",
+            "description": "启用MemorySanitizer检测未初始化内存访问",
+            "type": "boolean",
+            "value": false,
+            "vscode_setting_id": "oicode.debug.memorySanitizer"
+        },
+        {
+            "name": "未定义行为检查器",
+            "description": "启用UndefinedBehaviorSanitizer检测未定义行为",
+            "type": "boolean",
+            "value": false,
+            "vscode_setting_id": "oicode.debug.ubSanitizer"
+        },
+        {
+            "name": "栈保护强度",
+            "description": "选择栈保护级别",
+            "type": "select",
+            "options": [
+                "无",
+                "基本",
+                "全部",
+                "严格"
+            ],
+            "value": "基本",
+            "vscode_setting_id": "oicode.debug.stackProtector"
+        },
+        {
+            "name": "保存测试用例",
+            "description": "自动保存运行过的测试用例供后续使用",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.debug.saveTestCases"
         }
     ],
     "C 语言配置": [
         {
             "name": "C 编译器",
-            "description": "用于编译和运行 C 文件的编译器路径. 例如: /usr/bin/gcc",
+            "description": "用于编译和运行 C 文件的编译器路径, 例如: /usr/bin/gcc",
             "type": "fill",
             "value": "",
-            "vscode_setting_id": "oi-code.language.c.Command"
+            "vscode_setting_id": "oicode.language.c.command"
         },
         {
             "name": "C 编译参数",
-            "description": "C 语言的编译参数. 例如: -Wall -O2 -std=c++11",
+            "description": "C 语言的编译参数, 例如: -Wall -O2 -std=c11",
             "type": "fill",
             "value": "",
-            "vscode_setting_id": "oi-code.language.c.Args"
+            "vscode_setting_id": "oicode.language.c.args"
         }
     ],
     "C++ 语言配置": [
         {
             "name": "C++ 编译器",
-            "description": "用于编译和运行 C++ 文件的编译器路径. 例如: /usr/bin/g++",
+            "description": "用于编译和运行 C++ 文件的编译器路径, 例如: /usr/bin/g++",
             "type": "fill",
             "value": "",
-            "vscode_setting_id": "oi-code.language.cpp.Command"
+            "vscode_setting_id": "oicode.language.cpp.command"
         },
         {
             "name": "C++ 编译参数",
-            "description": "C++ 语言的编译参数. 例如: -Wall -O2 -std=c++11",
+            "description": "C++ 语言的编译参数, 例如: -Wall -O2 -std=c++17",
             "type": "fill",
             "value": "",
-            "vscode_setting_id": "oi-code.language.cpp.Args"
+            "vscode_setting_id": "oicode.language.cpp.args"
+        }
+    ],
+    "编译器警告设置": [
+        {
+            "name": "警告级别",
+            "description": "选择编译器警告级别",
+            "type": "select",
+            "options": [
+                "无",
+                "普通",
+                "详细",
+                "最严格"
+            ],
+            "value": "普通",
+            "vscode_setting_id": "oicode.warnings.level"
+        },
+        {
+            "name": "将警告视为错误",
+            "description": "将所有警告当作错误处理",
+            "type": "boolean",
+            "value": false,
+            "vscode_setting_id": "oicode.warnings.treatAsError"
+        },
+        {
+            "name": "显示额外警告",
+            "description": "显示额外的有用警告信息",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.warnings.extra"
+        },
+        {
+            "name": "未使用参数警告",
+            "description": "警告未使用的函数参数",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.warnings.unusedParams"
+        },
+        {
+            "name": "未使用变量警告",
+            "description": "警告未使用的变量",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.warnings.unusedVars"
+        },
+        {
+            "name": "格式安全警告",
+            "description": "警告printf/scanf等格式字符串安全问题",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.warnings.formatSecurity"
+        },
+        {
+            "name": "类型转换警告",
+            "description": "警告可能的类型转换问题",
+            "type": "boolean",
+            "value": true,
+            "vscode_setting_id": "oicode.warnings.conversion"
         }
     ]
 }

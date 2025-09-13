@@ -1,117 +1,636 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pair Check</title>
+    <title>对拍检查 - OI-Code</title>
     <style>
-        body, html {
-            height: 100%;
+        * {
             margin: 0;
             padding: 0;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                "Helvetica Neue", Arial, "Noto Sans", sans-serif,
-                "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-                "Noto Color Emoji";
-            color: var(--vscode-editor-foreground);
-            background-color: var(--vscode-editor-background);
+            box-sizing: border-box;
         }
-        .container { display: flex; flex-direction: column; height: 100%; }
-        .input-section {
+
+        :root {
+            --background-primary: #ffffff;
+            --background-secondary: #f8f9fa;
+            --background-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+            --border-color: #dee2e6;
+            --accent-color: #0066cc;
+            --accent-hover: #0052a3;
+            --success-color: #28a745;
+            --success-hover: #218838;
+            --warning-color: #ffc107;
+            --warning-hover: #e0a800;
+            --danger-color: #dc3545;
+            --danger-hover: #c82333;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+            --radius: 8px;
+            --transition: all 0.2s ease;
+        }
+
+        [data-theme='dark'] {
+            --background-primary: #1a1a1a;
+            --background-secondary: #2d2d2d;
+            --background-tertiary: #404040;
+            --text-primary: #e4e4e4;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --border-color: #404040;
+            --accent-color: #4d9fff;
+            --accent-hover: #6bb1ff;
+            --success-color: #34ce57;
+            --success-hover: #2fb94e;
+            --warning-color: #ffc107;
+            --warning-hover: #e0a800;
+            --danger-color: #dc3545;
+            --danger-hover: #c82333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            padding: 8px;
-            border-bottom: 1px solid var(--vscode-panel-border);
         }
-        .input-section textarea {
-            flex-grow: 1;
-            width: 98%;
-            border: 1px solid var(--vscode-input-border);
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            font-family: var(--vscode-editor-font-family);
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        .input-section button {
-            margin-top: 8px;
-            width: 100px;
-            border: 1px solid var(--vscode-button-border);
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+
+        .header {
+            background: var(--background-secondary);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .input-section button:hover { background-color: var(--vscode-button-hoverBackground); }
-        .output-section { flex-grow: 1; display: flex; flex-direction: row; overflow: hidden; }
-        .output-box {
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-ready {
+            background: var(--background-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .status-running {
+            background: var(--warning-color);
+            color: #000;
+        }
+
+        .status-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-error {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .input-section {
+            background: var(--background-secondary);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .input-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .input-title {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--background-tertiary);
+        }
+
+        .input-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--background-primary);
+            color: var(--text-primary);
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            resize: vertical;
+            transition: var(--transition);
+        }
+
+        .input-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .output-section {
             flex: 1;
-            padding: 8px;
-            overflow: auto;
+            display: flex;
+            overflow: hidden;
+            background: var(--background-primary);
+        }
+
+        .output-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .output-panel:last-child {
+            border-right: none;
+        }
+
+        .output-header {
+            background: var(--background-secondary);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .output-title {
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .output-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .output-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
             white-space: pre-wrap;
             word-wrap: break-word;
-            font-family: var(--vscode-editor-font-family);
         }
-        #output1-container { border-right: 1px solid var(--vscode-panel-border); }
-        h4 { margin-top: 0; margin-bottom: 8px; }
-        .diff-added { background-color: var(--vscode-editorGutter-addedBackground); }
-        .diff-removed { background-color: var(--vscode-editorGutter-deletedBackground); }
+
+        .output-empty {
+            color: var(--text-muted);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .diff-highlight {
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .diff-added {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: var(--success-color);
+        }
+
+        .diff-removed {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: var(--danger-color);
+        }
+
+        .stats-bar {
+            background: var(--background-secondary);
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+
+        .stats-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-label {
+            color: var(--text-secondary);
+        }
+
+        .stats-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-icon {
+            color: var(--success-color);
+        }
+
+        .error-icon {
+            color: var(--danger-color);
+        }
+
+        .warning-icon {
+            color: var(--warning-color);
+        }
+
+        @media (max-width: 768px) {
+            .output-section {
+                flex-direction: column;
+            }
+            
+            .output-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            
+            .output-panel:last-child {
+                border-bottom: none;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .stats-bar {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: flex-start;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="input-section">
-            <label for="input-data">Input data:</label>
-            <textarea id="input-data" rows="5"></textarea>
-            <button id="run-button">Run Pair Check</button>
-        </div>
-        <div class="output-section">
-            <div id="output1-container" class="output-box">
-                <h4>Left Code Output</h4>
-                <div id="output1-content"></div>
+        <div class="header">
+            <h1>对拍检查</h1>
+            <div class="header-controls">
+                <div class="status-indicator status-ready" id="status-indicator">
+                    <span>●</span>
+                    <span id="status-text">就绪</span>
+                </div>
             </div>
-            <div id="output2-container" class="output-box">
-                <h4>Right Code Output</h4>
-                <div id="output2-content"></div>
+        </div>
+
+        <div class="input-section">
+            <div class="input-header">
+                <h3 class="input-title">测试输入数据</h3>
+                <div class="input-actions">
+                    <button class="btn btn-secondary" id="clear-btn">
+                        <span>🗑️</span> 清空
+                    </button>
+                    <button class="btn btn-secondary" id="load-btn">
+                        <span>📁</span> 从文件加载
+                    </button>
+                    <button class="btn btn-primary" id="run-btn">
+                        <span>▶️</span> 运行对拍
+                    </button>
+                </div>
+            </div>
+            <textarea 
+                id="input-data" 
+                class="input-textarea" 
+                placeholder="在此输入测试数据，或使用上方按钮从文件加载..."
+            ></textarea>
+        </div>
+
+        <div class="output-section">
+            <div class="output-panel">
+                <div class="output-header">
+                    <h3 class="output-title">暴力代码输出</h3>
+                    <div class="output-status">
+                        <span id="left-status" class="output-status-icon"></span>
+                        <span id="left-status-text">等待输入</span>
+                    </div>
+                </div>
+                <div class="output-content" id="left-output">
+                    <div class="output-empty">等待运行...</div>
+                </div>
+            </div>
+
+            <div class="output-panel">
+                <div class="output-header">
+                    <h3 class="output-title">优化代码输出</h3>
+                    <div class="output-status">
+                        <span id="right-status" class="output-status-icon"></span>
+                        <span id="right-status-text">等待输入</span>
+                    </div>
+                </div>
+                <div class="output-content" id="right-output">
+                    <div class="output-empty">等待运行...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stats-item">
+                <span class="stats-label">执行时间:</span>
+                <span class="stats-value" id="execution-time">-</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label">比较结果:</span>
+                <span class="stats-value" id="comparison-result">未运行</span>
+            </div>
+            <div class="stats-item">
+                <span class="stats-label">字符差异:</span>
+                <span class="stats-value" id="diff-count">-</span>
             </div>
         </div>
     </div>
+
     <script>
         const vscode = acquireVsCodeApi();
-        document.getElementById('run-button').addEventListener('click', () => {
-            const inputData = document.getElementById('input-data').value;
-            vscode.postMessage({ command: 'runPairCheck', input: inputData });
-        });
 
-  
-        function escapeHtml(str) {
-            return str.replace(/[&<>"'/]/g, match => {
-                const escape = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;',
-                    '/': '&#x2F;'
-                };
-                return escape[match];
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function setSafeHtml(element, html) {
+            element.innerHTML = escapeHtml(html);
+        }
+
+        function updateStatus(status, text) {
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            
+            indicator.className = `status-indicator status-${status}`;
+            statusText.textContent = text;
+        }
+
+        function updateOutputStatus(side, status, text) {
+            const statusIcon = document.getElementById(`${side}-status`);
+            const statusText = document.getElementById(`${side}-status-text`);
+            
+            statusIcon.textContent = status === 'success' ? '✓' : status === 'error' ? '✗' : status === 'running' ? '⟳' : '●';
+            statusIcon.className = `output-status-icon ${status}-icon`;
+            statusText.textContent = text;
+        }
+
+        function setOutputContent(side, content, hasDiff = false) {
+            const outputElement = document.getElementById(`${side}-output`);
+            
+            if (!content || content.trim() === '') {
+                setSafeHtml(outputElement, '<div class="output-empty">无输出</div>');
+                return;
+            }
+
+            if (hasDiff) {
+                const diffedContent = highlightDifferences(content);
+                // Use setSafeHtml to safely set the diff-highlighted content
+                setSafeHtml(outputElement, diffedContent);
+            } else {
+                outputElement.textContent = content;
+            }
+        }
+
+        function highlightDifferences(text) {
+            // First escape the text to prevent XSS, then apply diff highlighting
+            const escapedText = escapeHtml(text);
+            return escapedText
+                .replace(/^[+](.*)$/gm, '<span class="diff-highlight diff-added">+$1</span>')
+                .replace(/^[-](.*)$/gm, '<span class="diff-highlight diff-removed">-$1</span>');
+        }
+
+        function updateStats(executionTime, comparisonResult, diffCount) {
+            document.getElementById('execution-time').textContent = executionTime || '-';
+            document.getElementById('comparison-result').textContent = comparisonResult || '-';
+            document.getElementById('diff-count').textContent = diffCount || '-';
+        }
+
+        function clearOutputs() {
+            setOutputContent('left', '');
+            setOutputContent('right', '');
+            updateOutputStatus('left', 'ready', '等待输入');
+            updateOutputStatus('right', 'ready', '等待输入');
+            updateStats('-', '未运行', '-');
+        }
+
+        function runPairCheck() {
+            const inputData = document.getElementById('input-data').value;
+            
+            if (!inputData.trim()) {
+                vscode.postMessage({
+                    command: 'showError',
+                    message: '请输入测试数据'
+                });
+                return;
+            }
+
+            updateStatus('running', '运行中...');
+            updateOutputStatus('left', 'running', '执行中...');
+            updateOutputStatus('right', 'running', '执行中...');
+            clearOutputs();
+
+            vscode.postMessage({
+                command: 'runPairCheck',
+                input: inputData
             });
         }
 
-        function setSafeHtml(elementId, content) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                // Always escape HTML content to prevent XSS attacks
-                element.textContent = content;
-            }
-        }
+        document.getElementById('run-btn').addEventListener('click', runPairCheck);
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            document.getElementById('input-data').value = '';
+            clearOutputs();
+            updateStatus('ready', '就绪');
+        });
+
+        document.getElementById('load-btn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'loadTestData' });
+        });
 
         window.addEventListener('message', event => {
             const message = event.data;
+            
             switch (message.command) {
-                case 'setOutputs':
-                    setSafeHtml('output1-content', message.output1);
-                    setSafeHtml('output2-content', message.output2);
+                case 'set-theme':
+                    document.documentElement.setAttribute('data-theme', message.theme);
+                    break;
+                    
+                case 'pairCheckStarted':
+                    updateStatus('running', '运行中...');
+                    updateOutputStatus('left', 'running', '执行中...');
+                    updateOutputStatus('right', 'running', '执行中...');
+                    break;
+                    
+                case 'pairCheckComplete':
+                    const { output1, output2, executionTime, isMatch } = message;
+                    
+                    updateStatus(isMatch ? 'success' : 'error', isMatch ? '完成 - 输出一致' : '完成 - 输出不一致');
+                    
+                    updateOutputStatus('left', 'success', '执行完成');
+                    updateOutputStatus('right', 'success', '执行完成');
+                    
+                    setOutputContent('left', output1, !isMatch);
+                    setOutputContent('right', output2, !isMatch);
+                    
+                    const diffCount = !isMatch ? calculateDifferences(output1, output2) : 0;
+                    updateStats(
+                        executionTime ? `${executionTime}ms` : '-',
+                        isMatch ? '✓ 一致' : '✗ 不一致',
+                        isMatch ? '0' : diffCount.toString()
+                    );
+                    
+                    if (!isMatch) {
+                        updateOutputStatus('left', 'error', '存在差异');
+                        updateOutputStatus('right', 'error', '存在差异');
+                    }
+                    break;
+                    
+                case 'pairCheckError':
+                    updateStatus('error', '执行失败');
+                    updateOutputStatus('left', 'error', '执行失败');
+                    updateOutputStatus('right', 'error', '执行失败');
+                    updateStats('-', '错误', '-');
+                    break;
+                    
+                case 'testDataLoaded':
+                    document.getElementById('input-data').value = message.data;
+                    break;
+                    
+                case 'showError':
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: var(--danger-color);
+                        color: white;
+                        padding: 1rem;
+                        border-radius: var(--radius);
+                        z-index: 1000;
+                        max-width: 300px;
+                        box-shadow: var(--shadow-md);
+                    `;
+                    errorDiv.textContent = message.message;
+                    document.body.appendChild(errorDiv);
+                    
+                    setTimeout(() => {
+                        errorDiv.remove();
+                    }, 5000);
                     break;
             }
         });
+
+        function calculateDifferences(str1, str2) {
+            const lines1 = str1.split('\n');
+            const lines2 = str2.split('\n');
+            const maxLines = Math.max(lines1.length, lines2.length);
+            
+            let diffCount = 0;
+            for (let i = 0; i < maxLines; i++) {
+                if (lines1[i] !== lines2[i]) {
+                    diffCount++;
+                }
+            }
+            
+            return diffCount;
+        }
+
+        vscode.postMessage({ command: 'get-theme' });
     </script>
 </body>
 </html>

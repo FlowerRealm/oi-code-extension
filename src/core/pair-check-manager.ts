@@ -3,17 +3,26 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as Diff from 'diff';
 import { NativeCompilerManager } from '../native';
-import { CompilerInfo } from '../types';
 import { DEFAULT_PAIR_CHECK_TIME_LIMIT, DEFAULT_PAIR_CHECK_MEMORY_LIMIT, OI_CODE_TEST_BASE_PATH } from '../constants';
-import { htmlEscape, getLanguageIdFromEditor, normalizeOutput, getWebviewContent } from '../utils/webview-utils';
+import {
+    htmlEscape,
+    getLanguageIdFromEditor,
+    normalizeOutput,
+    getWebviewContent,
+    getTheme,
+    postWebviewMessage
+} from '../utils/webview-utils';
 import { getSuitableCompiler } from '../utils/compiler-utils';
 
-export class PairCheckManager {
+import { BaseManager } from './base-manager';
+
+export class PairCheckManager extends BaseManager {
     private static instance: PairCheckManager;
     private _view?: vscode.WebviewView;
-    private context: vscode.ExtensionContext | undefined;
 
-    private constructor() {}
+    private constructor() {
+        super();
+    }
 
     public static getInstance(): PairCheckManager {
         if (!PairCheckManager.instance) {
@@ -24,13 +33,6 @@ export class PairCheckManager {
 
     public setContext(context: vscode.ExtensionContext) {
         this.context = context;
-    }
-
-    private async getSuitableCompiler(
-        context: vscode.ExtensionContext,
-        languageId: 'c' | 'cpp'
-    ): Promise<CompilerInfo> {
-        return getSuitableCompiler(context, languageId);
     }
 
     private async runPairWithNativeCompilers(
@@ -56,7 +58,7 @@ export class PairCheckManager {
             spaceExceeded?: boolean;
         };
     }> {
-        const compiler = await this.getSuitableCompiler(context, languageId);
+        const compiler = await getSuitableCompiler(context, languageId);
         const timeLimit = options?.timeLimit ?? DEFAULT_PAIR_CHECK_TIME_LIMIT;
         const memoryLimit = options?.memoryLimit ?? DEFAULT_PAIR_CHECK_MEMORY_LIMIT;
 
@@ -109,7 +111,7 @@ export class PairCheckManager {
         }
     }
 
-    private _getPairCheckEditors(): [vscode.TextEditor, vscode.TextEditor] {
+    private getPairCheckEditors(): [vscode.TextEditor, vscode.TextEditor] {
         const editors = vscode.window.visibleTextEditors.filter(
             e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp')
         );
@@ -198,7 +200,7 @@ export class PairCheckManager {
         options?: { timeLimit?: number; memoryLimit?: number }
     ) {
         try {
-            const [editor1, editor2] = this._getPairCheckEditors();
+            const [editor1, editor2] = this.getPairCheckEditors();
             const input = testInput ?? '';
             const result = await this.executePairCheck(context, editor1, editor2, input, options);
             this.setOutputs(htmlEscape(result.output1 || ''), htmlEscape(result.output2 || ''));
@@ -215,22 +217,34 @@ export class PairCheckManager {
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.ExtensionContext,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken
+        context: vscode.ExtensionContext
     ) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
         getWebviewContent(context, 'pair-check.html').then(html => {
             if (this._view) {
                 this._view.webview.html = html;
+                // 初始化时发送当前主题
+                const currentTheme = getTheme(vscode.window.activeColorTheme.kind);
+                postWebviewMessage(this._view, 'set-theme', { theme: currentTheme });
             }
+        });
+
+        // 监听主题变化
+        const themeListener = vscode.window.onDidChangeActiveColorTheme(e => {
+            if (this._view) {
+                postWebviewMessage(this._view, 'set-theme', { theme: getTheme(e.kind) });
+            }
+        });
+
+        webviewView.onDidDispose(() => {
+            themeListener.dispose();
         });
 
         webviewView.webview.onDidReceiveMessage(async (message: { command: string; input?: string }) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const [editor1, editor2] = this._getPairCheckEditors();
+                    const [editor1, editor2] = this.getPairCheckEditors();
 
                     this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
 
