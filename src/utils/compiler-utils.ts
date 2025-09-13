@@ -55,7 +55,6 @@ export async function detectCompilersWithProgress(
     context: vscode.ExtensionContext,
     title: string,
     forceRescan: boolean = false,
-    _deepScan: boolean = false,
     successMessage?: string
 ): Promise<void> {
     return await vscode.window.withProgress(

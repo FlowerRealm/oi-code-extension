@@ -1,32 +1,39 @@
 export class Logger {
     private static instance: Logger;
     private prefix = '[OI-Code]';
+    private context: string;
 
-    private constructor() {}
+    public constructor(context?: string) {
+        this.context = context || '';
+    }
 
-    public static getInstance(): Logger {
-        if (!Logger.instance) {
+    public static getInstance(context?: string): Logger {
+        if (!Logger.instance && !context) {
             Logger.instance = new Logger();
         }
-        return Logger.instance;
+        return context ? new Logger(context) : Logger.instance;
     }
 
     public info(message: string, ...args: unknown[]): void {
-        console.log(`${this.prefix} INFO: ${message}`, ...args);
+        const prefix = this.context ? `[${this.context}]` : this.prefix;
+        console.log(`${prefix} INFO: ${message}`, ...args);
     }
 
     public error(message: string, ...args: unknown[]): void {
-        console.error(`${this.prefix} ERROR: ${message}`, ...args);
+        const prefix = this.context ? `[${this.context}]` : this.prefix;
+        console.error(`${prefix} ERROR: ${message}`, ...args);
     }
 
     public warn(message: string, ...args: unknown[]): void {
-        console.warn(`${this.prefix} WARN: ${message}`, ...args);
+        const prefix = this.context ? `[${this.context}]` : this.prefix;
+        console.warn(`${prefix} WARN: ${message}`, ...args);
     }
 
     public debug(message: string, ...args: unknown[]): void {
         if (process.env.NODE_ENV === 'development') {
+            const prefix = this.context ? `[${this.context}]` : this.prefix;
             // eslint-disable-next-line no-console
-            console.debug(`${this.prefix} DEBUG: ${message}`, ...args);
+            console.debug(`${prefix} DEBUG: ${message}`, ...args);
         }
     }
 }

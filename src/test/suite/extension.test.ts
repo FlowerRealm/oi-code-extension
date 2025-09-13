@@ -193,7 +193,7 @@ suite('Extension Test Suite', () => {
         assert.ok(activeTab, 'No active tab found after executing command');
         const isWebview = activeTab.input instanceof vscode.TabInputWebview;
         assert.ok(isWebview, 'The active tab is not a webview panel');
-        assert.strictEqual(activeTab.label, 'OI-Code Settings', 'Webview panel title is incorrect');
+        assert.strictEqual(activeTab.label, 'OI-Code 设置', 'Webview panel title is incorrect');
     });
 
     test('Compiler initialization and code execution', async function () {

@@ -111,7 +111,7 @@ export class PairCheckManager extends BaseManager {
         }
     }
 
-    private _getPairCheckEditors(): [vscode.TextEditor, vscode.TextEditor] {
+    private getPairCheckEditors(): [vscode.TextEditor, vscode.TextEditor] {
         const editors = vscode.window.visibleTextEditors.filter(
             e => !e.document.isUntitled && (e.document.languageId === 'c' || e.document.languageId === 'cpp')
         );
@@ -200,7 +200,7 @@ export class PairCheckManager extends BaseManager {
         options?: { timeLimit?: number; memoryLimit?: number }
     ) {
         try {
-            const [editor1, editor2] = this._getPairCheckEditors();
+            const [editor1, editor2] = this.getPairCheckEditors();
             const input = testInput ?? '';
             const result = await this.executePairCheck(context, editor1, editor2, input, options);
             this.setOutputs(htmlEscape(result.output1 || ''), htmlEscape(result.output2 || ''));
@@ -217,9 +217,7 @@ export class PairCheckManager extends BaseManager {
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.ExtensionContext,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken
+        context: vscode.ExtensionContext
     ) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
@@ -246,7 +244,7 @@ export class PairCheckManager extends BaseManager {
         webviewView.webview.onDidReceiveMessage(async (message: { command: string; input?: string }) => {
             if (message.command === 'runPairCheck') {
                 try {
-                    const [editor1, editor2] = this._getPairCheckEditors();
+                    const [editor1, editor2] = this.getPairCheckEditors();
 
                     this.setOutputs('<i>Running...</i>', '<i>Running...</i>');
 

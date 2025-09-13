@@ -50,7 +50,6 @@ export class UnifiedUtils {
      */
     static async safeExecute<T>(
         fn: () => Promise<T>,
-        _errorMessage: string = 'Operation failed',
         context: string = 'Operation'
     ): Promise<T | undefined> {
         try {

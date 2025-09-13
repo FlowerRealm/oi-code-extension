@@ -105,7 +105,7 @@ export class LLVMInstaller {
 
             // 解压LLVM
             progress.report({ message: '解压LLVM...', increment: 30 });
-            await this.extractLLVM(archivePath, installPath, platform);
+            await this.extractLLVM(archivePath, installPath);
             outputChannel.appendLine(`[LLVMInstaller] Extracted to: ${installPath}`);
 
             // 清理临时文件
@@ -245,7 +245,7 @@ export class LLVMInstaller {
     /**
      * 解压LLVM压缩包
      */
-    private static async extractLLVM(archivePath: string, installPath: string, _platform: string): Promise<void> {
+    private static async extractLLVM(archivePath: string, installPath: string): Promise<void> {
         const outputChannel = this.getOutputChannel();
 
         if (archivePath.endsWith('.zip')) {

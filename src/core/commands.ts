@@ -135,7 +135,7 @@ export class CommandManager extends BaseManager {
     }
 
     public async initializeEnvironment() {
-        await detectCompilersWithProgress(this.getContext(), 'Check Compiler Environment', false, false);
+        await detectCompilersWithProgress(this.getContext(), 'Check Compiler Environment', false);
     }
 
     public async rescanCompilers() {
@@ -143,7 +143,6 @@ export class CommandManager extends BaseManager {
             this.getContext(),
             'Rescanning compilers...',
             true,
-            false,
             'Compiler rescan completed!'
         );
     }
@@ -168,7 +167,6 @@ export class CommandManager extends BaseManager {
             this.getContext(),
             'Deep Scanning for Compilers...',
             false,
-            true,
             'Deep scan completed!'
         );
         NativeCompilerManager.getOutputChannel().show(true);

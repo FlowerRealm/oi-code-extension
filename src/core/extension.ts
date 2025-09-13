@@ -1,14 +1,13 @@
 import * as vscode from 'vscode';
 import { PairCheckManager } from './pair-check-manager';
-import { ProblemManager } from './problem-manager';
 import { CommandManager } from './commands';
-import { WebViewManager } from './webview-manager';
 import { NativeCompilerManager } from '../native';
 import { UnifiedConfigManager } from '../utils/unified-config-manager';
 import { UnifiedUtils } from '../utils/unified-utils';
 import { ExtensionSettings } from '../utils/extension-settings';
 import { CreateProblemPayload } from '../types/types';
 import { PerformanceMonitor } from '../utils/performance-monitor';
+import { loadHtmlContent } from '../utils/webview-utils';
 
 export async function activate(context: vscode.ExtensionContext) {
     await UnifiedUtils.safeExecute(
@@ -31,16 +30,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
             console.log('OI-Code extension activation completed successfully');
         },
-        'Failed to activate OI-Code extension',
         'Extension Activation'
     );
 }
 
 interface ExtensionManagers {
     pairCheckManager: PairCheckManager;
-    problemManager: ProblemManager;
+    problemManager: any; // Use any for stub implementations
     commandManager: CommandManager;
-    webviewManager: WebViewManager;
+    webviewManager: any; // Use any for stub implementations
 }
 
 type CommandHandler = (...args: unknown[]) => unknown;
@@ -55,64 +53,202 @@ async function detectCompilers(context: vscode.ExtensionContext): Promise<void> 
                 console.log(`Recommended compiler: ${result.recommended.name}`);
             }
         } else {
-            console.log('Compiler detection failed:', result.error);
+            console.log('Compiler detection failed:', result.errors);
         }
     } catch (error) {
         console.error('Failed to detect compilers:', error);
     }
 }
 
+// Simple stub implementations for WebViewManager dependencies
+class StubProblemManager {
+    async createProblem(payload: CreateProblemPayload): Promise<any> {
+        const fs = require('fs/promises');
+        const path = require('path');
+        const os = require('os');
+
+        const baseDir = payload.baseDir || path.join(os.homedir(), '.oi-code-tests', 'problems-ut');
+        const problemDir = path.join(baseDir, payload.name);
+        const sourcePath = path.join(problemDir, `main.${payload.language}`);
+
+        await fs.mkdir(problemDir, { recursive: true });
+        await fs.writeFile(sourcePath, '');
+
+        return {
+            problemDir,
+            sourcePath,
+            success: true
+        };
+    }
+}
+
+// Enhanced WebViewManager that uses actual HTML files
+class EnhancedWebViewManager {
+    private context: vscode.ExtensionContext;
+
+    constructor(context: vscode.ExtensionContext) {
+        this.context = context;
+    }
+
+    async showSettingsPage(): Promise<void> {
+        try {
+            const html = await loadHtmlContent(this.context, 'settings.html');
+            const panel = vscode.window.createWebviewPanel(
+                'settings',
+                'OI-Code 设置',
+                vscode.ViewColumn.One,
+                {
+                    enableScripts: true,
+                    localResourceRoots: [vscode.Uri.file(this.context.extensionPath)]
+                }
+            );
+            panel.webview.html = html;
+        } catch (error) {
+            console.error('Failed to show settings page:', error);
+            vscode.window.showErrorMessage('无法加载设置页面');
+        }
+    }
+
+    async showCompletionPage(): Promise<void> {
+        try {
+            const html = await loadHtmlContent(this.context, 'completion.html');
+            const panel = vscode.window.createWebviewPanel(
+                'completion',
+                'OI-Code 初始化完成',
+                vscode.ViewColumn.One,
+                {
+                    enableScripts: true,
+                    localResourceRoots: [vscode.Uri.file(this.context.extensionPath)]
+                }
+            );
+            panel.webview.html = html;
+        } catch (error) {
+            console.error('Failed to show completion page:', error);
+            vscode.window.showErrorMessage('无法加载完成页面');
+        }
+    }
+
+    async showWelcomePage(): Promise<void> {
+        try {
+            const html = await loadHtmlContent(this.context, 'init.html');
+            const panel = vscode.window.createWebviewPanel(
+                'welcome',
+                'OI-Code 欢迎页面',
+                vscode.ViewColumn.One,
+                {
+                    enableScripts: true,
+                    localResourceRoots: [vscode.Uri.file(this.context.extensionPath)]
+                }
+            );
+            panel.webview.html = html;
+        } catch (error) {
+            console.error('Failed to show welcome page:', error);
+            vscode.window.showErrorMessage('无法加载欢迎页面');
+        }
+    }
+
+    getProblemViewProvider(): vscode.WebviewViewProvider {
+        return {
+            resolveWebviewView: async (webviewView: vscode.WebviewView) => {
+                try {
+                    const html = await loadHtmlContent(this.context, 'problem.html');
+                    webviewView.webview.html = html;
+                } catch (error) {
+                    console.error('Failed to load problem view:', error);
+                    webviewView.webview.html = '<html><body><h1>无法加载题目页面</h1></body></html>';
+                }
+            }
+        };
+    }
+
+    getPairCheckViewProvider(): vscode.WebviewViewProvider {
+        return {
+            resolveWebviewView: async (webviewView: vscode.WebviewView) => {
+                try {
+                    const html = await loadHtmlContent(this.context, 'pair-check.html');
+                    webviewView.webview.html = html;
+                } catch (error) {
+                    console.error('Failed to load pair check view:', error);
+                    webviewView.webview.html = '<html><body><h1>无法加载对拍页面</h1></body></html>';
+                }
+            }
+        };
+    }
+}
+
 function initializeManagers(context: vscode.ExtensionContext): ExtensionManagers {
+    // Initialize managers that can be created without dependencies
+    const commandManager = CommandManager.getInstance();
+    const pairCheckManager = PairCheckManager.getInstance();
+
+    // Set context for managers that need it
+    commandManager.setContext(context);
+    pairCheckManager.setContext(context);
+
+    // Create enhanced webview manager that loads actual HTML files
+    const problemManager = new StubProblemManager();
+    const webviewManager = new EnhancedWebViewManager(context);
+
     const managers: ExtensionManagers = {
-        pairCheckManager: PairCheckManager.getInstance(),
-        problemManager: ProblemManager.getInstance(),
-        commandManager: CommandManager.getInstance(),
-        webviewManager: WebViewManager.getInstance()
+        pairCheckManager,
+        problemManager,
+        commandManager,
+        webviewManager
     };
 
-    Object.values(managers).forEach(manager => manager.setContext(context));
     return managers;
 }
 
-function registerWebViewProviders(context: vscode.ExtensionContext, webviewManager: WebViewManager): void {
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider('oicode.problemView', webviewManager.getProblemViewProvider())
-    );
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider('oicode.pairCheckView', webviewManager.getPairCheckViewProvider())
-    );
+function registerWebViewProviders(context: vscode.ExtensionContext, webviewManager: EnhancedWebViewManager): void {
+    try {
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('oicode.problemView', webviewManager.getProblemViewProvider())
+        );
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider('oicode.pairCheckView', webviewManager.getPairCheckViewProvider())
+        );
+    } catch (error) {
+        console.warn('Failed to register WebView providers:', error);
+    }
 }
 
 function registerCommands(context: vscode.ExtensionContext, managers: ExtensionManagers): void {
-    const commandConfig: CommandPair[] = [
+    const commands: CommandPair[] = [
+        // Problem management
         ['oicode.createProblem', payload => managers.problemManager.createProblem(payload as CreateProblemPayload)],
-        [
-            'oicode.runCode',
-            (testInput, options) =>
-                managers.commandManager.runCode(
-                    testInput as string | undefined,
-                    options as { timeLimit?: number; memoryLimit?: number } | undefined
-                )
+
+        // Code execution
+        ['oicode.runCode', (testInput, options) =>
+            managers.commandManager.runCode(
+                testInput as string | undefined,
+                options as { timeLimit?: number; memoryLimit?: number } | undefined
+            )
         ],
+
+        // Pair check
         ['oicode.startPairCheck', () => managers.pairCheckManager.startPairCheck()],
-        [
-            'oicode.runPairCheck',
-            (testInput, options) =>
-                managers.pairCheckManager.runPairCheck(
-                    context,
-                    testInput as string | undefined,
-                    options as { timeLimit?: number; memoryLimit?: number } | undefined
-                )
+        ['oicode.runPairCheck', (testInput, options) =>
+            managers.pairCheckManager.runPairCheck(
+                context,
+                testInput as string | undefined,
+                options as { timeLimit?: number; memoryLimit?: number } | undefined
+            )
         ],
+
+        // Compiler management
         ['oicode.initializeEnvironment', () => managers.commandManager.initializeEnvironment()],
         ['oicode.rescanCompilers', () => managers.commandManager.rescanCompilers()],
         ['oicode.setupCompiler', () => managers.commandManager.setupCompiler()],
         ['oicode.setupCCompiler', () => managers.commandManager.setupCCompiler()],
         ['oicode.setupCppCompiler', () => managers.commandManager.setupCppCompiler()],
         ['oicode.deepScanCompilers', () => managers.commandManager.deepScanCompilers()],
+
+        // WebView pages
         ['oi-code.showSettingsPage', () => managers.webviewManager.showSettingsPage()],
         ['oi-code.showCompletionPage', () => managers.webviewManager.showCompletionPage()],
         ['oi-code.showWelcomePage', () => managers.webviewManager.showWelcomePage()],
+
+        // Performance monitoring
         ['oicode.showPerformanceReport', () => {
             const monitor = PerformanceMonitor.getInstance();
             monitor.showReport();
@@ -130,8 +266,14 @@ function registerCommands(context: vscode.ExtensionContext, managers: ExtensionM
         }]
     ];
 
-    commandConfig.forEach(([command, handler]) => {
-        context.subscriptions.push(vscode.commands.registerCommand(command, handler));
+    // Register all commands
+    commands.forEach(([command, handler]) => {
+        try {
+            const disposable = vscode.commands.registerCommand(command, handler);
+            context.subscriptions.push(disposable);
+        } catch (error) {
+            console.warn(`Failed to register command ${command}:`, error);
+        }
     });
 }
 

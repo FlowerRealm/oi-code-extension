@@ -3,31 +3,20 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *-------------------------------------------------------------------------------------------- */
 
-/**
- * Compiler information interface
- */
-export interface CompilerInfo {
-    path: string;
-    name: string;
-    type: 'clang' | 'clang++' | 'gcc' | 'g++' | 'msvc' | 'apple-clang';
-    version: string;
-    supportedStandards: string[];
-    is64Bit: boolean;
-    priority: number;
-}
-
-/**
- * Compiler detection result
- */
-export interface CompilerDetectionResult {
-    success: boolean;
-    compilers: CompilerInfo[];
-    recommended?: CompilerInfo;
-    error?: string;
-    suggestions: string[];
-    cacheVersion?: string;
-    cachedAt?: number;
-}
+// Re-export types from models to avoid duplication
+export {
+    CompilerInfo,
+    CompilerDetectionResult,
+    ValidationResult,
+    CompilationResult,
+    ProgrammingLanguage,
+    LanguageStandard,
+    OptimizationLevel,
+    CompilationError,
+    DiagnosticSeverity,
+    Diagnostic,
+    ID
+} from './models';
 
 /**
  * LLVM installation result

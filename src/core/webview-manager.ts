@@ -1,627 +1,915 @@
 import * as vscode from 'vscode';
-import { getTheme, postWebviewMessage } from '../utils/webview-utils';
-import { PairCheckManager } from './pair-check-manager';
-import { ProblemManager } from './problem-manager';
-import { BaseManager } from './base-manager';
-import { UnifiedWebViewManager } from '../utils/unified-webview-manager';
-import { UnifiedConfigManager } from '../utils/unified-config-manager';
-import { WebViewThemeManager } from '../utils/webview-theme-manager';
-import { UnifiedUtils } from '../utils/unified-utils';
-import { NativeCompilerManager } from '../native/manager/nativeCompilerManager';
-import { CompilerInfo } from '../types/types';
-import { ExtensionSettings } from '../utils/extension-settings';
-import { LLVMInstaller } from '../utils/llvm-installer';
+import { EventSystem, EventSystemManager } from './event-system';
+import {
+    WebViewManager,
+    WebViewAPI,
+    WebViewMessage,
+    WebViewRequest,
+    WebViewResponse,
+    WebViewState,
+    WebViewConfig,
+    WebViewTheme,
+    WebViewContent,
+    WebViewPanelConfig
+} from '../types/webview';
+import {
+    ProblemManagerAPI,
+    CompilerManagerAPI,
+    TestRunnerAPI,
+    PairCheckManagerAPI
+} from '../types/models';
+import { Disposable } from '../types/models';
 
-export class WebViewManager extends BaseManager {
-    private static instance: WebViewManager;
-    private webviewManager: UnifiedWebViewManager;
-    private configManager: UnifiedConfigManager;
-    private themeManager: WebViewThemeManager;
-    private pairCheckManager!: PairCheckManager;
-    private problemManager!: ProblemManager;
+/**
+ * WebView Manager implementation
+ * Manages WebView panels, communication, and content rendering
+ */
+export class WebViewManagerImpl implements WebViewManager, Disposable {
+    private static instance: WebViewManagerImpl;
+    private panels: Map<string, vscode.WebviewPanel> = new Map();
+    private messageHandlers: Map<string, (message: WebViewMessage) => void> = new Map();
+    private disposables: Disposable[] = [];
+    private eventSystem: EventSystem;
+    private config: WebViewConfig;
+    private problemManager: ProblemManagerAPI;
+    private compilerManager: CompilerManagerAPI;
+    private testRunner: TestRunnerAPI;
+    private pairCheckManager: PairCheckManagerAPI;
 
-    private constructor() {
-        super();
-        this.webviewManager = UnifiedWebViewManager.getInstance();
-        this.configManager = UnifiedConfigManager.getInstance();
-        this.themeManager = WebViewThemeManager.getInstance();
-        this.initializeDependencies();
+    private constructor(
+        problemManager: ProblemManagerAPI,
+        compilerManager: CompilerManagerAPI,
+        testRunner: TestRunnerAPI,
+        pairCheckManager: PairCheckManagerAPI,
+        config: Partial<WebViewConfig> = {}
+    ) {
+        this.eventSystem = EventSystemManager.getInstance();
+        this.problemManager = problemManager;
+        this.compilerManager = compilerManager;
+        this.testRunner = testRunner;
+        this.pairCheckManager = pairCheckManager;
+        this.config = this.mergeConfig(config);
     }
 
-    public static getInstance(): WebViewManager {
-        if (!WebViewManager.instance) {
-            WebViewManager.instance = new WebViewManager();
+    static getInstance(
+        problemManager?: ProblemManagerAPI,
+        compilerManager?: CompilerManagerAPI,
+        testRunner?: TestRunnerAPI,
+        pairCheckManager?: PairCheckManagerAPI,
+        config?: Partial<WebViewConfig>
+    ): WebViewManagerImpl {
+        if (!WebViewManagerImpl.instance) {
+            if (!problemManager || !compilerManager || !testRunner || !pairCheckManager) {
+                throw new Error('All managers are required for first initialization');
+            }
+            WebViewManagerImpl.instance = new WebViewManagerImpl(
+                problemManager,
+                compilerManager,
+                testRunner,
+                pairCheckManager,
+                config
+            );
         }
-        return WebViewManager.instance;
+        return WebViewManagerImpl.instance;
     }
 
-    private initializeDependencies(): void {
-        this.pairCheckManager = PairCheckManager.getInstance();
-        this.problemManager = ProblemManager.getInstance();
-    }
-
-    public setContext(context: vscode.ExtensionContext) {
-        super.setContext(context);
-        this.pairCheckManager.setContext(context);
-        this.problemManager.setContext(context);
-    }
-
-    public getPairCheckViewProvider() {
+    private mergeConfig(config: Partial<WebViewConfig>): WebViewConfig {
         return {
-            resolveWebviewView: (
-                webviewView: vscode.WebviewView,
-                context: vscode.WebviewViewResolveContext,
-                token: vscode.CancellationToken
-            ) => {
-                if (!this.context) {
-                    throw new Error('Context not initialized');
-                }
-                this.pairCheckManager.resolveWebviewView(webviewView, this.context, context, token);
+            enableScripts: config.enableScripts !== false,
+            enableForms: config.enableForms !== false,
+            localResourceRoots: config.localResourceRoots || [],
+            port: config.port || 3000,
+            theme: config.theme || 'system',
+            enableAnimations: config.enableAnimations !== false,
+            enableDebug: config.enableDebug || false,
+            enableCors: config.enableCors !== false,
+            enableCompression: config.enableCompression !== false,
+            maxMessageSize: config.maxMessageSize || 1024 * 1024, // 1MB
+            timeout: config.timeout || 30000,
+            enableMetrics: config.enableMetrics !== false
+        };
+    }
+
+    /**
+     * Create a new WebView panel
+     */
+    async createWebViewPanel(config: WebViewPanelConfig): Promise<vscode.WebviewPanel> {
+        const panel = vscode.window.createWebviewPanel(
+            config.id,
+            config.title,
+            config.viewColumn || vscode.ViewColumn.One,
+            {
+                enableScripts: this.config.enableScripts,
+                localResourceRoots: this.config.localResourceRoots,
+                retainContextWhenHidden: config.retainContextWhenHidden || false,
+                enableFindWidget: config.enableFindWidget || true
+            }
+        );
+
+        // Set up message handler
+        panel.webview.onDidReceiveMessage(
+            message => this.handleWebViewMessage(config.id, message),
+            undefined,
+            this.disposables
+        );
+
+        // Handle panel disposal
+        panel.onDidDispose(() => {
+            this.panels.delete(config.id);
+            this.messageHandlers.delete(config.id);
+        }, undefined, this.disposables);
+
+        // Store panel
+        this.panels.set(config.id, panel);
+
+        // Set initial content
+        if (config.content) {
+            panel.webview.html = await this.generateWebViewContent(config.id, config.content);
+        }
+
+        return panel;
+    }
+
+    /**
+     * Get a WebView panel by ID
+     */
+    getWebViewPanel(id: string): vscode.WebviewPanel | undefined {
+        return this.panels.get(id);
+    }
+
+    /**
+     * Show a WebView panel
+     */
+    async showWebViewPanel(id: string, viewColumn?: vscode.ViewColumn): Promise<void> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            throw new Error(`WebView panel not found: ${id}`);
+        }
+
+        panel.reveal(viewColumn);
+    }
+
+    /**
+     * Hide a WebView panel
+     */
+    async hideWebViewPanel(id: string): Promise<void> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            throw new Error(`WebView panel not found: ${id}`);
+        }
+
+        panel.reveal(vscode.ViewColumn.Beside);
+    }
+
+    /**
+     * Close a WebView panel
+     */
+    async closeWebViewPanel(id: string): Promise<void> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            throw new Error(`WebView panel not found: ${id}`);
+        }
+
+        panel.dispose();
+    }
+
+    /**
+     * List all active WebView panels
+     */
+    listWebViewPanels(): string[] {
+        return Array.from(this.panels.keys());
+    }
+
+    /**
+     * Send message to WebView
+     */
+    async postMessageToWebView(id: string, message: WebViewMessage): Promise<boolean> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            return false;
+        }
+
+        return panel.webview.postMessage(message);
+    }
+
+    /**
+     * Register message handler for WebView
+     */
+    registerWebViewMessageHandler(id: string, handler: (message: WebViewMessage) => void): void {
+        this.messageHandlers.set(id, handler);
+    }
+
+    /**
+     * Unregister message handler for WebView
+     */
+    unregisterWebViewMessageHandler(id: string): void {
+        this.messageHandlers.delete(id);
+    }
+
+    /**
+     * Get WebView state
+     */
+    async getWebViewState(id: string): Promise<WebViewState | undefined> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            return undefined;
+        }
+
+        return {
+            id,
+            activePanel: null,
+            panels: {},
+            lastMessageTime: Date.now(),
+            settings: {
+                theme: 'dark',
+                fontSize: 14,
+                wordWrap: true
             }
         };
     }
 
-    public getProblemViewProvider() {
-        return this.problemManager.getProblemViewProvider();
-    }
-
-    public async showSettingsPage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
+    /**
+     * Update WebView content
+     */
+    async updateWebViewContent(id: string, content: WebViewContent): Promise<void> {
+        const panel = this.panels.get(id);
+        if (!panel) {
+            throw new Error(`WebView panel not found: ${id}`);
         }
 
-        this.webviewManager.setContext(this.context);
-        const panel = this.webviewManager.createPanel({
-            viewType: 'oiCodeSettings',
-            title: 'OI-Code Settings',
-            htmlContent: await this.getSettingsHtmlContent(),
-            key: 'settings'
+        panel.webview.html = await this.generateWebViewContent(id, content);
+    }
+
+    /**
+     * Get WebView theme
+     */
+    async getWebViewTheme(): Promise<WebViewTheme> {
+        const colorTheme = vscode.window.activeColorTheme;
+        return {
+            type: colorTheme.kind === vscode.ColorThemeKind.Light ? 'light' : 'dark',
+            colors: {
+                background: this.getThemeColor(colorTheme.kind, 'background'),
+                foreground: this.getThemeColor(colorTheme.kind, 'foreground'),
+                primary: this.getThemeColor(colorTheme.kind, 'primary'),
+                secondary: this.getThemeColor(colorTheme.kind, 'secondary'),
+                accent: this.getThemeColor(colorTheme.kind, 'accent'),
+                border: this.getThemeColor(colorTheme.kind, 'border'),
+                error: this.getThemeColor(colorTheme.kind, 'error'),
+                warning: this.getThemeColor(colorTheme.kind, 'warning'),
+                success: this.getThemeColor(colorTheme.kind, 'success')
+            }
+        };
+    }
+
+    /**
+     * Generate WebView content with theme support
+     */
+    async generateWebViewContent(id: string, content: WebViewContent): Promise<string> {
+        const theme = await this.getWebViewTheme();
+        const cspSource = this.panels.get(id)?.webview.cspSource || '';
+
+        return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; style-src ${cspSource}; script-src ${cspSource};">
+    <title>${content.title || 'OI-Code WebView'}</title>
+    <style>
+        :root {
+            --background-color: ${theme.colors.background};
+            --foreground-color: ${theme.colors.foreground};
+            --primary-color: ${theme.colors.primary};
+            --secondary-color: ${theme.colors.secondary};
+            --accent-color: ${theme.colors.accent};
+            --border-color: ${theme.colors.border};
+            --error-color: ${theme.colors.error};
+            --warning-color: ${theme.colors.warning};
+            --success-color: ${theme.colors.success};
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--foreground-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .content {
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .status.success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .status.error {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .status.warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            opacity: 0.8;
+        }
+
+        .btn.secondary {
+            background-color: var(--secondary-color);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--background-color);
+            color: var(--foreground-color);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table th {
+            background-color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .diff-container {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            background-color: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .diff-added {
+            background-color: rgba(0, 255, 0, 0.1);
+        }
+
+        .diff-removed {
+            background-color: rgba(255, 0, 0, 0.1);
+        }
+
+        .diff-changed {
+            background-color: rgba(255, 255, 0, 0.1);
+        }
+
+        ${content.styles || ''}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${content.title || 'OI-Code WebView'}</h1>
+            <p>${content.subtitle || ''}</p>
+        </div>
+        
+        <div class="content">
+            ${content.html || ''}
+        </div>
+        
+        <div id="status-container"></div>
+        <div id="loading-container"></div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        // Communication with VS Code extension
+        function postMessage(type, data) {
+            vscode.postMessage({ type, data });
+        }
+
+        // Handle messages from VS Code extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            
+            switch (message.type) {
+                case 'updateContent':
+                    updateContent(message.data);
+                    break;
+                case 'showStatus':
+                    showStatus(message.data);
+                    break;
+                case 'showLoading':
+                    showLoading(message.data.show, message.data.message);
+                    break;
+                case 'showError':
+                    showError(message.data);
+                    break;
+                case 'showSuccess':
+                    showSuccess(message.data);
+                    break;
+                default:
+                    console.log('Unknown message type:', message.type);
+            }
         });
 
-        // 注册消息处理器
-        panel.webview.onDidReceiveMessage(async (message: Record<string, unknown>) => {
-            await this.handleWebviewMessage(message, panel);
-        });
-    }
-
-    public async showCompletionPage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        this.webviewManager.setContext(this.context);
-        const panel = this.webviewManager.createPanel({
-            viewType: 'oiCodeCompletion',
-            title: 'OI-Code Setup Complete',
-            htmlContent: await this.getCompletionHtmlContent(),
-            key: 'completion'
-        });
-
-        // 注册消息处理器
-        panel.webview.onDidReceiveMessage(async (message: Record<string, unknown>) => {
-            await this.handleWebviewMessage(message, panel);
-        });
-    }
-
-    public async showWelcomePage() {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        this.webviewManager.setContext(this.context);
-        const panel = this.webviewManager.createPanel({
-            viewType: 'oiCodeWelcome',
-            title: 'Welcome to OI-Code',
-            htmlContent: await this.getWelcomeHtmlContent(),
-            key: 'welcome'
-        });
-
-        // 注册消息处理器
-        panel.webview.onDidReceiveMessage(async (message: Record<string, unknown>) => {
-            await this.handleWebviewMessage(message, panel);
-        });
-    }
-
-    private async getSettingsHtmlContent(): Promise<string> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const htmlPath = vscode.Uri.joinPath(this.context.extensionUri, 'webview', 'settings.html');
-        const htmlContent = await vscode.workspace.fs.readFile(htmlPath);
-        return htmlContent.toString();
-    }
-
-    private async getCompletionHtmlContent(): Promise<string> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const htmlPath = vscode.Uri.joinPath(this.context.extensionUri, 'webview', 'completion.html');
-        const htmlContent = await vscode.workspace.fs.readFile(htmlPath);
-        return htmlContent.toString();
-    }
-
-    private async getWelcomeHtmlContent(): Promise<string> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        const htmlPath = vscode.Uri.joinPath(this.context.extensionUri, 'webview', 'init.html');
-        const htmlContent = await vscode.workspace.fs.readFile(htmlPath);
-        return htmlContent.toString();
-    }
-
-    private async handleWebviewMessage(message: Record<string, unknown>, panel: vscode.WebviewPanel): Promise<void> {
-        const command = message.command as string;
-
-        try {
-            switch (command) {
-                case 'get-theme': {
-                    const currentTheme = getTheme(vscode.window.activeColorTheme.kind);
-                    postWebviewMessage(panel, 'set-theme', { theme: currentTheme });
-                    break;
-                }
-
-                case 'getSettings': {
-                    const settingsData = await this.loadSettingsData();
-                    postWebviewMessage(panel, 'loadSettings', { data: settingsData });
-                    break;
-                }
-
-                case 'saveSetting': {
-                    const settingId = message.id as string;
-                    if (settingId) {
-                        await this.saveSetting(settingId, message.value);
-                    }
-                    break;
-                }
-
-                case 'executeApi': {
-                    const apiCommand = message.id as string;
-                    if (apiCommand) {
-                        await vscode.commands.executeCommand(apiCommand);
-                    }
-                    break;
-                }
-
-                case 'select-theme':
-                    await vscode.commands.executeCommand('workbench.action.selectTheme');
-                    break;
-
-                case 'select-folder': {
-                    const folderUri = await UnifiedUtils.showOpenDialog({
-                        canSelectFolders: true,
-                        canSelectMany: false,
-                        title: '选择工作区文件夹'
-                    });
-                    if (folderUri && folderUri[0]) {
-                        postWebviewMessage(panel, 'workspace-selected', {
-                            path: folderUri[0].fsPath
-                        });
-                    }
-                    break;
-                }
-
-                case 'configure-languages': {
-                    const languages = (message.languages as string[]) || [];
-                    if (languages.length > 0) {
-                        // 不再直接调用setup命令，而是等待用户在编译器检查步骤中确认
-                        setTimeout(() => {
-                            postWebviewMessage(panel, 'go-to-step', { step: 2 });
-                        }, 2000);
-                    }
-                    break;
-                }
-
-                case 'check-compilers': {
-                    const languages = (message.languages as string[]) || [];
-                    if (languages.length > 0 && this.context) {
-                        await this.checkCompilers(panel, languages);
-                    }
-                    break;
-                }
-
-                case 'install-compiler': {
-                    const type = message.type as string;
-                    const languages = (message.languages as string[]) || [];
-                    if (languages.length > 0) {
-                        await this.installCompiler(panel, type, languages);
-                    }
-                    break;
-                }
-
-                case 'skip-compiler-install':
-                    console.log('跳过编译器安装...');
-                    setTimeout(() => {
-                        panel.dispose();
-                        UnifiedUtils.showInfo('已跳过编译器安装，您可以在稍后通过命令面板重新配置');
-                    }, 1000);
-                    break;
-
-                case 'initialize': {
-                    console.log('初始化环境...');
-                    const settings = message.settings as {
-                        languages?: string[];
-                        compilers?: Record<string, number>;
-                        workspace?: string;
-                        theme?: string;
-                    };
-
-                    // 保存初始化设置
-                    await this.saveInitializationSettings(settings);
-
-                    // 标记初始化完成
-                    if (this.context) {
-                        await ExtensionSettings.initialize(this.context);
-                        await ExtensionSettings.markInitialized();
-
-                        // 保存编译器和工作区设置到扩展设置
-                        if (settings.compilers) {
-                            if (settings.compilers.c) {
-                                await ExtensionSettings.setCompiler('c', String(settings.compilers.c));
-                            }
-                            if (settings.compilers.cpp) {
-                                await ExtensionSettings.setCompiler('cpp', String(settings.compilers.cpp));
-                            }
-                        }
-
-                        if (settings.workspace) {
-                            await ExtensionSettings.setWorkspace(settings.workspace);
-                        }
-
-                        // 保存语言偏好
-                        if (settings.languages) {
-                            await ExtensionSettings.updatePreferences({
-                                defaultLanguage: settings.languages.includes('cpp') ? 'cpp' : 'c'
-                            });
-                        }
-                    }
-
-                    setTimeout(() => {
-                        panel.dispose();
-                        UnifiedUtils.showInfo('环境初始化完成！');
-                    }, 2000);
-                    break;
-                }
-
-                case 'close':
-                    panel.dispose();
-                    break;
-
-                case 'continue-config':
-                    panel.dispose();
-                    await vscode.commands.executeCommand('oi-code.showSettingsPage');
-                    break;
+        function updateContent(data) {
+            if (data.html) {
+                document.querySelector('.content').innerHTML = data.html;
             }
-        } catch (error) {
-            UnifiedUtils.showError(
-                `WebView message handling failed: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
-    }
-
-    private async saveInitializationSettings(settings: {
-        languages?: string[];
-        compilers?: Record<string, number>;
-        workspace?: string;
-        theme?: string;
-    }): Promise<void> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
-        }
-
-        try {
-            const config = vscode.workspace.getConfiguration();
-
-            // 保存编译器设置 - 映射到实际的配置项
-            if (settings.compilers && typeof settings.compilers === 'object') {
-                if (settings.compilers.c !== undefined) {
-                    await config.update(
-                        'oicode.language.c.command',
-                        settings.compilers.c,
-                        vscode.ConfigurationTarget.Global
-                    );
-                }
-                if (settings.compilers.cpp !== undefined) {
-                    await config.update(
-                        'oicode.language.cpp.command',
-                        settings.compilers.cpp,
-                        vscode.ConfigurationTarget.Global
-                    );
-                }
+            if (data.title) {
+                document.querySelector('.header h1').textContent = data.title;
             }
-
-            // 保存工作区设置 - 暂时跳过，因为没有对应的配置项
-            if (settings.workspace && settings.workspace !== '尚未选择工作区') {
-                console.log('工作区设置:', settings.workspace);
-                // 注意：这里没有对应的配置项，暂时跳过
-            }
-
-            // 保存主题设置 - 暂时跳过，因为没有对应的配置项
-            if (settings.theme) {
-                console.log('主题设置:', settings.theme);
-                // 注意：这里没有对应的配置项，暂时跳过
-            }
-
-            // 语言设置暂时跳过，因为没有对应的配置项
-            if (settings.languages && Array.isArray(settings.languages)) {
-                console.log('语言设置:', settings.languages);
-                // 注意：这里没有对应的配置项，暂时跳过
-            }
-
-            console.log('初始化设置已保存到 settings.json:', settings);
-            UnifiedUtils.showInfo('环境初始化完成！设置已保存。');
-        } catch (error) {
-            console.error('保存初始化设置失败:', error);
-            UnifiedUtils.showError(`保存初始化设置失败: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
-    private async loadSettingsData(): Promise<Record<string, unknown[]>> {
-        if (!this.context) {
-            throw new Error('Context not initialized');
         }
 
-        try {
-            const schemaPath = vscode.Uri.joinPath(this.context.extensionUri, 'webview', 'settings-schema.json');
-            const schemaContent = await vscode.workspace.fs.readFile(schemaPath);
-            const schema = JSON.parse(schemaContent.toString());
-
-            const settingsData: Record<string, unknown[]> = {};
-            const config = vscode.workspace.getConfiguration();
-
-            for (const category of Object.keys(schema)) {
-                const settings = await Promise.all(
-                    schema[category].map(async (setting: Record<string, unknown>) => {
-                        let value = setting.value; // 默认值
-
-                        if (setting.vscode_setting_id) {
-                            const configValue = config.get(setting.vscode_setting_id as string);
-
-                            // 如果配置项在 VS Code settings.json 中存在，使用实际值
-                            // 如果不存在，使用默认值（schema 中的 value）
-                            if (configValue !== undefined) {
-                                value = configValue;
-                            }
-
-                            // 对于不存在的配置项，如果还没有在 VS Code 中设置，则初始化
-                            if (configValue === undefined && setting.vscode_setting_id) {
-                                // 检查是否是 VS Code 的内置设置（如 editor.formatOnSave）
-                                if (setting.vscode_setting_id.toString().startsWith('editor.')) {
-                                    // VS Code 内置设置，不需要初始化，使用默认值
-                                    value = setting.value;
-                                } else {
-                                    // 扩展的私有设置，初始化到 VS Code 配置中
-                                    try {
-                                        await this.configManager.set(setting.vscode_setting_id as string, value);
-                                        console.log(`初始化设置项: ${setting.vscode_setting_id} = ${value}`);
-                                    } catch (initError) {
-                                        console.warn(`初始化设置项失败 ${setting.vscode_setting_id}:`, initError);
-                                        // 初始化失败时使用默认值
-                                        value = setting.value;
-                                    }
-                                }
-                            }
-                        }
-
-                        return {
-                            name: setting.name,
-                            description: setting.description,
-                            value,
-                            vscodeSettingId: setting.vscode_setting_id,
-                            vscodeApi: setting.vscode_api,
-                            type: this.getSettingType(setting, value),
-                            options: setting.options || []
-                        };
-                    })
-                );
-
-                settingsData[category] = settings;
-            }
-
-            return settingsData;
-        } catch (error) {
-            console.error('加载设置数据失败:', error);
-            return {
-                'IDE 配置': [
-                    {
-                        name: '加载失败',
-                        description: '无法加载设置数据',
-                        value: '',
-                        vscodeSettingId: '',
-                        type: 'text'
-                    }
-                ]
-            };
-        }
-    }
-
-    private async saveSetting(settingId: string, value: unknown): Promise<void> {
-        try {
-            console.log(`保存设置: ${settingId} = ${value}`);
-            await this.configManager.set(settingId, value);
-            UnifiedUtils.showInfo('设置已保存');
-        } catch (error) {
-            console.error(`保存设置失败 ${settingId}:`, error);
-            UnifiedUtils.showError(`保存设置失败: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
-    private getSettingType(setting: Record<string, unknown>, _value: unknown): string {
-        if (setting.type === 'search' || setting.type === 'fill') {
-            return 'text';
-        }
-        if (setting.type === 'api') {
-            return 'button';
-        }
-        if (setting.type === 'select') {
-            return 'select';
-        }
-        if (setting.type === 'number') {
-            return 'number';
-        }
-        if (
-            setting.type === 'fill' &&
-            setting.vscode_setting_id &&
-            (setting.vscode_setting_id as string).includes('args')
-        ) {
-            return 'text'; // 数组类型在界面上显示为文本
-        }
-        if (
-            setting.type === '' &&
-            setting.vscode_setting_id &&
-            (setting.vscode_setting_id as string).includes('formatOnSave')
-        ) {
-            return 'boolean';
-        }
-        return (setting.type as string) || 'text';
-    }
-
-    private async checkCompilers(panel: vscode.WebviewPanel, languages: string[]): Promise<void> {
-        if (!this.context) return;
-
-        try {
-            // 报告扫描开始
-            this.reportScanProgress(panel, 0, '开始扫描编译器...');
-
-            // 模拟扫描进度
-            await this.simulateScanProgress(panel);
-
-            // 执行真实的编译器检测
-            this.reportScanProgress(panel, 50, '正在检测系统编译器...');
-
-            const detectionResult = await NativeCompilerManager.detectCompilers(this.context, true);
-
-            this.reportScanProgress(panel, 80, '正在分析编译器信息...');
-
-            // 根据用户选择的语言过滤编译器
-            const filteredCompilers = this.filterCompilersByLanguage(detectionResult.compilers, languages);
-
-            const result = {
-                success: detectionResult.success,
-                compilers: filteredCompilers.map(compiler => ({
-                    name: compiler.name,
-                    version: compiler.version,
-                    path: compiler.path
-                })),
-                suggestions: detectionResult.suggestions
-            };
-
-            this.reportScanProgress(panel, 95, '正在完成扫描...');
-
-            // 延迟一点让用户看到完成状态
+        function showStatus(data) {
+            const container = document.getElementById('status-container');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = \`status \${data.type}\`;
+            statusDiv.textContent = data.message;
+            container.appendChild(statusDiv);
+            
+            // Auto-remove after 5 seconds
             setTimeout(() => {
-                postWebviewMessage(panel, 'compiler-check-result', { result });
-            }, 500);
-        } catch (error) {
-            console.error('编译器检查失败:', error);
-            postWebviewMessage(panel, 'compiler-check-result', {
-                result: {
-                    success: false,
-                    compilers: [],
-                    suggestions: []
-                }
-            });
+                statusDiv.remove();
+            }, 5000);
         }
-    }
 
-    private async simulateScanProgress(panel: vscode.WebviewPanel): Promise<void> {
-        return new Promise(resolve => {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 10;
-                if (progress <= 40) {
-                    postWebviewMessage(panel, 'scan-progress', {
-                        progress,
-                        message: this.getScanMessage(progress)
-                    });
-                } else {
-                    clearInterval(interval);
-                    resolve();
-                }
-            }, 200);
-        });
-    }
-
-    private getScanMessage(progress: number): string {
-        if (progress < 20) return '正在初始化扫描...';
-        if (progress < 40) return '正在搜索编译器路径...';
-        return '正在分析编译器...';
-    }
-
-    private reportScanProgress(panel: vscode.WebviewPanel, progress: number, message: string): void {
-        postWebviewMessage(panel, 'scan-progress', { progress, message });
-    }
-
-    private async installCompiler(panel: vscode.WebviewPanel, type: string, _languages: string[]): Promise<void> {
-        try {
-            if (type === 'llvm') {
-                // 初始化LLVM安装器
-                if (this.context) {
-                    LLVMInstaller.initialize(this.context);
-                }
-
-                // 使用新的LLVM安装器
-                const success = await vscode.window.withProgress(
-                    {
-                        location: vscode.ProgressLocation.Notification,
-                        title: '安装LLVM编译器',
-                        cancellable: true
-                    },
-                    async (progress, token) => {
-                        token.onCancellationRequested(() => {
-                            console.log('用户取消了LLVM安装');
-                        });
-
-                        return await LLVMInstaller.installLLVM(progress);
-                    }
-                );
-
-                if (success) {
-                    postWebviewMessage(panel, 'compiler-install-complete', {
-                        message: 'LLVM安装成功！请重新扫描编译器。'
-                    });
-                } else {
-                    postWebviewMessage(panel, 'compiler-install-error', {
-                        message: 'LLVM安装失败，请检查网络连接或手动安装。'
-                    });
-                }
+        function showLoading(show, message = 'Loading...') {
+            const container = document.getElementById('loading-container');
+            if (show) {
+                container.innerHTML = \`
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>\${message}</p>
+                    </div>
+                \`;
             } else {
-                postWebviewMessage(panel, 'compiler-install-error', {
-                    message: `不支持的编译器类型: ${type}`
-                });
+                container.innerHTML = '';
             }
+        }
+
+        function showError(message) {
+            showStatus({ type: 'error', message });
+        }
+
+        function showSuccess(message) {
+            showStatus({ type: 'success', message });
+        }
+
+        // Form handling
+        function submitForm(formId, data) {
+            postMessage('formSubmit', { formId, data });
+        }
+
+        // Button actions
+        function buttonClick(action, data) {
+            postMessage('buttonClick', { action, data });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            postMessage('ready', {});
+        });
+
+        ${content.scripts || ''}
+    </script>
+</body>
+</html>
+    `;
+    }
+
+    /**
+     * Handle WebView messages
+     */
+    private async handleWebViewMessage(panelId: string, message: WebViewMessage): Promise<void> {
+        // Create a generic extension event for WebView messages
+        const extensionEvent: any = {
+            type: 'webview-message' as any,
+            source: 'webview-manager',
+            timestamp: Date.now(),
+            data: {
+                viewType: panelId,
+                message
+            }
+        };
+        await this.eventSystem.emit(extensionEvent);
+
+        // Call registered handler
+        const handler = this.messageHandlers.get(panelId);
+        if (handler) {
+            handler(message);
+        }
+
+        // Handle common message types
+        switch (message.type) {
+            case 'ready':
+                await this.handleWebViewReady(panelId);
+                break;
+            case 'formSubmit':
+                await this.handleFormSubmit(panelId, message.data);
+                break;
+            case 'buttonClick':
+                await this.handleButtonClick(panelId, message.data);
+                break;
+            case 'request':
+                await this.handleWebViewRequest(panelId, message.data);
+                break;
+            default:
+                // Unknown message type, log for debugging
+                if (this.config.enableDebug) {
+                    console.log(`Unknown WebView message type: ${message.type}`);
+                }
+        }
+    }
+
+    /**
+     * Handle WebView ready event
+     */
+    private async handleWebViewReady(panelId: string): Promise<void> {
+        const theme = await this.getWebViewTheme();
+        await this.postMessageToWebView(panelId, {
+            type: 'theme',
+            action: 'update',
+            data: theme
+        });
+    }
+
+    /**
+     * Handle form submission
+     */
+    private async handleFormSubmit(panelId: string, data: any): Promise<void> {
+        // This is a placeholder for form handling
+        // In a real implementation, this would:
+        // 1. Validate form data
+        // 2. Call appropriate API methods
+        // 3. Send response back to WebView
+        console.log('Form submitted:', data);
+    }
+
+    /**
+     * Handle button click
+     */
+    private async handleButtonClick(panelId: string, data: any): Promise<void> {
+        // This is a placeholder for button handling
+        // In a real implementation, this would:
+        // 1. Determine action from button ID
+        // 2. Call appropriate API methods
+        // 3. Update WebView state
+        console.log('Button clicked:', data);
+    }
+
+    /**
+     * Handle WebView request
+     */
+    private async handleWebViewRequest(panelId: string, data: WebViewRequest): Promise<void> {
+        try {
+            const response = await this.processWebViewRequest(data);
+            await this.postMessageToWebView(panelId, {
+                type: 'response',
+                action: 'notify',
+                data: response
+            });
         } catch (error) {
-            console.error('编译器安装失败:', error);
-            postWebviewMessage(panel, 'compiler-install-error', {
-                message: `安装失败: ${error instanceof Error ? error.message : String(error)}`
+            await this.postMessageToWebView(panelId, {
+                type: 'error',
+                action: 'notify',
+                data: {
+                    requestId: data.requestId,
+                    error: error instanceof Error ? error.message : String(error)
+                }
             });
         }
     }
 
-    private filterCompilersByLanguage(compilers: CompilerInfo[], languages: string[]): CompilerInfo[] {
-        return compilers.filter(compiler => {
-            const compilerName = compiler.name.toLowerCase();
-
-            if (languages.includes('c') && languages.includes('cpp')) {
-                // 如果选择了C和C++，显示所有编译器
-                return true;
-            } else if (languages.includes('c')) {
-                // 只选择C编译器
-                return (
-                    (compilerName.includes('gcc') && !compilerName.includes('g++')) ||
-                    (compilerName.includes('clang') && !compilerName.includes('clang++')) ||
-                    (compilerName.includes('cc') && !compilerName.includes('g++'))
-                );
-            } else if (languages.includes('cpp')) {
-                // 只选择C++编译器
-                return (
-                    compilerName.includes('g++') || compilerName.includes('clang++') || compilerName.includes('cl.exe')
-                );
+    /**
+     * Process WebView request
+     */
+    private async processWebViewRequest(request: WebViewRequest): Promise<WebViewResponse> {
+        switch (request.action) {
+            case 'getProblem': {
+                const problem = await this.problemManager.getProblem(request.data.problemId);
+                return {
+                    requestId: request.requestId,
+                    success: true,
+                    data: problem,
+                    timestamp: Date.now()
+                };
             }
 
-            return false;
+            case 'listProblems': {
+                const problems = await this.problemManager.listProblems(request.data.options);
+                return {
+                    requestId: request.requestId,
+                    success: true,
+                    data: problems,
+                    timestamp: Date.now()
+                };
+            }
+
+            case 'detectCompilers': {
+                const compilers = await this.compilerManager.detectCompilers();
+                return {
+                    requestId: request.requestId,
+                    success: true,
+                    data: compilers,
+                    timestamp: Date.now()
+                };
+            }
+
+            case 'executeTest': {
+                const testResult = await this.testRunner.executeTest(request.data.options);
+                return {
+                    requestId: request.requestId,
+                    success: true,
+                    data: testResult,
+                    timestamp: Date.now()
+                };
+            }
+
+            case 'executePairCheck': {
+                const pairCheckResult = await this.pairCheckManager.executePairCheck(request.data.options);
+                return {
+                    requestId: request.requestId,
+                    success: true,
+                    data: pairCheckResult,
+                    timestamp: Date.now()
+                };
+            }
+
+            default:
+                throw new Error(`Unknown request action: ${request.action}`);
+        }
+    }
+
+    /**
+     * Get theme color
+     */
+    private getThemeColor(theme: vscode.ColorThemeKind, colorType: string): string {
+        // This is a placeholder for theme color extraction
+        // In a real implementation, this would:
+        // 1. Extract colors from VS Code theme
+        // 2. Return appropriate color values
+        switch (colorType) {
+            case 'background':
+                return theme === vscode.ColorThemeKind.Light ? '#ffffff' : '#1e1e1e';
+            case 'foreground':
+                return theme === vscode.ColorThemeKind.Light ? '#333333' : '#cccccc';
+            case 'primary':
+                return '#007acc';
+            case 'secondary':
+                return '#6c757d';
+            case 'accent':
+                return '#28a745';
+            case 'border':
+                return theme === vscode.ColorThemeKind.Light ? '#e0e0e0' : '#333333';
+            case 'error':
+                return '#dc3545';
+            case 'warning':
+                return '#ffc107';
+            case 'success':
+                return '#28a745';
+            default:
+                return '#000000';
+        }
+    }
+
+    /**
+     * Get WebView content
+     */
+    private getWebViewContent(type: string): string {
+        // Basic implementation - would need to be enhanced with actual HTML content
+        return `<html><body><h1>${type} View</h1></body></html>`;
+    }
+
+    /**
+     * Setup WebView message handlers
+     */
+    private setupWebViewMessageHandlers(webview: vscode.Webview, type: string): void {
+        // Setup message handlers for the webview
+        webview.onDidReceiveMessage(message => {
+            this.handleMessage(type, message);
         });
+    }
+
+    /**
+     * Register WebView provider
+     */
+    registerProvider(): vscode.Disposable {
+        // Implementation would register the provider
+        const disposable = {
+            dispose: () => {
+                // Clean up provider registration
+            }
+        };
+        this.disposables.push(disposable);
+        return disposable;
+    }
+
+    /**
+     * Show WebView by type
+     */
+    showWebView(type: string): void {
+        this.showWebViewPanel(type);
+    }
+
+    /**
+     * Hide WebView by type
+     */
+    hideWebView(type: string): void {
+        this.hideWebViewPanel(type);
+    }
+
+    /**
+     * Get WebView by type
+     */
+    getWebView<T extends WebViewAPI>(type: string): T | undefined {
+        const panel = this.panels.get(type);
+        if (panel) {
+            // Return a wrapper that implements WebViewAPI
+            return {
+                postMessage: (message: WebViewMessage) => {
+                    panel.webview.postMessage(message);
+                },
+                onMessage: (callback: (message: WebViewMessage) => void) => {
+                    const disposable = panel.webview.onDidReceiveMessage(callback);
+                    this.disposables.push(disposable);
+                    return disposable;
+                },
+                updateContent: (content: string) => {
+                    panel.webview.html = content;
+                },
+                show: () => {
+                    panel.reveal();
+                },
+                hide: () => {
+                    // WebviewPanel doesn't have hide method, but we can implement similar behavior
+                    panel.reveal(vscode.ViewColumn.Beside);
+                },
+                focus: () => {
+                    panel.reveal(vscode.ViewColumn.Active);
+                },
+                refresh: () => {
+                    // Implementation would refresh the content
+                },
+                getPanel: () => panel,
+                isVisible: () => panel.visible
+            } as T;
+        }
+        return undefined;
+    }
+
+    /**
+     * Send message to WebView
+     */
+    postMessage(type: string, message: WebViewMessage): void {
+        this.postMessageToWebView(type, message);
+    }
+
+    /**
+     * Broadcast message to all WebViews
+     */
+    broadcast(message: WebViewMessage): void {
+        for (const [, panel] of this.panels) {
+            panel.webview.postMessage(message);
+        }
+    }
+
+    /**
+     * Handle WebView message
+     */
+    async handleMessage(type: string, message: WebViewMessage): Promise<void> {
+        await this.handleWebViewMessage(type, message);
+    }
+
+    /**
+     * Get problem view provider
+     */
+    getProblemViewProvider(): vscode.WebviewViewProvider {
+        return {
+            resolveWebviewView: (webviewView: vscode.WebviewView) => {
+                webviewView.webview.html = this.getWebViewContent('problem');
+                this.setupWebViewMessageHandlers(webviewView.webview, 'problem');
+            }
+        };
+    }
+
+    /**
+     * Get pair check view provider
+     */
+    getPairCheckViewProvider(): vscode.WebviewViewProvider {
+        return {
+            resolveWebviewView: (webviewView: vscode.WebviewView) => {
+                webviewView.webview.html = this.getWebViewContent('paircheck');
+                this.setupWebViewMessageHandlers(webviewView.webview, 'paircheck');
+            }
+        };
+    }
+
+    /**
+     * Show settings page
+     */
+    showSettingsPage(): void {
+        this.showWebViewPanel('settings');
+    }
+
+    /**
+     * Show completion page
+     */
+    showCompletionPage(): void {
+        this.showWebViewPanel('completion');
+    }
+
+    /**
+     * Show welcome page
+     */
+    showWelcomePage(): void {
+        this.showWebViewPanel('welcome');
+    }
+
+    /**
+     * Dispose of resources
+     */
+    dispose(): void {
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
+        this.panels.forEach(panel => panel.dispose());
+        this.panels.clear();
+        this.messageHandlers.clear();
     }
 }
+
+// Re-export for backward compatibility
+export { WebViewManagerImpl as WebViewManager };

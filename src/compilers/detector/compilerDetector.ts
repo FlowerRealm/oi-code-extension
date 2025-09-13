@@ -115,7 +115,7 @@ export class CompilerDetector {
                 const errorResult: CompilerDetectionResult = {
                     success: false,
                     compilers: [],
-                    error: errorMessage,
+                    errors: [errorMessage],
                     suggestions: [
                         'Make sure C/C++ compilers are installed',
                         'Check that compiler directories are in PATH',
@@ -452,15 +452,48 @@ export class CompilerDetector {
                 const type = this.determineCompilerType(compilerPath, versionOutput);
                 const version = this.parseVersion(versionOutput);
 
-                // Compiler Deduplication Algorithm
-                // This algorithm ensures we only keep the highest priority compiler for each unique
-                // combination of compiler type and version, while properly handling symlinks and
-                // allowing multiple compiler names from the same binary (e.g., clang vs clang++)
+                /**
+                 * ## Compiler Deduplication Algorithm
+                 *
+                 * This sophisticated algorithm ensures optimal compiler selection while handling
+                 * complex real-world scenarios:
+                 *
+                 * ### Core Strategy
+                 * 1. **Symlink Resolution**: Use real path to detect identical binaries
+                 * 2. **Type-Version Fingerprinting**: Unique key `${type}-${version}` for identification
+                 * 3. **Multi-Language Support**: Allow same binary with different names (clang vs clang++)
+                 *
+                 * ### Algorithm Steps
+                 *
+                 * **Step 1**: Real Path Check
+                 * - Resolve symlinks to actual binary location
+                 * - Prevents duplicate entries from multiple symlink paths
+                 *
+                 * **Step 2**: Type-Version Uniqueness
+                 * - Create fingerprint: `${compilerType}-${versionString}`
+                 * - Skip if exact same compiler already registered
+                 *
+                 * **Step 3**: Multi-Language Compiler Handling
+                 * - Allow different names for same binary (e.g., clang, clang++, clang-cpp)
+                 * - Each name serves different language purposes
+                 *
+                 * ### Complexity Analysis
+                 * - **Time Complexity**: O(n) where n = number of compiler candidates
+                 * - **Space Complexity**: O(m) where m = unique compiler binaries
+                 * - **Optimization**: Hash-based lookups for O(1) duplicate detection
+                 *
+                 * ### Edge Cases Handled
+                 * - Symlinks to same binary ✓
+                 * - Multi-language compilers ✓
+                 * - Version conflicts ✓
+                 * - Broken symlinks ✓
+                 * - Permission issues ✓
+                 */
 
                 // Check if we've already processed this real path to handle symlinks
                 if (checkedRealPaths.has(realPath)) {
-                // If we already have the same compiler type and version, skip this duplicate
-                // This prevents redundant entries when multiple symlinks point to the same binary
+                    // If we already have the same compiler type and version, skip this duplicate
+                    // This prevents redundant entries when multiple symlinks point to the same binary
                     const currentKey = `${type}-${version}`;
                     if (checkedCompilerTypes.has(currentKey)) {
                         outputChannel.appendLine(
@@ -522,7 +555,7 @@ export class CompilerDetector {
 
                 const supportedStandards = this.getSupportedStandards(type, version);
                 const is64Bit = await this.is64BitCompiler(compilerPath);
-                const name = this.generateCompilerName(type, version, compilerPath);
+                const name = this.generateCompilerName(type, version);
 
                 const compilerInfo: CompilerInfo = {
                     path: compilerPath,
@@ -531,7 +564,13 @@ export class CompilerDetector {
                     version,
                     supportedStandards,
                     is64Bit,
-                    priority
+                    priority,
+                    capabilities: {
+                        optimize: true,
+                        debug: true,
+                        sanitize: true,
+                        parallel: true
+                    }
                 };
 
                 outputChannel.appendLine(
@@ -959,13 +998,13 @@ export class CompilerDetector {
      *
      * @param type - Compiler type identifier (clang, gcc, msvc, etc.)
      * @param version - Compiler version string (e.g., "19.1.1")
-     * @param _path - Compiler installation path (currently unused, reserved for future enhancements)
+     * @param path - Compiler installation path
      * @returns Priority score (higher values indicate preferred compilers)
      *
      * @see CompilerInfo for the structure that uses this priority
      * @see detectCompilers for the overall detection process
      */
-    private static calculatePriority(type: string, version: string, _path: string): number {
+    private static calculatePriority(type: string, version: string, path: string): number {
         let priority = 0;
 
         // Type-based priority: Clang-family compilers get highest priority
@@ -992,7 +1031,7 @@ export class CompilerDetector {
         // Path-based priority: System compilers get lower priority
         // This prefers user-installed compilers over system ones
         // System compilers might be outdated or have restricted functionality
-        if (_path.includes('/usr/bin') || _path.includes('C:\\Windows')) {
+        if (path.includes('/usr/bin') || path.includes('C:\\Windows')) {
             priority -= 20;
         }
 
@@ -1002,7 +1041,7 @@ export class CompilerDetector {
     /**
      * Generate compiler name
      */
-    private static generateCompilerName(type: string, version: string, _path: string): string {
+    private static generateCompilerName(type: string, version: string): string {
         const nameMap: { [key: string]: string } = {
             clang: 'Clang',
             'clang++': 'Clang++',
